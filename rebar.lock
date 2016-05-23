@@ -1,0 +1,6 @@
+[{<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.7">>},1},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.0.2">>},0},
+ {<<"z_stdlib">>,
+  {git,"git://github.com/zotonic/z_stdlib.git",
+       {ref,"1f3b41ecb97fa44ff3f389a0e0a41721dcd01e0a"}},
+  0}].
