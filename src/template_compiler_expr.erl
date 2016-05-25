@@ -102,14 +102,14 @@ compile({apply_filter, Expr, {filter, {identifier, _, FilterName}, FilterArgs}},
 find_value_lookup([{identifier, _SrcPos, <<"now">>}], _CState, Ws) ->
     Ast = ?Q("erlang:universaltime()"),
     {Ws, Ast};
-find_value_lookup([{identifier, _SrcPos, Var}], #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
+find_value_lookup([{identifier, _SrcPos, Var} = Idn], #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
     VarName = template_compiler_utils:to_atom(Var),
     Ast = ?Q("'@Runtime@':find_value(_@VarName@, _@vars, _@vars, _@context)",
             [
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {vars, erl_syntax:variable(Vars)}
             ]),
-    {Ws, Ast};
+    {maybe_forloop_var(Ws, Idn), Ast};
 find_value_lookup(ValueLookup, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
     {Ws1, ValueLookupAsts} = value_lookup_asts(ValueLookup, CState, Ws, []),
     ListAst = erl_syntax:list(ValueLookupAsts),
@@ -118,8 +118,12 @@ find_value_lookup(ValueLookup, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws)
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {vars, erl_syntax:variable(Vars)}
             ]),
-    {Ws1, Ast}.
+    {maybe_forloop_var(Ws1, hd(ValueLookup)), Ast}.
 
+maybe_forloop_var(Ws, {identifier, _, <<"forloop">>}) ->
+    Ws#ws{is_forloop_var=true};
+maybe_forloop_var(Ws, _) ->
+    Ws.
 
 value_lookup_asts([], _CState, Ws, Acc) ->
     {Ws, lists:reverse(Acc)};

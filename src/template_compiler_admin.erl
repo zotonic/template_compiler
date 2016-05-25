@@ -23,7 +23,8 @@
 
 -export([
     lookup/3,
-    changed/1
+    flush_file/1,
+    flush_context_name/1
     ]).
 
 -export([
@@ -39,41 +40,61 @@
 
 -include("template_compiler.hrl").
 
--record(state, {
-        compiled :: ets:tab(),
-        compiling = [] :: list({binary(), pid()}),
-        waiting = [] :: list({binary(), any()})
+-type gen_server_from() :: {pid(),term()}.
+
+-record(tpl, {
+        key :: template_compiler:template_key(),
+        module :: atom()
     }).
 
+-record(state, {
+        compiled :: ets:tab(),
+        compiling = [] :: list({reference(), template_compiler:template_key(), gen_server_from()}),
+        waiting = [] :: list({template_compiler:template_key(), gen_server_from()}),
+        filename_keys = [] :: list({filename:filename(), template_compiler:template_key()})
+    }).
 
 
 %%% ---------------------- API ----------------------
 
 
 %% @doc Find a template, start a compilation if not found
--spec lookup(binary(), template_compiler:options(), any()) -> {ok, atom()} | {error, term()}.
+-spec lookup(binary()|{overrides, binary(), filename:filename()}, template_compiler:options(), any()) -> {ok, atom()} | {error, term()}.
 lookup(Template, Options, Context) ->
-    case ets:lookup(?MODULE, Template) of
-        [#tpl{module=Mod}] ->
-            {ok, Mod};
+    Runtime = template_compiler:get_option(runtime, Options),
+    ContextName = Runtime:context_name(Context),
+    TplKey = {ContextName, Runtime, Template},
+    case ets:lookup(?MODULE, TplKey) of
+        [#tpl{module=Module}] ->
+            {ok, Module};
         [] ->
-            case gen_server:call(?MODULE, {compile, Template, Options, Context}) of
-                {ok, {compile, Key}} ->
-                    % Unknown, compile the template
-                    Result = template_compiler:compile_file(Template, Options, Context),
-                    gen_server:call(?MODULE, {compile_ready, Result, Key});
-                {ok, compiling} ->
-                    gen_server:call(?MODULE, {wait, Template, Options, Context});
-                {ok, Module} ->
-                    {ok, Module}
+            case Runtime:find_template(Template, ContextName, Context) of
+                {ok, Filename} when is_binary(Filename) ->
+                    case gen_server:call(?MODULE, {compile_request, TplKey, Filename}, infinity) of
+                        {ok, {compile, TplKey}} ->
+                            % Unknown, compile the template
+                            Result = template_compiler:compile_file(Filename, Options, Context),
+                            ok = gen_server:cast(?MODULE, {compile_done, Result, TplKey}),
+                            Result;
+                        {ok, Module} when is_atom(Module) ->
+                            {ok, Module};
+                        {error, _} = Error ->
+                            Error
+                    end;
+                {error, _} = Error ->
+                    Error
             end
     end.
 
 %% @doc Ping that a template has been changed
--spec changed(binary()) -> ok.
-changed(Template) ->
-    gen_server:cast(?MODULE, {changed, Template}). 
+-spec flush_file(filename:filename()) -> ok.
+flush_file(Filename) ->
+    gen_server:cast(?MODULE, {flush_file, Filename}).
 
+%% @doc Ping that a template has been changed
+-spec flush_context_name(ContextName::term()) -> ok.
+flush_context_name(ContextName) ->
+    gen_server:cast(?MODULE, {flush_context, ContextName}).
 
 -spec start_link() -> {ok, pid()} | {error, any()}.
 start_link() ->
@@ -83,19 +104,100 @@ start_link() ->
 %%% ---------------------- Callbacks ----------------------
 
 init([]) ->
-    Compiled = ets:new(?MODULE, [set, {keypos, #tpl.template}, named_table, protected]),
-    #state{
+    Compiled = ets:new(?MODULE, [set, {keypos, #tpl.key}, named_table, protected]),
+    {ok, #state{
         compiled = Compiled,
         compiling = [],
-        waiting = []
-    }.
+        waiting = [],
+        filename_keys = []
+    }}.
 
+handle_call({compile_request, TplKey, Filename}, From, State) ->
+    case is_compiling(TplKey, State) of
+        true ->
+            {noreply, wait_for_compile(TplKey, From, State)};
+        false ->
+            FTpl = {Filename, TplKey},
+            State1 = case lists:member(FTpl, State#state.filename_keys) of
+                        false -> 
+                            State#state{
+                                filename_keys=[ FTpl | State#state.filename_keys ]
+                            };
+                        true ->
+                            State
+                    end,
+            {noreply, start_compile(TplKey, From, State1)}
+    end;
 handle_call(Msg, _From, State) ->
     {stop, {unknown_call, Msg}, State}.
 
+handle_cast({compile_done, Result, TplKey}, State) ->
+    State1 = case lists:keytake(TplKey, 2, State#state.compiling) of
+                {value, {MRef, _TplKey, _From}, Compiling1} ->
+                    erlang:demonitor(MRef),
+                    State#state{compiling=Compiling1};
+                false ->
+                    State
+             end,
+    case Result of
+        {ok, Module} ->
+            ets:insert(?MODULE, #tpl{key=TplKey, module=Module});
+        {error, _} ->
+            ok
+    end,
+    {Waiters, State2} = split_waiters(TplKey, State1),
+    lists:foreach(
+            fun(Waiter) ->
+                gen_server:reply(Waiter, Result)
+            end,
+            Waiters),
+    {noreply, State2};
+handle_cast({flush_file, Filename}, State) ->
+    {ChangedKeys, FnKeys} = lists:partition(
+                                fun ({F,_}) ->
+                                    F =:= Filename
+                                end,
+                                State#state.filename_keys),
+    lists:foreach(
+            fun({_,TplKey}) ->
+                ets:delete(?MODULE, TplKey)
+            end,
+            ChangedKeys),
+    {noreply, State#state{filename_keys=FnKeys}};
+handle_cast({flush_context_name, ContextName}, State) ->
+    Matched = ets:foldl(
+                    fun
+                        (#tpl{key={Ctx, _, _}} = Tpl, Acc) when Ctx =:= ContextName ->
+                            [Tpl|Acc];
+                        (_, Acc) ->
+                            Acc
+                    end,
+                    [],
+                    ?MODULE),
+    % TODO: add module to list of modules that might be purged
+    lists:foreach(
+            fun(#tpl{key=Key}) ->
+                ets:delete(?MODULE, Key)
+            end,
+            Matched),
+    FilenameKeys = lists:filter(
+                        fun({_Fn, K}) -> 
+                            K =/= ContextName
+                        end,
+                        State#state.filename_keys),
+    {noreply, State#state{filename_keys=FilenameKeys}};
 handle_cast(Msg, State) ->
     {stop, {unknown_cast, Msg}, State}.
 
+handle_info({'DOWN', MRef, process, _Pid, Reason}, State) ->
+    case lists:keytake(MRef, 1, State#state.compiling) of
+        {value, {_MRef, TplKey, _From}, Compiling1} ->
+            lager:error("[template_compiler] Process compiling ~p down (reason ~p), restarting other waiter",
+                        [TplKey, Reason]),
+            {noreply, restart_compile(TplKey, State#state{compiling=Compiling1})};
+        false ->
+            {noreply, State}
+    end;
 handle_info(Msg, State) ->
     {stop, {unknown_info, Msg}, State}.
 
@@ -106,4 +208,34 @@ terminate(_Reason, _State) ->
     ok.
 
 %%% ---------------------- Internal  ----------------------
+
+is_compiling(TplKey, State) ->
+    lists:keymember(TplKey, 1, State#state.waiting)
+    orelse lists:keymember(TplKey, 2, State#state.compiling).
+
+wait_for_compile(TplKey, From, State) ->
+    State#state{waiting=[{TplKey,From} | State#state.waiting]}.
+
+start_compile(TplKey, From, State) ->
+    State1 = wait_for_compile(TplKey, From, State),
+    restart_compile(TplKey, State1).
+
+restart_compile(TplKey, State) ->
+    case lists:keytake(TplKey, 1, State#state.waiting) of
+        {value, {_,{Pid, _} = From}, Waiting} ->
+            MRef = erlang:monitor(process, Pid),
+            gen_server:reply(From, {ok, {compile, TplKey}}),
+            State#state{waiting=Waiting, compiling=[{MRef,TplKey,From}|State#state.compiling]};
+        false ->
+            % Drop this request, no one is waiting anymore
+            State
+    end.
+
+split_waiters(TplKey, State) ->
+    {Ready,Waiting} = lists:partition(
+                                fun({K,_From}) ->
+                                    K =:= TplKey
+                                end,
+                                State#state.waiting),
+    {Ready, State#state{waiting=Waiting}}.
 

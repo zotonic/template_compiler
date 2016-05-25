@@ -20,13 +20,15 @@
 -author('Marc Worrell <marc@worrell.nl>').
 
 -export([
-    compile/5
+    compile/6
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
 -include("template_compiler.hrl").
 
-compile(Module, Filename, Extends, BlockAsts, TemplateAst) ->
+compile(Module, Filename, Runtime, Extends, BlockAsts, undefined) ->
+    compile(Module, Filename, Runtime, Extends, BlockAsts, erl_syntax:abstract(<<>>));
+compile(Module, Filename, Runtime, Extends, BlockAsts, TemplateAst) ->
     Now = os:timestamp(),
     BlockNames = [ BN || {BN,_} <- BlockAsts ],
     lists:flatten(
@@ -36,14 +38,18 @@ compile(Module, Filename, Extends, BlockAsts, TemplateAst) ->
                 "render_block/4,",
                 "timestamp/0,",
                 "blocks/0,",
+                "module/0,",
                 "extends/0,",
-                "filename/0",
+                "filename/0,",
+                "runtime/0",
             "]).",
             "render(Vars, Blocks, Context) -> _@TemplateAst.",
             "timestamp() -> _@Now@.",
             "blocks() -> _@BlockNames@.",
+            "module() -> _@Module@.",
             "extends() -> _@Extends@.",
             "filename() -> _@Filename@.",
+            "runtime() -> _@Runtime@.",
             "'@_functions'() -> _."
             ],
             [

@@ -44,7 +44,7 @@ start_link() ->
 init([]) ->
     Children = [
         {template_compiler_admin, {template_compiler_admin, start_link, []},
-         worker, 5000, [template_compiler_admin]}
+         permanent, 5000, worker, [template_compiler_admin]}
     ],
     {ok, { {one_for_all, 1000, 10}, Children} }.
 

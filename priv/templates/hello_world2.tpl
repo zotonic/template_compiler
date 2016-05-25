@@ -1,0 +1,1 @@
+{% extends "hello_world.tpl" %}

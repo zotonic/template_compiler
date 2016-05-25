@@ -21,6 +21,8 @@
 -author('Marc Worrell <marc@worrell.nl>').
 
 -export([
+    find_template/3,
+    context_name/1,
     find_multi_value/3,
     find_value/4,
     get_translations/2,
@@ -35,8 +37,39 @@
 -callback get_translations(Text :: binary(), Context :: term()) -> binary() | {trans, [{atom(), binary()}]}.
 -callback lookup_translation({trans, list({atom(), binary()})}, TplVars :: #{}, Context :: term()) -> binary().
 
+-callback context_name(Context :: term()) -> term().
+
 -callback to_bool(Value :: term(), Context :: term()) -> boolean().
 -callback to_list(Value :: term(), Context :: term()) -> list().
+
+
+
+%% @doc Map a template name to a template file.
+-spec find_template(Template::binary()|{overrides, ContextName::term(), Tpl::binary()}, ContextName::term(), Context::term()) ->
+            {ok, filename:filename()} | {error, notfound|term()}.
+find_template({overrides, _ContextName, _Template}, _ContextName, _Context) ->
+    % No overridden templates supported (this is for Zotonic and its module system).
+    {error, notfound};
+find_template(Template, _ContextName, _Context) ->
+    case application:get_env(template_compiler, template_dir) of
+        {ok, {App, SubDir}} when is_atom(App) ->
+            case code:priv_dir(App) of
+                {error, _} = Error ->
+                    Error;
+                PrivDir ->
+                    {ok, filename:join([PrivDir, SubDir, Template])}
+            end;
+        {ok, Dir} when is_list(Dir), is_binary(Dir) ->
+            {ok, filename:join([Dir, Template])};
+        undefind ->
+            {error, notfound}
+    end.
+
+%% @doc Fetch the name to tag template lookups. This should make the name of the template unique with
+%%      respect to the mapping of a template to a filename.  Example: {site, ua_class}
+-spec context_name(Context::term()) -> term().
+context_name(_Context) ->
+    default.
 
 
 %% @doc Find a list of values at once, easier and more efficient than a nested find_value/4
@@ -125,7 +158,6 @@ lookup_translation({trans, Tr}, #{} = TplVars, _Context) ->
         false ->
             <<>>
     end.
-
 
 %% @doc Convert a value to a boolean.
 -spec to_bool(Value :: term(), Context :: term()) -> boolean().

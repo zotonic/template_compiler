@@ -27,8 +27,11 @@ upgrade-deps: $(REBAR)
 compile: $(REBAR)
 	$(REBAR) $(REBAR_OPTS) compile
 
+shell: $(REBAR) compile
+	$(REBAR) $(REBAR_OPTS) shell
+
 test: compile
-	$(REBAR) $(REBAR_OPTS) test    
+	$(REBAR) $(REBAR_OPTS) ct    
 
 # Cleaning
 .PHONY: clean_logs

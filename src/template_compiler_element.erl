@@ -80,6 +80,20 @@ compile({block, {identifier, _Pos, Name}, _Elts}, CState, Ws) ->
                 erl_syntax:variable(CState#cs.context_var)
             ]),
     {Ws, Ast};
+compile(inherit, #cs{block=undefined}, Ws) ->
+    {Ws, erl_syntax:abstract(<<>>)};
+compile(inherit, #cs{block=Block, module=Module} = CState, Ws) ->
+    Ast = erl_syntax:application(
+            erl_syntax:atom(template_compiler_runtime_internal),
+            erl_syntax:atom(block_inherit),
+            [
+                erl_syntax:atom(Module),
+                erl_syntax:atom(Block),
+                erl_syntax:variable(CState#cs.vars_var),
+                erl_syntax:variable("Blocks"),
+                erl_syntax:variable(CState#cs.context_var)
+            ]),
+    {Ws, Ast};
 compile({'if', {'as', Expr, undefined}, IfElts, ElseElts}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
     {Ws2, IfClauseAst} = compile(IfElts, CState, Ws1),

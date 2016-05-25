@@ -20,33 +20,106 @@
 -author('Marc Worrell <marc@worrell.nl>').
 
 -export([
+    render/4,
     lookup/3,
+    flush_file/1,
+    flush_context_name/1,
     compile_file/3,
-    compile_binary/4
+    compile_binary/4,
+    get_option/2
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
 -include("template_compiler.hrl").
 
 -type option() :: {runtime, atom()}.
-
 -type options() :: list(option()).
+-type template() :: binary()|string().
+-type template_key() :: {ContextName::term(), Runtime::atom(), template()}.
+-type render_result() :: binary() | string() | term() | list(render_result()).
 
 -export_type([
         option/0,
-        options/0
+        options/0,
+        template/0,
+        template_key/0
     ]).
+
+
+%% @doc Render a template. This looks up the templates needed, ensures compilation and
+%%      returns the rendering result.
+-spec render(Template :: template(), Vars :: #{}, Options :: options(), Context :: term()) ->
+        {ok, render_result()} | {error, term()}.
+render(Template0, Vars, Options, Context) ->
+    Template = z_convert:to_binary(Template0), 
+    % 1. Check _admin to map template to module (compile if needed)
+    case block_lookup(Template, #{}, [], Options, Context) of
+        {ok, BaseModule, BlockMap} ->
+            % Start with the render function of the "base" template
+            {ok, BaseModule:render(Vars, BlockMap, Context)};
+        {error, _} = Error ->
+            Error
+    end.
+
+%% @doc Recursive lookup of blocks via the extends-chain of a template.
+block_lookup(Template, BlockMap, ExtendsStack, Options, Context) ->
+    case template_compiler_admin:lookup(Template, Options, Context) of
+        {ok, Module} ->
+            case lists:member(Module, ExtendsStack) of
+                true ->
+                    {error, {recursion, [Module:filename() | [ M:filename() || M <- ExtendsStack ]]}};
+                false ->
+                    % Check extended/overruled templates (build block map)
+                    BlockMap1 = add_blocks(Module:blocks(), Module, BlockMap),
+                    case Module:extends() of
+                        undefined ->
+                            {ok, Module, BlockMap1};
+                        overrides ->
+                            Next = {overrides, Template, Module:filename()},
+                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], Options, Context);
+                        Extends when is_binary(Extends) ->
+                            block_lookup(Extends, BlockMap1, [Module|ExtendsStack], Options, Context)
+                    end
+            end;
+        {error, _} = Error ->
+            Error
+    end.
+
+add_blocks([], _Module, BlockMap) ->
+    BlockMap;
+add_blocks([Block|Blocks], Module, BlockMap) ->
+    List = maps:get(Block, BlockMap, []),
+    BlockMap1 = BlockMap#{ Block => List ++ [Module]},
+    add_blocks(Blocks, Module, BlockMap1).
+
+
+%% @doc Extract the runtime to be used from the options.
+-spec get_option(Option :: atom(), Options :: options()) -> term().
+get_option(runtime, Options) ->
+    proplists:get_value(runtime, Options, template_compiler_runtime).
 
 
 %% @doc Find the module of a compiled template, if not yet compiled then
 %% compile the template.
--spec lookup(binary(), options(), any()) -> {ok, atom()} | {error, any()}.
+-spec lookup(binary(), options(), term()) -> {ok, atom()} | {error, term()}.
 lookup(Filename, Options, Context) ->
     template_compiler_admin:lookup(Filename, Options, Context).
 
+
+%% @doc Ping that a template has been changed
+-spec flush_file(filename:filename()) -> ok.
+flush_file(Filename) ->
+    template_compiler_admin:flush_file(Filename).
+
+%% @doc Ping that a template has been changed
+-spec flush_context_name(ContextName::term()) -> ok.
+flush_context_name(ContextName) ->
+    template_compiler_admin:flush_context_name(ContextName).
+
+
 %% @doc Compile a template to a module. The template is the path of the
 %% template to be compiled.
--spec compile_file(binary(), options(), any()) -> {ok, atom()} | {error, any()}.
+-spec compile_file(filename:filename(), options(), term()) -> {ok, atom()} | {error, term()}.
 compile_file(Filename, Options, Context) ->
     case file:read_file(Filename) of
         {ok, Tpl} ->
@@ -56,20 +129,21 @@ compile_file(Filename, Options, Context) ->
     end.
 
 %% @doc Compile a in-memory template to a module.
--spec compile_binary(binary(), binary(), options(), any()) -> {ok, atom()} | {error, any()}.
-compile_binary(Tpl, Filename, Options, Context) ->
+-spec compile_binary(binary(), filename:filename(), options(), term()) -> {ok, atom()} | {error, term()}.
+compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
     case template_compiler_scanner:scan(Filename, Tpl) of
         {ok, Tokens} ->
+            Runtime = get_option(runtime, Options),
             Tokens1 = maybe_drop_text(Tokens, Tokens),
-            Tokens2 = expand_translations(Tokens1, proplists:get_value(runtime, Options, template_compiler_runtime), Context),
-            Module = module_name(Tokens2),
+            Tokens2 = expand_translations(Tokens1, Runtime, Context),
+            Module = module_name(Runtime, Tokens2),
             case erlang:module_loaded(Module) of
                 true ->
                     {ok, Module};
                 false ->
-                    case compile_tokens(template_compiler_parser:parse(Tokens2), cs(Filename, Options, Context)) of
+                    case compile_tokens(template_compiler_parser:parse(Tokens2), cs(Module, Filename, Options, Context)) of
                         {ok, {Extends, BlockAsts, TemplateAst}} ->
-                            Forms = template_compiler_module:compile(Module, Filename, Extends, BlockAsts, TemplateAst),
+                            Forms = template_compiler_module:compile(Module, Filename, Runtime, Extends, BlockAsts, TemplateAst),
                             compile_forms(Filename, Forms);
                         {error, _} = Error ->
                             Error
@@ -81,15 +155,14 @@ compile_binary(Tpl, Filename, Options, Context) ->
 
 %%%% --------------------------------- Internal ----------------------------------
 
-module_name(Tokens) ->
-    TokenChecksum = crypto:hash(sha, term_to_binary({?COMPILER_VERSION, Tokens})),
+module_name(Runtime, Tokens) ->
+    TokenChecksum = crypto:hash(sha, term_to_binary({?COMPILER_VERSION, Runtime, Tokens})),
     Hex = z_string:to_lower(z_url:hex_encode(TokenChecksum)),
     binary_to_atom(iolist_to_binary(["tpl_",Hex]), 'utf8').
 
 compile_forms(Filename, Forms) ->
     % case compile:forms(Forms, [nowarn_shadow_vars]) of
     Forms1 = [ erl_syntax:revert(Form) || Form <- Forms ],
-    io:format("~p", [Forms1]),
     case compile:forms(Forms1, [report_errors]) of
         Compiled when element(1, Compiled) =:= ok ->
             [ok, Module, Bin | _Info] = tuple_to_list(Compiled),
@@ -111,14 +184,15 @@ compile_forms(Filename, Forms) ->
             {error, {compile, Es, Ws}}
     end.
 
-cs(Filename, Options, Context) ->
+cs(Module, Filename, Options, Context) ->
     #cs{
         filename=Filename,
+        module=Module,
         runtime=proplists:get_value(runtime, Options, template_compiler_runtime),
         context=Context
     }.
 
-compile_tokens({ok, {extends, Extend, Elements}}, CState) ->
+compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState) ->
     Blocks = find_blocks(Elements),
     {_Ws, BlockAsts} = compile_blocks(Blocks, CState),
     {ok, {Extend, BlockAsts, undefined}};
@@ -149,8 +223,9 @@ compile_blocks(Blocks, CState) ->
 %% @doc Compile a block definition to a function name and its body elements.
 -spec compile_block(block_element(), #cs{}, #ws{}) -> {#ws{}, {atom(), erl_syntax:syntaxTree()}}.
 compile_block({block, {identifier, _Pos, Name}, Elts}, CState, Ws) ->
-    {Ws1, Body} = template_compiler_element:compile(Elts, CState, Ws),
-    {Ws1, {template_compiler_utils:to_atom(Name), Body}}.
+    BlockName = template_compiler_utils:to_atom(Name),
+    {Ws1, Body} = template_compiler_element:compile(Elts, CState#cs{block=BlockName}, Ws),
+    {Ws1, {BlockName, Body}}.
 
 
 %% @doc Extract all block definitions from the parse tree, keep the tree as-is.
@@ -184,6 +259,8 @@ maybe_drop_text([{open_tag, _, _}, {extends_keyword, _, _}|_] = Tks, _OrgTks) ->
     Tks;
 maybe_drop_text([{open_tag, _, _}, {overrides_keyword, _, _}|_] = Tks, _OrgTks) ->
     Tks;
+maybe_drop_text(_, [{open_tag, SrcRef, _}|_] = OrgTks) ->
+    [{text, SrcRef, <<>>}|OrgTks];
 maybe_drop_text(_, OrgTks) ->
     OrgTks.
 

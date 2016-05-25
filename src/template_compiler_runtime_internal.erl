@@ -22,6 +22,7 @@
 -export([
     forloop/8,
     block_call/4,
+    block_inherit/5,
     unique/0
     ]).
 
@@ -92,7 +93,23 @@ assign_vars([V|Vs], [], Vars) ->
 block_call(Block, Vars, BlockMap, Context) ->
     case maps:find(Block, BlockMap) of
         {ok, [Module|_]} when is_atom(Module) ->
-            Module:Block(Vars, BlockMap, Context);
+            Module:render_block(Block, Vars, BlockMap, Context);
+        error ->
+            % No such block, return empty data.
+            <<>>
+    end.
+
+%% @doc Call the block function of the template the current module extends.
+-spec block_inherit(atom(), atom(), #{}, #{}, term()) -> term().
+block_inherit(Module, Block, Vars, BlockMap, Context) ->
+    case maps:find(Block, BlockMap) of
+        {ok, Modules} ->
+            case lists:dropwhile(fun(M) -> M =/= Module end, Modules) of
+                [Module, Next|_] ->
+                    Next:render_block(Block, Vars, BlockMap, Context);
+                _ ->
+                    <<>>
+            end;
         error ->
             % No such block, return empty data.
             <<>>

@@ -3,13 +3,15 @@
   {vsn, "0.1.0"},
   {registered, []},
   {mod, { template_compiler_app, []}},
-  {applications,
-   [kernel,
-    stdlib
-   ]},
-  {env,[]},
+  {applications, [
+      kernel,
+      stdlib,
+      crypto
+  ]},
+  {env,[
+      {template_dir, {template_compiler, "templates"}}
+  ]},
   {modules, []},
-
   {maintainers, []},
   {licenses, []},
   {links, []}

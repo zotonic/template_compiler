@@ -20,11 +20,6 @@
 %% @doc Increment this with compiler bug fixes
 -define(COMPILER_VERSION, 1).
 
--record(tpl, {
-        template :: binary(),
-        module :: atom()
-    }).
-
 -type linecol() :: {integer(), integer()}.
 
 -type token() :: {atom(), linecol(), term()}.
@@ -43,6 +38,7 @@
 %% @doc State for the compiler. Also records the current block's arguments variable, and context variable.
 -record(cs, {
         filename = <<>> :: binary(),
+        module = undefined :: atom(),
         block = undefined :: atom(),
         runtime = template_compiler_runtime :: atom(),
         context = undefined :: any(),
