@@ -57,8 +57,7 @@ compile({trans_ext, {string_literal, Pos, Text}, Args}, CState, Ws) ->
             Args),
     Trans1 = {trans, lists:sort([{en,Text} | Trans])},
     compile({trans_text, Pos, Trans1}, CState, Ws);
-compile({value, Expr, _With}, #cs{runtime=Runtime} = CState, Ws) ->
-    % TODO: handle optional With
+compile({value, Expr, []}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
     Ast = ?Q("'@Runtime@':to_iolist(_@ExprAst, _@vars, _@context)",
             [
@@ -66,6 +65,25 @@ compile({value, Expr, _With}, #cs{runtime=Runtime} = CState, Ws) ->
                 {vars, erl_syntax:variable(CState#cs.vars_var)}
             ]),
     {Ws1, Ast};
+compile({value, Expr, With}, CState, Ws) ->
+    {Ws1, WithExprAsts} = with_args(With, CState, Ws),
+    {CState1, Ws2} = template_compiler_utils:next_vars_var(CState, Ws1),
+    MapAst = erl_syntax:map_expr(
+                erl_syntax:variable(CState#cs.vars_var),
+                [
+                    erl_syntax:map_field_assoc(WName, WExpr)
+                    || {WName, WExpr} <- WithExprAsts
+                ]),
+    {Ws3, WithAst} = compile({value, Expr, []}, CState1, Ws2),
+    Ast = ?Q([
+        "begin",
+            "_@vars = _@MapAst,",
+            "_@WithAst",
+        "end"],
+        [
+            {vars, erl_syntax:variable(CState1#cs.vars_var)}
+        ]),
+    {Ws3, Ast};
 compile({date, now, {string_literal, _Pos, Format}}, CState, Ws) ->
     FormatAst = erl_syntax:abstract(Format),
     Ast = ?Q("filter_date:date(erlang:universaltime(), _@FormatAst, _@context)",
@@ -163,9 +181,48 @@ compile({'for', {'in', Idents, ListExpr}, LoopElts, EmptyElts}, #cs{runtime=Runt
             {vars, erl_syntax:variable(CState#cs.vars_var)},
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]),
-    {WsExpr, Ast}.
+    {WsExpr, Ast};
+compile({'with', {Exprs, Idents}, Elts}, CState, Ws) ->
+    {Ws1, ExprAsts} = expr_list(Exprs, CState, Ws),
+    VarsAsts = erl_syntax:abstract(idents_as_atoms(Idents)),
+    ExprListAst = erl_syntax:list(ExprAsts),
+    {CsWith, Ws2} = template_compiler_utils:next_vars_var(CState, Ws1),
+    {Ws3, BodyAst} = compile(Elts, CsWith, Ws2),
+    Ast = ?Q([
+            "begin",
+                "_@vars1 = template_compiler_runtime_internal:with_vars(",
+                    "_@VarsAsts,",
+                    "_@ExprListAst,",
+                    "_@vars),",
+                "_@BodyAst",
+            "end"
+        ],
+        [
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {vars1, erl_syntax:variable(CsWith#cs.vars_var)}
+        ]),
+    {Ws3, Ast}.
 
 
+expr_list(ExprList, CState, Ws) ->
+    lists:foldr(
+        fun(E, {WsAcc, ExprAcc}) ->
+            {WsAcc1, EAst} = template_compiler_expr:compile(E, CState, WsAcc),
+            {WsAcc1, [EAst|ExprAcc]}
+        end,
+        {Ws, []},
+        ExprList).
+
+
+with_args(With, CState, Ws) ->
+    lists:foldl(
+            fun({Ident, Expr}, {WsAcc, Acc}) ->
+                {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, WsAcc),
+                VarAst = erl_syntax:atom(ident_as_atom(Ident)),
+                {Ws1, [{VarAst, ExprAst}|Acc]}
+            end,
+            {Ws, []},
+            With).
 
 idents_as_atoms(Idents) ->
     [ ident_as_atom(Ident) || Ident <- Idents ].

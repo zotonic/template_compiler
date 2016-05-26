@@ -21,6 +21,7 @@
 
 -export([
     forloop/8,
+    with_vars/3,
     block_call/4,
     block_inherit/5,
     unique/0
@@ -71,10 +72,10 @@ forloop_map(List, Idents, Fun, Vars) ->
 %% @doc Used with forloops, assign variables from an expression value
 assign_vars([V], E, Vars) ->
     Vars#{V => E};
-assign_vars(Vs, Es, Vars) when is_list(Es) ->
-    assign_vars_list(Vs, Es, Vars);
-assign_vars(Vs, Es, Vars) when is_tuple(Es) ->
-    assign_vars_tuple(Vs, Es, Vars);
+assign_vars(Vs, L, Vars) when is_list(L) ->
+    assign_vars_list(Vs, L, Vars);
+assign_vars(Vs, T, Vars) when is_tuple(T) ->
+    assign_vars_tuple(Vs, T, Vars);
 assign_vars([V|Vs], E, Vars) ->
     assign_vars_list(Vs, [], Vars#{V => E}).
 
@@ -95,6 +96,14 @@ assign_vars_tuple([V1,V2,V3,V4], {E1,E2,E3,E4}, Vars) ->
     Vars#{V1 => E1, V2 => E2, V3 => E3, V4 => E4};
 assign_vars_tuple(Vs, Es, Vars) ->
     assign_vars_list(Vs, tuple_to_list(Es), Vars).
+
+
+%% @doc Assign variables from a with statement. Care has to be taken for unpacking tuples and lists.
+-spec with_vars([atom()], [term()], #{}) -> #{}.
+with_vars([_,_|_] = Vs, [E], Vars) ->
+    assign_vars(Vs, E, Vars);
+with_vars(Vs, Es, Vars) ->
+    assign_vars_list(Vs, Es, Vars).
 
 
 %% @doc Call the block function, lookup the function in the BlockMap to find
