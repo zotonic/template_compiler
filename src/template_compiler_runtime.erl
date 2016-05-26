@@ -28,7 +28,8 @@
     get_translations/2,
     lookup_translation/3,
     to_bool/2,
-    to_list/2
+    to_list/2,
+    to_iolist/3
     ]).
 
 -callback find_multi_value(Keys :: list(), TplVars :: term(), Context :: term()) -> term().
@@ -41,6 +42,7 @@
 
 -callback to_bool(Value :: term(), Context :: term()) -> boolean().
 -callback to_list(Value :: term(), Context :: term()) -> list().
+-callback to_iolist(Value :: term(), TplVars :: #{}, Context :: term()) -> iolist().
 
 
 
@@ -170,7 +172,38 @@ to_list(undefined, _Context) ->
     [];
 to_list(#{} = Map, _Context) ->
     maps:to_list(Map);
+to_list({trans, Tr}, _Context) when is_list(Tr) ->
+    Tr;
 to_list(Tuple, _Context) when is_tuple(Tuple) ->
     tuple_to_list(Tuple);
 to_list(Value, _Context) ->
     z_convert:to_list(Value).
+
+
+%% @doc Convert a value to an iolist, used for converting values in {{ ... }} expressions.
+-spec to_iolist(Value::term(), TplVars:: #{}, Context::term()) -> iolist().
+to_iolist(undefined, _TplVars, _Context) -> <<>>;
+to_iolist(B, _TplVars, _Context) when is_binary(B) -> 
+    B;
+to_iolist(A, _TplVars, _Context) when is_atom(A) -> 
+    atom_to_binary(A, 'utf8');
+to_iolist(N, _TplVars, _Context) when is_integer(N) -> 
+    integer_to_binary(N);
+to_iolist(F, _TplVars, _Context) when is_float(F) -> 
+    io_lib:format("~p", [F]);
+to_iolist({{Y,M,D},{H,I,S}} = Date, TplVars, _Context)
+    when is_integer(Y), is_integer(M), is_integer(D),
+         is_integer(H), is_integer(I), is_integer(S) ->
+    Options = [
+        {tz, maps:get(tz, TplVars, "GMT")}
+    ],
+    z_dateformat:format(Date, "Y-m-d H:i:s", Options);
+to_iolist(T, _TplVars, _Context) when is_tuple(T) -> 
+    io_lib:format("~p", [T]);
+to_iolist(L, TplVars, Context) when is_list(L) ->
+    try
+        unicode:characters_to_binary(L)
+    catch
+        error:badarg ->
+            [ to_iolist(C, TplVars, Context) || C <- L ]
+    end.

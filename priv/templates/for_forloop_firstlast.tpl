@@ -1,0 +1,1 @@
+{% for n in v %}{% if forloop.first %}first|{% endif %}{{ n }},{% if forloop.last %}|last{% endif %}{% endfor %}

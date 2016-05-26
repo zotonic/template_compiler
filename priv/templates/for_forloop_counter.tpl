@@ -1,0 +1,1 @@
+{% for n in v %}{{ n }}:{{ forloop.counter }},{% endfor %}

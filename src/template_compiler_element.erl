@@ -57,10 +57,15 @@ compile({trans_ext, {string_literal, Pos, Text}, Args}, CState, Ws) ->
             Args),
     Trans1 = {trans, lists:sort([{en,Text} | Trans])},
     compile({trans_text, Pos, Trans1}, CState, Ws);
-compile({value, Expr, _With}, CState, Ws) ->
-    % TODO: wrap in stringify
+compile({value, Expr, _With}, #cs{runtime=Runtime} = CState, Ws) ->
     % TODO: handle optional With
-    template_compiler_expr:compile(Expr, CState, Ws);
+    {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
+    Ast = ?Q("'@Runtime@':to_iolist(_@ExprAst, _@vars, _@context)",
+            [
+                {context, erl_syntax:variable(CState#cs.context_var)},
+                {vars, erl_syntax:variable(CState#cs.vars_var)}
+            ]),
+    {Ws1, Ast};
 compile({date, now, {string_literal, _Pos, Format}}, CState, Ws) ->
     FormatAst = erl_syntax:abstract(Format),
     Ast = ?Q("filter_date:date(erlang:universaltime(), _@FormatAst, _@context)",
@@ -131,27 +136,31 @@ compile({'if', {'as', Expr, {identifier, _Pos, Name}}, IfElts, ElseElts}, #cs{ru
        ]),
     {Ws5, Ast};
 compile({'for', {'in', Idents, ListExpr}, LoopElts, EmptyElts}, #cs{runtime=Runtime} = CState, Ws) ->
-    {CsLoop, WsLoop} = template_compiler_utils:next_vars(CState, Ws#ws{is_forloop_var=false, is_include_inherit=false}),
+    {CsLoop, WsLoop} = template_compiler_utils:next_vars_var(CState, Ws#ws{is_forloop_var=false, is_include_inherit=false}),
     {WsLoop1, LoopAst} = compile(LoopElts, CsLoop, WsLoop),
-    WsEmpty = WsLoop1#ws{ is_forloop_var=Ws#ws.is_forloop_var },
+    WsEmpty = WsLoop1#ws{ 
+        is_forloop_var=Ws#ws.is_forloop_var,
+        is_include_inherit=Ws#ws.is_include_inherit
+    },
     {WsEmpty1, EmptyAst} = compile(EmptyElts, CState, WsEmpty),
     {WsExpr, ExprAst} = template_compiler_expr:compile(ListExpr, CState, WsEmpty1),
-    LoopVars = idents_as_atoms(Idents),
+    LoopVarsAst = erl_syntax:abstract(idents_as_atoms(Idents)),
     Ast = ?Q([
             "template_compiler_runtime_internal:forloop(",
                 "_@isforloopvar,"
                 "_@ExprAst,"
-                "_@LoopVars,",
-                "fun(_@vars) -> _@LoopAst end,"
+                "_@LoopVarsAst,",
+                "fun(_@varsloop) -> _@LoopAst end,"
                 "fun() -> _@EmptyAst end,",
-                "_@Runtime,",
+                "_@Runtime@,",
                 "_@vars,",
                 "_@context"
             ")"
         ],
         [
-            {isforloopvar, erl_synax:abstract(WsLoop1#ws.is_forloop_var or WsLoop1#ws.is_include_inherit)},
-            {vars, erl_syntax_abstract:variable(CsLoop#cs.vars_var)},
+            {isforloopvar, erl_syntax:atom(WsLoop1#ws.is_forloop_var or WsLoop1#ws.is_include_inherit)},
+            {varsloop, erl_syntax:variable(CsLoop#cs.vars_var)},
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]),
     {WsExpr, Ast}.

@@ -455,12 +455,12 @@ TermValue -> hash AutoId : {auto_id, '$2'}.
 TermValue -> open_curly identifier Args close_curly : {tuple_value, '$2', '$3'}.
 TermValue -> open_bracket OptArrayList close_bracket : {value_list, '$2'}.
 
-AutoId -> identifier dot identifier : {'$1', '$3' }.
+AutoId -> identifier dot identifier : {'$1', '$3'}.
 AutoId -> identifier : '$1'.
 
 Variable -> identifier : ['$1'].
 Variable -> Variable open_bracket E close_bracket : '$1' ++ [{expr, '$3'}].
-Variable -> Variable dot identifier : '$1' ++ ['$2'].
+Variable -> Variable dot identifier : '$1' ++ ['$3'].
 
 ValueList -> E : ['$1'].
 ValueList -> ValueList comma E : '$1' ++ ['$3'].

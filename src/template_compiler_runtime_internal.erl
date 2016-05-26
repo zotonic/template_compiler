@@ -54,7 +54,7 @@ forloop_fold(List, Idents, Fun, Vars) ->
                     revcounter0 => Len - Counter,
                     first => Counter =:= 1,
                     last => Counter =:= Len,
-                    parentloop => maps:get(forloop, Vars)
+                    parentloop => maps:get(forloop, Vars, undefined)
                 },
                 Vars1 = assign_vars(Idents, Val, Vars#{forloop => Forloop}),
                 {[Fun(Vars1) | Acc], Counter+1}
@@ -68,23 +68,33 @@ forloop_map(List, Idents, Fun, Vars) ->
     [ Fun(assign_vars(Idents, Val, Vars)) || Val <- List ].
 
 
-%% @doc Used with forloops, assign variable from an expression value
-assign_vars([], _, Vars) ->
-    Vars;
-assign_vars([V|Vs], [E|Es], Vars) ->
-    assign_vars(Vs, Es, Vars#{V => E});
-assign_vars([V1], {E1}, Vars) ->
-    Vars#{V1 => E1};
-assign_vars([V1,V2], {E1,E2}, Vars) ->
-    Vars#{V1 => E1, V2 => E2};
-assign_vars([V1,V2,V3], {E1,E2,E3}, Vars) ->
-    Vars#{V1 => E1, V2 => E2, V3 => E3};
-assign_vars([V1,V2,V3,V4], {E1,E2,E3,E4}, Vars) ->
-    Vars#{V1 => E1, V2 => E2, V3 => E3, V4 => E4};
+%% @doc Used with forloops, assign variables from an expression value
+assign_vars([V], E, Vars) ->
+    Vars#{V => E};
+assign_vars(Vs, Es, Vars) when is_list(Es) ->
+    assign_vars_list(Vs, Es, Vars);
 assign_vars(Vs, Es, Vars) when is_tuple(Es) ->
-    assign_vars(Vs, tuple_to_list(Es), Vars);
-assign_vars([V|Vs], [], Vars) ->
-    assign_vars(Vs, [], Vars#{V => undefined}).
+    assign_vars_tuple(Vs, Es, Vars);
+assign_vars([V|Vs], E, Vars) ->
+    assign_vars_list(Vs, [], Vars#{V => E}).
+
+assign_vars_list([], _, Vars) ->
+    Vars;
+assign_vars_list([V|Vs], [], Vars) ->
+    assign_vars_list(Vs, [], Vars#{ V => undefined });
+assign_vars_list([V|Vs], [E|Es], Vars) ->
+    assign_vars_list(Vs, Es, Vars#{V => E}).
+
+assign_vars_tuple([V1], {E1}, Vars) ->
+    Vars#{V1 => E1};
+assign_vars_tuple([V1,V2], {E1,E2}, Vars) ->
+    Vars#{V1 => E1, V2 => E2};
+assign_vars_tuple([V1,V2,V3], {E1,E2,E3}, Vars) ->
+    Vars#{V1 => E1, V2 => E2, V3 => E3};
+assign_vars_tuple([V1,V2,V3,V4], {E1,E2,E3,E4}, Vars) ->
+    Vars#{V1 => E1, V2 => E2, V3 => E3, V4 => E4};
+assign_vars_tuple(Vs, Es, Vars) ->
+    assign_vars_list(Vs, tuple_to_list(Es), Vars).
 
 
 %% @doc Call the block function, lookup the function in the BlockMap to find
