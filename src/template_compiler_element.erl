@@ -129,7 +129,7 @@ compile({'if', {'as', Expr, {identifier, _Pos, Name}}, IfElts, ElseElts}, #cs{ru
           "end",
         "end"],
        [
-            {name, template_compiler_utils:to_atom(Name)},
+            {name, erl_syntax:atom(template_compiler_utils:to_atom(Name))},
             {context, erl_syntax:variable(CState#cs.context_var)},
             {vars, erl_syntax:variable(CState#cs.vars_var)},
             {vars1, erl_syntax:variable(CState1#cs.vars_var)}

@@ -20,6 +20,7 @@ groups() ->
         [if_test
         ,if_else_test
         ,if_var_test
+        ,if_as_test
         ,for_test
         ,for_forloop_test
         ,for_multivar_test
@@ -58,6 +59,13 @@ if_var_test(_Config) ->
     <<"three">> = z_string:trim(iolist_to_binary(Bin3)),
     {ok, Bin4} = template_compiler:render("if_var.tpl", #{ v => 4 }, [], undefined),
     <<"else">> = z_string:trim(iolist_to_binary(Bin4)),
+    ok.
+
+if_as_test(_Config) ->
+    {ok, Bin1} = template_compiler:render("if_as.tpl", #{ v => 1 }, [], undefined),
+    <<"2">> = iolist_to_binary(Bin1),
+    {ok, Bin2} = template_compiler:render("if_as.tpl", #{ v => -1 }, [], undefined),
+    <<"9">> = iolist_to_binary(Bin2),
     ok.
 
 for_test(_Config) ->
