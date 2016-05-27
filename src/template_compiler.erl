@@ -34,7 +34,10 @@
 
 -type option() :: {runtime, atom()}.
 -type options() :: list(option()).
--type template() :: binary()|string().
+-type template() :: binary()
+                  | string()
+                  | {cat, binary()|string()}
+                  | {overrides, ContextName::term(), binary()|string()}.
 -type template_key() :: {ContextName::term(), Runtime::atom(), template()}.
 -type render_result() :: binary() | string() | term() | list(render_result()).
 
@@ -48,11 +51,12 @@
 
 %% @doc Render a template. This looks up the templates needed, ensures compilation and
 %%      returns the rendering result.
+%% @todo: map non-binary templates (cat, overrides) to a template name (use runtime routine)
 -spec render(Template :: template(), Vars :: #{}, Options :: options(), Context :: term()) ->
         {ok, render_result()} | {error, term()}.
 render(Template0, Vars, Options, Context) ->
-    Template = z_convert:to_binary(Template0), 
-    % 1. Check _admin to map template to module (compile if needed)
+    Template = normalize_template(Template0), 
+    % Check _admin to map template to module (compile if needed)
     case block_lookup(Template, #{}, [], Options, Context) of
         {ok, BaseModule, BlockMap} ->
             % Start with the render function of the "base" template
@@ -60,6 +64,16 @@ render(Template0, Vars, Options, Context) ->
         {error, _} = Error ->
             Error
     end.
+
+%% @doc Map all string() values in a template to binary().
+normalize_template(Template) when is_binary(Template) ->
+    Template;
+normalize_template(Template) when is_list(Template) ->
+    unicode:characters_to_binary(Template);
+normalize_template({cat, Template}) when is_list(Template) ->
+    {cat, unicode:characters_to_binary(Template)};
+normalize_template({overrides, Ctx, Template}) when is_list(Template) -> 
+    {overrides, Ctx, unicode:characters_to_binary(Template)}.
 
 %% @doc Recursive lookup of blocks via the extends-chain of a template.
 block_lookup(Template, BlockMap, ExtendsStack, Options, Context) ->

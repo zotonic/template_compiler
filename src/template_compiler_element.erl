@@ -117,6 +117,13 @@ compile(inherit, #cs{block=Block, module=Module} = CState, Ws) ->
                 erl_syntax:variable(CState#cs.context_var)
             ]),
     {Ws, Ast};
+compile({'include', Method, Template, Args}, CState, Ws) ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws),
+    include(Method, Template, ArgsList, CState, Ws1);
+compile({'catinclude', Method, Template, IdExpr, Args}, CState, Ws) ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws),
+    {Ws2, IdAst} = template_compiler_expr:compile(IdExpr, CState, Ws1),
+    catinclude(Method, Template, IdAst, ArgsList, CState, Ws2);
 compile({'if', {'as', Expr, undefined}, IfElts, ElseElts}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
     {Ws2, IfClauseAst} = compile(IfElts, CState, Ws1),
@@ -204,6 +211,55 @@ compile({'with', {Exprs, Idents}, Elts}, CState, Ws) ->
     {Ws3, Ast}.
 
 
+include(Method, Template, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
+    {Ws1, TemplateAst} = case Template of
+        {string_literal, _, String} ->
+            {Ws#ws{is_include_inherit=true}, erl_syntax:abstract(String)};
+        _ ->
+            template_compiler_expr:compile(Template, CState, Ws)
+    end,
+    ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList ]),
+    Ast = ?Q([
+            "template_compiler_runtime_internal:include(",
+                    "_@Method@,",
+                    "_@TemplateAst,",
+                    "_@ArgsListAst,",
+                    "_@Runtime@,",
+                    "_@vars,",
+                    "_@context)"
+        ],
+        [
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {context, erl_syntax:variable(CState#cs.context_var)}
+        ]),
+    {Ws1, Ast}.
+
+catinclude(Method, Template, IdAst, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
+    {Ws1, TemplateAst} = case Template of
+        {string_literal, _, String} ->
+            {Ws#ws{is_include_inherit=true}, erl_syntax:abstract(String)};
+        _ ->
+            template_compiler_expr:compile(Template, CState, Ws)
+    end,
+    ArgsList1 = [ {erl_syntax:atom(id),IdAst} | ArgsList ],
+    ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList1 ]),
+    Ast = ?Q([
+            "template_compiler_runtime_internal:include(",
+                    "_@Method@,",
+                    "{cat, _@TemplateAst},",
+                    "_@ArgsListAst,",
+                    "_@Runtime@,",
+                    "_@vars,",
+                    "_@context)"
+        ],
+        [
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {context, erl_syntax:variable(CState#cs.context_var)}
+        ]),
+    {Ws1, Ast}.
+
+
+
 expr_list(ExprList, CState, Ws) ->
     lists:foldr(
         fun(E, {WsAcc, ExprAcc}) ->
@@ -216,10 +272,14 @@ expr_list(ExprList, CState, Ws) ->
 
 with_args(With, CState, Ws) ->
     lists:foldl(
-            fun({Ident, Expr}, {WsAcc, Acc}) ->
-                {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, WsAcc),
-                VarAst = erl_syntax:atom(ident_as_atom(Ident)),
-                {Ws1, [{VarAst, ExprAst}|Acc]}
+            fun
+                ({Ident, true}, {WsAcc, Acc}) ->
+                    VarAst = erl_syntax:atom(ident_as_atom(Ident)),
+                    {WsAcc, [{VarAst, erl_syntax:atom(true)}|Acc]};
+                ({Ident, Expr}, {WsAcc, Acc}) ->
+                    {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, WsAcc),
+                    VarAst = erl_syntax:atom(ident_as_atom(Ident)),
+                    {Ws1, [{VarAst, ExprAst}|Acc]}
             end,
             {Ws, []},
             With).

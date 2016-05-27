@@ -24,6 +24,7 @@
     with_vars/3,
     block_call/4,
     block_inherit/5,
+    include/6,
     unique/0
     ]).
 
@@ -131,6 +132,28 @@ block_inherit(Module, Block, Vars, BlockMap, Context) ->
             end;
         error ->
             % No such block, return empty data.
+            <<>>
+    end.
+
+
+%% @doc Include a template.
+%% @todo Add support for 'all' option
+-spec include(normal|optional|all, template_compiler:template(), list({atom(),term()}), atom(), #{}, term()) -> 
+        template_compiler:render_result().
+include(Method, Template, Args, Runtime, Vars, Context) ->
+    Vars1 = lists:foldl(
+                fun({V,E}, Acc) ->
+                    Acc#{V => E}
+                end,
+                Vars,
+                Args),
+    case template_compiler:render(Template, Vars1, [{runtime, Runtime}], Context) of
+        {ok, Result} ->
+            Result;
+        {error, notfound} when Method =/= optional ->
+            lager:error("Missing included template ~p", [Template]),
+            <<>>;
+        {error, _} ->
             <<>>
     end.
 

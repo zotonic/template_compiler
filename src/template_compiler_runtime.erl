@@ -38,6 +38,9 @@
 -callback get_translations(Text :: binary(), Context :: term()) -> binary() | {trans, [{atom(), binary()}]}.
 -callback lookup_translation({trans, list({atom(), binary()})}, TplVars :: #{}, Context :: term()) -> binary().
 
+-callback find_template(binary(), ContextName::term(), Vars::#{}, Context::term()) ->
+                {ok, filename:filename()} | {error, notfound|term()}.
+
 -callback context_name(Context :: term()) -> term().
 
 -callback to_bool(Value :: term(), Context :: term()) -> boolean().
@@ -47,11 +50,8 @@
 
 
 %% @doc Map a template name to a template file.
--spec find_template(Template::binary()|{overrides, ContextName::term(), Tpl::binary()}, ContextName::term(), Context::term()) ->
+-spec find_template(binary(), ContextName::term(), Context::term()) ->
             {ok, filename:filename()} | {error, notfound|term()}.
-find_template({overrides, _ContextName, _Template}, _ContextName, _Context) ->
-    % No overridden templates supported (this is for Zotonic and its module system).
-    {error, notfound};
 find_template(Template, _ContextName, _Context) ->
     case application:get_env(template_compiler, template_dir) of
         {ok, {App, SubDir}} when is_atom(App) ->

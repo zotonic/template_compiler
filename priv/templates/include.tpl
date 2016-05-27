@@ -1,0 +1,1 @@
+a{% include "include_b.tpl" %}c
