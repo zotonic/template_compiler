@@ -28,6 +28,8 @@
 
 
 -spec compile(element(), #cs{}, #ws{}) -> {#ws{}, erl_syntax:syntaxTree()}.
+compile({ast, Ast}, _CState, Ws) ->
+    {Ws, Ast};
 compile(true, _CState, Ws) ->
     {Ws, erl_syntax:atom(true)};
 compile(false, _CState, Ws) ->

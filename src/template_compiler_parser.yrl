@@ -3,9 +3,8 @@
 %%% @author    Roberto Saccon <rsaccon@gmail.com> [http://rsaccon.com]
 %%% @author    Evan Miller <emmiller@gmail.com>
 %%% @copyright 2008 Roberto Saccon, Evan Miller
-%%% @copyright 2009-2011 Marc Worrell
+%%% @copyright 2009-2016 Marc Worrell
 %%% @doc Template language grammar
-%%% @reference  See <a href="http://erlydtl.googlecode.com" target="_top">http://erlydtl.googlecode.com</a> for more information
 %%% @changes Marc Worrell - added print/image/scomp, more args options etc.
 %%% @end  
 %%%
@@ -405,7 +404,7 @@ WithBraced -> open_tag with_keyword ValueList as_keyword ForGroup close_tag : {'
 EndWithBraced -> open_tag endwith_keyword close_tag.
 
 CacheBlock -> CacheBraced Elements EndCacheBraced : {cache, '$1', '$2'}.
-CacheBraced -> open_tag cache_keyword OptCacheTime Args close_tag : [ '$3', '$4' ].
+CacheBraced -> open_tag cache_keyword OptCacheTime Args close_tag : {'$3', '$4'}.
 EndCacheBraced -> open_tag endcache_keyword close_tag.
 
 OptCacheTime -> '$empty' : undefined.
@@ -420,17 +419,16 @@ Literal -> trans_literal  : '$1'.
 Literal -> number_literal : '$1'.
 Literal -> atom_literal : '$1'.
 
-CustomTag -> open_tag OptionalAll identifier Args close_tag : {tag, '$3', '$4', '$2'}.
+CustomTag -> open_tag identifier Args close_tag : {custom_tag, '$2', '$3'}.
 
-CallTag -> open_tag call_keyword identifier Args close_tag : {call_args, '$3', '$4'}.
+CallTag -> open_tag call_keyword identifier Args close_tag : {call, '$3', '$4'}.
 CallWithTag -> open_tag call_keyword identifier with_keyword E close_tag : {call_with, '$3', '$5'}.
 
 ImageTag -> open_tag image_keyword E Args close_tag : {image, '$3', '$4' }.
-ImageUrlTag -> open_tag image_url_keyword Value Args close_tag : {image_url, '$3', '$4' }.
-
+ImageUrlTag -> open_tag image_url_keyword E Args close_tag : {image_url, '$3', '$4' }.
 MediaTag -> open_tag media_keyword E Args close_tag : {media, '$3', '$4' }.
 
-UrlTag -> open_tag url_keyword identifier Args close_tag : {url, '$3', '$4'}.
+UrlTag -> open_tag url_keyword E Args close_tag : {url, '$3', '$4'}.
 
 PrintTag -> open_tag print_keyword E close_tag : {print, '$3'}.
 

@@ -27,9 +27,15 @@
     find_value/4,
     get_translations/2,
     lookup_translation/3,
+    custom_tag/4,
+    builtin_tag/5,
+    cache_tag/5,
+    javascript_tag/3,
+    spaceless_tag/3,
     to_bool/2,
     to_list/2,
-    to_iolist/3
+    to_iolist/3,
+    escape/2
     ]).
 
 -callback find_nested_value(Keys :: list(), TplVars :: term(), Context :: term()) -> term().
@@ -43,11 +49,16 @@
 
 -callback context_name(Context :: term()) -> term().
 
+-callback custom_tag(Module::atom(), Args::#{}, TplVars::#{}, Context::term()) -> template_compiler:render_result().
+-callback builtin_tag(template_compiler:builtin_tag(), term(), Args::#{}, TplVars::#{}, Context::term()) -> template_compiler:render_result().
+-callback cache_tag(Seconds::integer(), Args::#{}, function(), TplVars::#{}, Context::term()) -> template_compiler:render_result().
+-callback javascript_tag(template_compiler:render_result(), #{}, term()) -> template_compiler:render_result().
+-callback spaceless_tag(template_compiler:render_result(), #{}, term()) -> template_compiler:render_result().
+
 -callback to_bool(Value :: term(), Context :: term()) -> boolean().
 -callback to_list(Value :: term(), Context :: term()) -> list().
 -callback to_iolist(Value :: term(), TplVars :: #{}, Context :: term()) -> iolist().
-
-
+-callback escape(iolist(), Context :: term()) -> iolist().
 
 %% @doc Map a template name to a template file.
 -spec find_template(binary(), ContextName::term(), Context::term()) ->
@@ -161,6 +172,40 @@ lookup_translation({trans, Tr}, #{} = TplVars, _Context) ->
             <<>>
     end.
 
+
+%% @doc Render a custom tag (Zotonic scomp) - this can be changed to more complex runtime lookups.
+-spec custom_tag(Tag::atom(), Args::#{}, Vars::#{}, Context::term()) -> template_compiler:render_result().
+custom_tag(Tag, Args, Vars, Context) ->
+    Tag:render(Args, Vars, Context).
+
+
+%% @doc Render image/image_url/media/url/lib tag. The Expr is the media item or dispatch rule.
+-spec builtin_tag(template_compiler:builtin_tag(), Expr::term(), Args::#{}, Vars::#{}, Context::term()) -> 
+            template_compiler:render_result().
+builtin_tag(_Tag, _Expr, _Args, _Vars, _Context) ->
+    <<>>.
+
+
+%% @doc Render a block, cache the result for some time. Caching should be implemented by the runtime.
+-spec cache_tag(Seconds::integer(), Args::#{}, function(), TplVars::#{}, Context::term()) -> template_compiler:render_result().
+cache_tag(_Seconds, Args, Fun, TplVars, Context) ->
+    FunVars = maps:merge(TplVars, Args),
+    Fun(FunVars, Context).
+
+
+%% @doc Render a script block, for Zotonic this is added to the scripts in the Context
+-spec javascript_tag(template_compiler:render_result(), #{}, term()) -> template_compiler:render_result().
+javascript_tag(_Javascript, _TplVars, _Context) ->
+    <<>>.
+
+%% @doc Remove spaces between HTML tags
+-spec spaceless_tag(template_compiler:render_result(), #{}, term()) -> template_compiler:render_result().
+spaceless_tag(Value, TplVars, Context) ->
+    Contents1 = re:replace(to_iolist(Value, TplVars, Context), "^[ \t\n\f\r]+<", "<"),
+    Contents2 = re:replace(Contents1, ">[ \t\n\f\r]+$", ">"),
+    re:replace(Contents2, ">[ \t\n\f\r]+<", "><", [global]).
+
+
 %% @doc Convert a value to a boolean.
 -spec to_bool(Value :: term(), Context :: term()) -> boolean().
 to_bool(Value, _Context) ->
@@ -207,3 +252,9 @@ to_iolist(L, TplVars, Context) when is_list(L) ->
         error:badarg ->
             [ to_iolist(C, TplVars, Context) || C <- L ]
     end.
+
+%% @doc HTML escape a value
+-spec escape(Value :: iolist(), Context :: term()) -> iolist().
+escape(Value, _Context) ->
+    z_html:escape(iolist_to_binary(Value)).
+

@@ -1,0 +1,1 @@
+a-{% for n in v %}{% cycle "a" "b" "c" %}{% endfor %}-b

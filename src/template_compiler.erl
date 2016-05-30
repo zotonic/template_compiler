@@ -41,11 +41,18 @@
 -type template_key() :: {ContextName::term(), Runtime::atom(), template()}.
 -type render_result() :: binary() | string() | term() | list(render_result()).
 
+-type builtin_tag() :: image
+                     | image_url
+                     | media
+                     | url
+                     | lib.
+
 -export_type([
         option/0,
         options/0,
         template/0,
-        template_key/0
+        template_key/0,
+        builtin_tag/0
     ]).
 
 

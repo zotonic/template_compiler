@@ -25,6 +25,8 @@
     block_call/4,
     block_inherit/5,
     include/6,
+    call/4,
+    print/1,
     unique/0
     ]).
 
@@ -156,6 +158,26 @@ include(Method, Template, Args, Runtime, Vars, Context) ->
         {error, _} ->
             <<>>
     end.
+
+
+%% @doc Call a module's render function.
+-spec call(Module::atom(), Args::#{}, Vars::#{}, Context::term()) -> template_compiler:render_result().
+call(Module, Args, Vars, Context) ->
+    case Module:render(Args, Vars, Context) of
+        {ok, Result} -> Result;
+        {error, _} -> <<>>
+    end.
+
+
+%% @doc Echo the HTML escape value within <pre> tags.
+-spec print(term()) -> iolist().
+print(Expr) ->
+    V = io_lib:format("~p", [Expr]),
+    [
+        <<"<pre>">>,
+        z_html:escape(iolist_to_binary(V)),
+        <<"</pre>">>
+    ].
 
 
 %% @doc Make an unique string (about 11 characters). Used for expanding unique args in templates. The string only 

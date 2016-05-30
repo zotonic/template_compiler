@@ -65,7 +65,16 @@ compile({value, Expr, []}, #cs{runtime=Runtime} = CState, Ws) ->
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {vars, erl_syntax:variable(CState#cs.vars_var)}
             ]),
-    {Ws1, Ast};
+    case CState#cs.is_autoescape of
+        true ->
+            Ast2 = ?Q("'@Runtime@':escape(_@Ast, _@context)",
+                      [
+                        {context, erl_syntax:variable(CState#cs.context_var)}
+                      ]),
+            {Ws1, Ast2};
+        false ->
+            {Ws1, Ast}
+    end;
 compile({value, Expr, With}, CState, Ws) ->
     {Ws1, WithExprAsts} = with_args(With, CState, Ws),
     {CState1, Ws2} = template_compiler_utils:next_vars_var(CState, Ws1),
@@ -91,6 +100,7 @@ compile({date, now, {string_literal, _Pos, Format}}, CState, Ws) ->
             [{context, erl_syntax:variable(CState#cs.context_var)}]),
     {Ws, Ast};
 compile({load, Names}, _CState, Ws) ->
+    % We don't do anything with this. Present for compatibility only.
     CustomTags = [ Name || {identifier, _, Name} <- Names ],
     {Ws#ws{custom_tags=CustomTags ++ Ws#ws.custom_tags}, <<>>};
 compile({block, {identifier, _Pos, Name}, _Elts}, CState, Ws) ->
@@ -128,6 +138,128 @@ compile({'catinclude', Method, Template, IdExpr, Args}, CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws),
     {Ws2, IdAst} = template_compiler_expr:compile(IdExpr, CState, Ws1),
     catinclude(Method, Template, IdAst, ArgsList, CState, Ws2);
+compile({'call', {identifier, _, Name}, Args}, CState, Ws) ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws),
+    Module = template_compiler_utils:to_atom(Name),
+    MapAst = erl_syntax:map_expr([
+                    erl_syntax:map_field_assoc(WName, WExpr)
+                    || {WName, WExpr} <- ArgsList
+                ]),
+    Ast = ?Q([
+            "template_compiler_runtime_internal:call(",
+                    "_@Module@,",
+                    "_@MapAst,",
+                    "_@vars,",
+                    "_@context)"
+        ],
+        [
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {context, erl_syntax:variable(CState#cs.context_var)}
+        ]),
+    {Ws1, Ast};
+compile({'call_with', {identifier, _, Name}, Expr}, CState, Ws) ->
+    {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
+    Module = template_compiler_utils:to_atom(Name),
+    Ast = ?Q([
+            "template_compiler_runtime_internal:call(",
+                    "_@Module@,",
+                    "#{ with => _@ExprAst },",
+                    "_@vars,",
+                    "_@context)"
+        ],
+        [
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {context, erl_syntax:variable(CState#cs.context_var)}
+        ]),
+    {Ws1, Ast};
+compile({custom_tag, {identifier, _, Name}, Args}, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws),
+    TagName = template_compiler_utils:to_atom(Name),
+    MapAst = erl_syntax:map_expr([
+                    erl_syntax:map_field_assoc(WName, WExpr)
+                    || {WName, WExpr} <- ArgsList
+                ]),
+    Ast = ?Q([
+            "'@Runtime@':custom_tag(",
+                    "_@TagName@,",
+                    "_@MapAst,",
+                    "_@vars,",
+                    "_@context)"
+        ],
+        [
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {context, erl_syntax:variable(CState#cs.context_var)}
+        ]),
+    {Ws1, Ast};
+compile({Tag, Expr, Args}, #cs{runtime=Runtime} = CState, Ws) when Tag =:= image; Tag =:= image_url; Tag =:= media ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws),
+    {Ws2, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws1),
+    MapAst = erl_syntax:map_expr([
+                    erl_syntax:map_field_assoc(WName, WExpr)
+                    || {WName, WExpr} <- ArgsList
+                ]),
+    Ast = ?Q([
+            "'@Runtime@':builtin_tag(",
+                    "_@Tag@,",
+                    "_@ExprAst,",
+                    "_@MapAst,",
+                    "_@vars,",
+                    "_@context)"
+        ],
+        [
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {context, erl_syntax:variable(CState#cs.context_var)}
+        ]),
+    {Ws2, Ast};
+compile({url, Expr, Args}, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws),
+    {Ws2, DispatchRuleAst} = case Expr of
+        {identifier, _, Name} ->
+            {Ws1, erl_syntax:atom(template_compiler_utils:to_atom(Name))};
+        _ ->
+            template_compiler_expr:compile(Expr, CState, Ws1)
+    end,
+    MapAst = erl_syntax:map_expr([
+                    erl_syntax:map_field_assoc(WName, WExpr)
+                    || {WName, WExpr} <- ArgsList
+                ]),
+    Ast = ?Q([
+            "'@Runtime@':builtin_tag(",
+                    "url,",
+                    "_@DispatchRuleAst,",
+                    "_@MapAst,",
+                    "_@vars,",
+                    "_@context)"
+        ],
+        [
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {context, erl_syntax:variable(CState#cs.context_var)}
+        ]),
+    {Ws2, Ast};
+compile({lib, LibList, Args}, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws),
+    MapAst = erl_syntax:map_expr([
+                    erl_syntax:map_field_assoc(WName, WExpr)
+                    || {WName, WExpr} <- ArgsList
+                ]),
+    LibFilenames = [ Filename || {string, _, Filename} <- LibList ],
+    Ast = ?Q([
+            "'@Runtime@':builtin_tag(",
+                    "lib,",
+                    "_@LibFilenames@,",
+                    "_@MapAst,",
+                    "_@vars,",
+                    "_@context)"
+        ],
+        [
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {context, erl_syntax:variable(CState#cs.context_var)}
+        ]),
+    {Ws1, Ast};
+compile({print, Expr}, CState, Ws) ->
+    {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
+    Ast = ?Q("template_compiler_runtime_internal:print(_@ExprAst)"),
+    {Ws1, Ast};
 compile({'if', {'as', Expr, undefined}, IfElts, ElseElts}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
     {Ws2, IfClauseAst} = compile(IfElts, CState, Ws1),
@@ -211,7 +343,100 @@ compile({'with', {Exprs, Idents}, Elts}, CState, Ws) ->
             {vars, erl_syntax:variable(CState#cs.vars_var)},
             {vars1, erl_syntax:variable(CsWith#cs.vars_var)}
         ]),
-    {Ws3, Ast}.
+    {Ws3, Ast};
+compile({cache, {CacheTime, Args}, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws),
+    {Ws2, CacheTimeAst} = template_compiler_expr:compile(CacheTime, CState, Ws1),
+    {CsBody, Ws3} = template_compiler_utils:next_vars_var(CState, Ws2),
+    {CsBody1, Ws4} = template_compiler_utils:next_vars_var(CsBody, Ws3),
+    {Ws5, BodyAst} = compile(Elts, CsBody1, Ws4),
+    MapAst = erl_syntax:map_expr([
+                    erl_syntax:map_field_assoc(WName, WExpr)
+                    || {WName, WExpr} <- ArgsList
+                ]),
+    Ast = ?Q([
+            "'@Runtime@':cache_tag(",
+                    "_@CacheTimeAst,",
+                    "_@MapAst,",
+                    "fun(_@varsbody, _@contextbody) -> _@BodyAst end,",
+                    "_@vars,",
+                    "_@context)"
+        ],
+        [
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {context, erl_syntax:variable(CState#cs.context_var)},
+            {varsbody, erl_syntax:variable(CsBody1#cs.vars_var)},
+            {contextbody, erl_syntax:variable(CsBody1#cs.context_var)}
+        ]),
+    {Ws5, Ast};
+compile({javascript, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, BodyAst} = compile(Elts, CState, Ws),
+    Ast = ?Q([
+            "'@Runtime@':javascript_tag(",
+                    "_@BodyAst,",
+                    "_@vars,",
+                    "_@context)"
+        ],
+        [
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {context, erl_syntax:variable(CState#cs.context_var)}
+        ]),
+    {Ws1, Ast};
+compile({filter, Filters, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, BodyAst} = compile(Elts, CState, Ws),
+    Expr = lists:foldl(
+                fun({filter, Name, Args}, Acc) ->
+                    {apply_filter, Acc, {filter, Name, Args}}
+                end,
+                {ast, BodyAst},
+                Filters),
+    {Ws2, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws1),
+    Ast = ?Q("'@Runtime@':to_iolist(_@ExprAst, _@vars, _@context)",
+            [
+                {context, erl_syntax:variable(CState#cs.context_var)},
+                {vars, erl_syntax:variable(CState#cs.vars_var)}
+            ]),
+    {Ws2, Ast};
+compile({spaceless, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, BodyAst} = compile(Elts, CState, Ws),
+    Ast = ?Q("'@Runtime@':spaceless_tag(_@BodyAst, _@vars, _@context)",
+            [
+                {context, erl_syntax:variable(CState#cs.context_var)},
+                {vars, erl_syntax:variable(CState#cs.vars_var)}
+            ]),
+    {Ws1, Ast};
+compile({autoescape, {identifier, _, <<"on">>}, Elts}, CState, Ws) ->
+    compile(Elts, CState#cs{is_autoescape = true}, Ws);
+compile({autoescape, {identifier, _, <<"off">>}, Elts}, CState, Ws) ->
+    compile(Elts, CState#cs{is_autoescape = false}, Ws);
+compile({autoescape, {identifier, _, OnOff}, Elts}, CState, Ws) ->
+    compile(Elts, CState#cs{is_autoescape = z_convert:to_bool(OnOff)}, Ws);
+compile({cycle_compat, Names}, CState, Ws) ->
+    Exprs = [{string_literal, Pos, Name} || {identifier, Pos, Name} <- Names ],
+    compile({cycle, Exprs}, CState, Ws);
+compile({cycle, []}, _CState, Ws) ->
+    {Ws, erl_syntax:list([])};
+compile({cycle, Exprs}, CState, Ws) ->
+    {Ws1, Var} = template_compiler_utils:var(Ws),
+    {Ws2, ExprList} = expr_list(Exprs, CState, Ws1),
+    N = length(Exprs),
+    Clauses = lists:zip(lists:seq(0,N-1), ExprList),
+    ClauseAsts = [ erl_syntax:clause([erl_syntax:integer(Nr)], none, [Expr]) || {Nr,Expr} <- Clauses ],
+    ValueAst = ?Q("maps:get(counter0, _@v) rem _@N@", 
+                  [ {v, erl_syntax:variable(Var)} ]),
+    CaseAst = erl_syntax:case_expr(ValueAst, ClauseAsts),
+    Ast = ?Q([
+                "case maps:get(forloop, _@vars, undefined) of",
+                    "undefined -> _@first;",
+                    "_@v -> _@CaseAst",
+                "end"
+            ],
+            [
+                {first, hd(ExprList)},
+                {v, erl_syntax:variable(Var)},
+                {vars, erl_syntax:variable(CState#cs.vars_var)}
+            ]),
+    compile({value, {ast, Ast}, []}, CState, Ws2#ws{is_forloop_var=true}).
 
 
 include(Method, Template, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
@@ -231,6 +456,7 @@ include(Method, Template, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_a
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]),
     {Ws1, Ast}.
+
 
 catinclude(Method, Template, IdAst, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
     {Ws1, TemplateAst} = template_compiler_expr:compile(Template, CState, Ws),

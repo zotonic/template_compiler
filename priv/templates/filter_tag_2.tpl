@@ -1,0 +1,1 @@
+a-{% filter template_compiler_test|template_compiler_test:"x":c %}{{ v }}{% endfilter %}-b

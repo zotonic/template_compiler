@@ -25,8 +25,10 @@
     template_compiler_test/4
     ]).
 
+template_compiler_test(Value, _Context) when is_integer(Value) ->
+    2*z_convert:to_integer(Value);
 template_compiler_test(Value, _Context) ->
-    2*Value.
+    2*z_convert:to_integer(iolist_to_binary(Value)).
 
 template_compiler_test(A, B, _Context) ->
     [

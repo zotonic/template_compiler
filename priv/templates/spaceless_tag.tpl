@@ -1,0 +1,1 @@
+a-{% spaceless %} <a> x<span>xxx </span> </a> {% endspaceless %}-b

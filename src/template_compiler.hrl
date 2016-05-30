@@ -56,6 +56,7 @@
         runtime = template_compiler_runtime :: atom(),
         context = undefined :: term(),
         vars_var = "Vars" :: string(),
-        context_var = "Context" :: string()
+        context_var = "Context" :: string(),
+        is_autoescape = false
     }).
 

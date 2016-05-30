@@ -1,0 +1,1 @@
+{% template_compiler_tags_SUITE a=v b=1 c %}

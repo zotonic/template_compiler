@@ -309,13 +309,13 @@ scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_back_quote, Cl
     scan(T, append_char(Scanned, H), {SourceRef, Row, Column + 1}, {in_back_quote, Closer});
 
 % Closing code blocks
-scan(<<"%}-->", T/binary>>, [{identifier, _, <<"raw">>}, {open_tag, _, <<"%{--!<">>}|Scanned], {SourceRef, Row, Column}, {_, <<"%}-->">>}) ->
+scan(<<"%}-->", T/binary>>, [{identifier, _, <<"raw">>}, {open_tag, _, <<"<!--{%">>}|Scanned], {SourceRef, Row, Column}, {_, <<"%}-->">>}) ->
     scan(T, Scanned, {SourceRef, Row, Column + 5}, {in_raw, <<"<!--{% endraw %}-->">>});
 
 scan(<<"%}-->", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, <<"%}-->">>}) ->
     scan(T, [{close_tag, {SourceRef, Row, Column}, <<"%}-->">>} | Scanned], {SourceRef, Row, Column + 5}, in_text);
 
-scan(<<"%}", T/binary>>, [{identifier, _, <<"raw">>}, {open_tag, _, <<"%{">>}|Scanned], {SourceRef, Row, Column}, {_, <<"%}">>}) ->
+scan(<<"%}", T/binary>>, [{identifier, _, <<"raw">>}, {open_tag, _, <<"{%">>}|Scanned], {SourceRef, Row, Column}, {_, <<"%}">>}) ->
     scan(T, Scanned, {SourceRef, Row, Column + 2}, {in_raw, <<"{% endraw %}">>});
 
 scan(<<"%}", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, <<"%}">>}) ->
