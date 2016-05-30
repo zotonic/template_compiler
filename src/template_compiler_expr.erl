@@ -52,14 +52,23 @@ compile({atom_literal, _SrcPos, Atom}, _CState, Ws) ->
     {Ws, erl_syntax:abstract(template_compiler_utils:to_atom(Atom))};
 compile({find_value, LookupList}, CState, Ws) ->
     find_value_lookup(LookupList, CState, Ws);
-compile({auto_id, {{identifier, _, Name}, {identifier, _, Var}}}, #cs{vars_var=Vars}, Ws) ->
-    VarName = template_compiler_utils:to_atom(Var),
-    VarsAst = erl_syntax:variable(Vars),
-    Ast = ?Q("[ maps:get('$autoid', _@VarsAst), $-, _@Name, $-, z_convert:to_binary(maps:get(_@VarName, _@VarsAst, <<>>)) ]"),
+compile({auto_id, {{identifier, _, Name}, {identifier, _, Var}}}, #cs{runtime=Runtime} = CState, Ws) ->
+    VarName = erl_syntax:atom(template_compiler_utils:to_atom(Var)),
+    Ast = ?Q(["[ ",
+                "maps:get('$autoid', _@vars),",
+                "$-, _@Name@,",
+                "$-, z_convert:to_binary(",
+                        "'@Runtime@':find_value(_@VarName, _@vars, _@vars, _@context)"
+                    ")"
+              "]"],
+              [
+                {context, erl_syntax:variable(CState#cs.context_var)},
+                {vars, erl_syntax:variable(CState#cs.vars_var)}
+              ]),
     {Ws#ws{is_autoid_var=true}, Ast};
 compile({auto_id, {identifier, _, Name}}, #cs{vars_var=Vars}, Ws) ->
     VarsAst = erl_syntax:variable(Vars),
-    Ast = ?Q("[ maps:get('$autoid', _@VarsAst), $-, _@Name ]"),
+    Ast = ?Q("[ maps:get('$autoid', _@VarsAst), $-, _@Name@ ]"),
     {Ws#ws{is_autoid_var=true}, Ast};
 compile({tuple_value, {identifier, _, Name}, Args}, Cs, Ws) ->
     TupleName = erl_syntax:atom(template_compiler_utils:to_atom(Name)),

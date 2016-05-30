@@ -58,9 +58,20 @@ render(Template0, Vars, Options, Context) ->
     Template = normalize_template(Template0), 
     % Check _admin to map template to module (compile if needed)
     case block_lookup(Template, #{}, [], Options, Context) of
-        {ok, BaseModule, BlockMap} ->
+        {ok, BaseModule, ExtendsStack, BlockMap} ->
             % Start with the render function of the "base" template
-            {ok, BaseModule:render(Vars, BlockMap, Context)};
+            % Optionally add the unique prefix for this rendering.
+            Vars1 = case BaseModule:is_autoid() 
+                        orelse lists:any(fun(M) -> M:is_autoid() end, ExtendsStack)
+                    of
+                        true ->
+                            Vars#{
+                                '$autoid' => template_compiler_runtime_internal:unique()
+                            };
+                        false ->
+                            Vars
+                    end,
+            {ok, BaseModule:render(Vars1, BlockMap, Context)};
         {error, _} = Error ->
             Error
     end.
@@ -92,7 +103,7 @@ block_lookup(Template, BlockMap, ExtendsStack, Options, Context) ->
                     BlockMap1 = add_blocks(Module:blocks(), Module, BlockMap),
                     case Module:extends() of
                         undefined ->
-                            {ok, Module, BlockMap1};
+                            {ok, Module, ExtendsStack, BlockMap1};
                         overrides ->
                             Next = {overrides, Template, Module:filename()},
                             block_lookup(Next, BlockMap1, [Module|ExtendsStack], Options, Context);
@@ -161,8 +172,10 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
                     {ok, Module};
                 false ->
                     case compile_tokens(template_compiler_parser:parse(Tokens2), cs(Module, Filename, Options, Context)) of
-                        {ok, {Extends, BlockAsts, TemplateAst}} ->
-                            Forms = template_compiler_module:compile(Module, Filename, Runtime, Extends, BlockAsts, TemplateAst),
+                        {ok, {Extends, BlockAsts, TemplateAst, IsAutoid}} ->
+                            Forms = template_compiler_module:compile(
+                                                Module, Filename, IsAutoid, Runtime, 
+                                                Extends, BlockAsts, TemplateAst),
                             compile_forms(Filename, Forms);
                         {error, _} = Error ->
                             Error
@@ -213,18 +226,18 @@ cs(Module, Filename, Options, Context) ->
 
 compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState) ->
     Blocks = find_blocks(Elements),
-    {_Ws, BlockAsts} = compile_blocks(Blocks, CState),
-    {ok, {Extend, BlockAsts, undefined}};
+    {Ws, BlockAsts} = compile_blocks(Blocks, CState),
+    {ok, {Extend, BlockAsts, undefined, Ws#ws.is_autoid_var}};
 compile_tokens({ok, {overrides, Elements}}, CState) ->
     Blocks = find_blocks(Elements),
-    {_Ws, BlockAsts} = compile_blocks(Blocks, CState),
-    {ok, {overrides, BlockAsts, undefined}};
+    {Ws, BlockAsts} = compile_blocks(Blocks, CState),
+    {ok, {overrides, BlockAsts, undefined, Ws#ws.is_autoid_var}};
 compile_tokens({ok, {base, Elements}}, CState) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
     CStateElts = CState#cs{blocks = BlockAsts},
-    {_Ws, TemplateAsts} = template_compiler_element:compile(Elements, CStateElts, Ws),
-    {ok, {undefined, BlockAsts, TemplateAsts}};
+    {Ws1, TemplateAsts} = template_compiler_element:compile(Elements, CStateElts, Ws),
+    {ok, {undefined, BlockAsts, TemplateAsts, Ws1#ws.is_autoid_var}};
 compile_tokens({error, _} = Error, _CState) ->
     Error.
 

@@ -21,6 +21,7 @@ groups() ->
         ,expr_op_test
         ,expr_filter
         ,expr_nested
+        ,expr_autoid
         ]}].
 
 init_per_suite(Config) ->
@@ -84,4 +85,11 @@ expr_nested(_Config) ->
     },
     {ok, Bin2} = template_compiler:render("expr_nested_2.tpl", Vars2, [], undefined),
     <<"a20c">> = iolist_to_binary(Bin2).
+
+
+expr_autoid(_Config) ->
+    {ok, Bin1} = template_compiler:render("expr_autoid.tpl", #{}, [], undefined),
+    {match, _} = re:run(iolist_to_binary(Bin1), "x:[a-z0-9]+-id:y"),
+    {ok, Bin2} = template_compiler:render("expr_autoid_2.tpl", #{ foo => 20 }, [], undefined),
+    {match, _} = re:run(iolist_to_binary(Bin2), "x:[a-z0-9]+-id-20:y").
 

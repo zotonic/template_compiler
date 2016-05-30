@@ -20,15 +20,15 @@
 -author('Marc Worrell <marc@worrell.nl>').
 
 -export([
-    compile/6
+    compile/7
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
 -include("template_compiler.hrl").
 
-compile(Module, Filename, Runtime, Extends, BlockAsts, undefined) ->
-    compile(Module, Filename, Runtime, Extends, BlockAsts, erl_syntax:abstract(<<>>));
-compile(Module, Filename, Runtime, Extends, BlockAsts, TemplateAst) ->
+compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, undefined) ->
+    compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, erl_syntax:abstract(<<>>));
+compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, TemplateAst) ->
     Now = os:timestamp(),
     BlockNames = [ BN || {BN,_Tree,_Ws} <- BlockAsts ],
     lists:flatten(
@@ -41,6 +41,7 @@ compile(Module, Filename, Runtime, Extends, BlockAsts, TemplateAst) ->
                 "module/0,",
                 "extends/0,",
                 "filename/0,",
+                "is_autoid/0,"
                 "runtime/0",
             "]).",
             "render(Vars, Blocks, Context) -> _@TemplateAst.",
@@ -49,6 +50,7 @@ compile(Module, Filename, Runtime, Extends, BlockAsts, TemplateAst) ->
             "module() -> _@Module@.",
             "extends() -> _@Extends@.",
             "filename() -> _@Filename@.",
+            "is_autoid() -> _@IsAutoid@.",
             "runtime() -> _@Runtime@.",
             "'@_functions'() -> _."
             ],
