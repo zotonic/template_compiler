@@ -118,7 +118,7 @@ find_value_lookup([{identifier, _SrcPos, Var} = Idn], #cs{runtime=Runtime, vars_
 find_value_lookup(ValueLookup, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
     {Ws1, ValueLookupAsts} = value_lookup_asts(ValueLookup, CState, Ws, []),
     ListAst = erl_syntax:list(ValueLookupAsts),
-    Ast = ?Q("'@Runtime@':find_multi_value(_@ListAst, _@vars, _@context)",
+    Ast = ?Q("'@Runtime@':find_nested_value(_@ListAst, _@vars, _@context)",
             [
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {vars, erl_syntax:variable(Vars)}

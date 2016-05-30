@@ -22,6 +22,7 @@ groups() ->
         ,hello_world_block_test
         ,hello_world_block2_test
         ,hello_world_block3_test
+        ,hello_world_comment_test
         ]}].
 
 init_per_suite(Config) ->
@@ -61,4 +62,9 @@ hello_world_block2_test(_Config) ->
 hello_world_block3_test(_Config) ->
     {ok, Bin} = template_compiler:render("hello_world_block3.tpl", #{}, [], undefined),
     <<"Bye Hello World!">> = iolist_to_binary(Bin),
+    ok.
+
+hello_world_comment_test(_Config) ->
+    {ok, Bin} = template_compiler:render("hello_world_comment.tpl", #{}, [], undefined),
+    <<"Hello World!">> = iolist_to_binary(Bin),
     ok.

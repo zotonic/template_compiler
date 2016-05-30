@@ -20,6 +20,7 @@ groups() ->
         [expr_test
         ,expr_op_test
         ,expr_filter
+        ,expr_nested
         ]}].
 
 init_per_suite(Config) ->
@@ -62,3 +63,25 @@ expr_filter(_Config) ->
     {ok, Bin2} = template_compiler:render("expr_filter_2.tpl", #{ a => 1, b => 2, c => 3 }, [], undefined),
     <<"*1:2*1:3:2*">> = iolist_to_binary(Bin2),
     ok.
+
+expr_nested(_Config) ->
+    Vars1 = #{
+        a => #{
+            b => #{
+                c => 20
+            }
+        }
+    },
+    {ok, Bin1} = template_compiler:render("expr_nested.tpl", Vars1, [], undefined),
+    <<"a20c">> = iolist_to_binary(Bin1),
+    Vars2 = #{
+        v => b,
+        a => #{
+            b => #{
+                c => 20
+            }
+        }
+    },
+    {ok, Bin2} = template_compiler:render("expr_nested_2.tpl", Vars2, [], undefined),
+    <<"a20c">> = iolist_to_binary(Bin2).
+

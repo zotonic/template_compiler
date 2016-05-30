@@ -23,7 +23,7 @@
 -export([
     find_template/3,
     context_name/1,
-    find_multi_value/3,
+    find_nested_value/3,
     find_value/4,
     get_translations/2,
     lookup_translation/3,
@@ -32,7 +32,7 @@
     to_iolist/3
     ]).
 
--callback find_multi_value(Keys :: list(), TplVars :: term(), Context :: term()) -> term().
+-callback find_nested_value(Keys :: list(), TplVars :: term(), Context :: term()) -> term().
 -callback find_value(Key :: term(), Vars :: term(), TplVars :: #{}, Context :: term()) -> term().
 
 -callback get_translations(Text :: binary(), Context :: term()) -> binary() | {trans, [{atom(), binary()}]}.
@@ -76,15 +76,15 @@ context_name(_Context) ->
 
 %% @doc Find a list of values at once, easier and more efficient than a nested find_value/4
 %%      Add pattern matching here for nested lookups.
-find_multi_value([K|Ks], TplVars, Context) ->
-    find_multi_value_1(find_value(K, TplVars, TplVars, Context), Ks, TplVars, Context).
+find_nested_value([K|Ks], TplVars, Context) ->
+    find_nested_value_1(find_value(K, TplVars, TplVars, Context), Ks, TplVars, Context).
 
-find_multi_value_1(undefined, _Ks, _TplVars, _Context) ->
+find_nested_value_1(undefined, _Ks, _TplVars, _Context) ->
     undefined;
-find_multi_value_1(V, [], _TplVars, _Context) ->
+find_nested_value_1(V, [], _TplVars, _Context) ->
     V;
-find_multi_value_1(V, [K|Ks], TplVars, Context) ->
-    find_multi_value_1(find_value(K, V, TplVars, Context), Ks, TplVars, Context).
+find_nested_value_1(V, [K|Ks], TplVars, Context) ->
+    find_nested_value_1(find_value(K, V, TplVars, Context), Ks, TplVars, Context).
 
 
 %% @doc Find the value of key in some structure.
