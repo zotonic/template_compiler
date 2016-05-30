@@ -26,6 +26,7 @@
 -include_lib("syntax_tools/include/merl.hrl").
 -include("template_compiler.hrl").
 
+-spec compile(element()|elements(), #cs{}, #ws{}) -> {#ws{}, erl_syntax:syntaxTree()}.
 compile([], _CState, Ws) ->
     {Ws, erl_syntax:abstract(<<>>)};
 compile(L, CState, Ws) when is_list(L) ->
@@ -93,16 +94,19 @@ compile({load, Names}, _CState, Ws) ->
     CustomTags = [ Name || {identifier, _, Name} <- Names ],
     {Ws#ws{custom_tags=CustomTags ++ Ws#ws.custom_tags}, <<>>};
 compile({block, {identifier, _Pos, Name}, _Elts}, CState, Ws) ->
+    BlockName = template_compiler_utils:to_atom(Name),
     Ast = erl_syntax:application(
             erl_syntax:atom(template_compiler_runtime_internal),
             erl_syntax:atom(block_call),
             [
-                erl_syntax:atom(template_compiler_utils:to_atom(Name)),
+                erl_syntax:atom(BlockName),
                 erl_syntax:variable(CState#cs.vars_var),
                 erl_syntax:variable("Blocks"),
                 erl_syntax:variable(CState#cs.context_var)
             ]),
-    {Ws, Ast};
+    {value, {BlockName, _Tree, BlockWs}} = lists:keysearch(BlockName, 1, CState#cs.blocks), 
+    Ws1 = Ws#ws{is_forloop_var = Ws#ws.is_forloop_var or BlockWs#ws.is_forloop_var}, 
+    {Ws1, Ast};
 compile(inherit, #cs{block=undefined}, Ws) ->
     {Ws, erl_syntax:abstract(<<>>)};
 compile(inherit, #cs{block=Block, module=Module} = CState, Ws) ->
@@ -116,7 +120,7 @@ compile(inherit, #cs{block=Block, module=Module} = CState, Ws) ->
                 erl_syntax:variable("Blocks"),
                 erl_syntax:variable(CState#cs.context_var)
             ]),
-    {Ws, Ast};
+    {Ws#ws{is_forloop_var=true}, Ast};
 compile({'include', Method, Template, Args}, CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws),
     include(Method, Template, ArgsList, CState, Ws1);
@@ -161,11 +165,10 @@ compile({'if', {'as', Expr, {identifier, _Pos, Name}}, IfElts, ElseElts}, #cs{ru
        ]),
     {Ws5, Ast};
 compile({'for', {'in', Idents, ListExpr}, LoopElts, EmptyElts}, #cs{runtime=Runtime} = CState, Ws) ->
-    {CsLoop, WsLoop} = template_compiler_utils:next_vars_var(CState, Ws#ws{is_forloop_var=false, is_include_inherit=false}),
+    {CsLoop, WsLoop} = template_compiler_utils:next_vars_var(CState, Ws#ws{is_forloop_var=false}),
     {WsLoop1, LoopAst} = compile(LoopElts, CsLoop, WsLoop),
     WsEmpty = WsLoop1#ws{ 
-        is_forloop_var=Ws#ws.is_forloop_var,
-        is_include_inherit=Ws#ws.is_include_inherit
+        is_forloop_var=Ws#ws.is_forloop_var
     },
     {WsEmpty1, EmptyAst} = compile(EmptyElts, CState, WsEmpty),
     {WsExpr, ExprAst} = template_compiler_expr:compile(ListExpr, CState, WsEmpty1),
@@ -183,7 +186,7 @@ compile({'for', {'in', Idents, ListExpr}, LoopElts, EmptyElts}, #cs{runtime=Runt
             ")"
         ],
         [
-            {isforloopvar, erl_syntax:atom(WsLoop1#ws.is_forloop_var or WsLoop1#ws.is_include_inherit)},
+            {isforloopvar, erl_syntax:atom(WsLoop1#ws.is_forloop_var)},
             {varsloop, erl_syntax:variable(CsLoop#cs.vars_var)},
             {vars, erl_syntax:variable(CState#cs.vars_var)},
             {context, erl_syntax:variable(CState#cs.context_var)}
@@ -212,12 +215,7 @@ compile({'with', {Exprs, Idents}, Elts}, CState, Ws) ->
 
 
 include(Method, Template, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
-    {Ws1, TemplateAst} = case Template of
-        {string_literal, _, String} ->
-            {Ws#ws{is_include_inherit=true}, erl_syntax:abstract(String)};
-        _ ->
-            template_compiler_expr:compile(Template, CState, Ws)
-    end,
+    {Ws1, TemplateAst} = template_compiler_expr:compile(Template, CState, Ws),
     ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList ]),
     Ast = ?Q([
             "template_compiler_runtime_internal:include(",
@@ -235,12 +233,7 @@ include(Method, Template, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_a
     {Ws1, Ast}.
 
 catinclude(Method, Template, IdAst, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
-    {Ws1, TemplateAst} = case Template of
-        {string_literal, _, String} ->
-            {Ws#ws{is_include_inherit=true}, erl_syntax:abstract(String)};
-        _ ->
-            template_compiler_expr:compile(Template, CState, Ws)
-    end,
+    {Ws1, TemplateAst} = template_compiler_expr:compile(Template, CState, Ws),
     ArgsList1 = [ {erl_syntax:atom(id),IdAst} | ArgsList ],
     ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList1 ]),
     Ast = ?Q([
@@ -284,6 +277,7 @@ with_args(With, CState, Ws) ->
             {Ws, []},
             With).
 
+-spec idents_as_atoms([identifier_token()]) -> [ atom() ].
 idents_as_atoms(Idents) ->
     [ ident_as_atom(Ident) || Ident <- Idents ].
 

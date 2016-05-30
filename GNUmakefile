@@ -30,7 +30,7 @@ compile: $(REBAR)
 shell: $(REBAR) compile
 	$(REBAR) $(REBAR_OPTS) shell
 
-test: compile
+test: $(REBAR)
 	$(REBAR) $(REBAR_OPTS) ct    
 
 # Cleaning

@@ -26,6 +26,8 @@
 -include_lib("syntax_tools/include/merl.hrl").
 -include("template_compiler.hrl").
 
+
+-spec compile(element(), #cs{}, #ws{}) -> {#ws{}, erl_syntax:syntaxTree()}.
 compile(true, _CState, Ws) ->
     {Ws, erl_syntax:atom(true)};
 compile(false, _CState, Ws) ->
@@ -89,13 +91,16 @@ compile({apply_filter, Expr, {filter, {identifier, _, <<"default_if_none">>}, [A
     filter_default_if_none(Expr, Arg, CState, Ws);
 compile({apply_filter, Expr, {filter, {identifier, _, <<"default_if_undefined">>}, [Arg]}}, CState, Ws) ->
     filter_default_if_none(Expr, Arg, CState, Ws);
-compile({apply_filter, Expr, {filter, {identifier, _, FilterName}, FilterArgs}}, CState, Ws) ->
-    FilterName = template_compiler_utils:to_atom(FilterName),
-    FilterModule = template_compiler_utils:to_atom(<<"filter_", FilterName/binary>>),
+compile({apply_filter, Expr, {filter, {identifier, _, Filter}, FilterArgs}}, CState, Ws) ->
+    FilterName = template_compiler_utils:to_atom(Filter),
+    FilterModule = template_compiler_utils:to_atom(<<"filter_", Filter/binary>>),
     {Ws1, ExprAst} = compile(Expr, CState, Ws),
     {Ws2, AstList} = list_1(FilterArgs, CState, Ws1, []),
-    Args = erl_syntax:list([ExprAst | AstList ] ++ erl_syntax:variable(CState#cs.context_var)),
-    Ast = erl_syntax:application(FilterModule, FilterName, Args),
+    Args = [ExprAst | AstList ] ++ [erl_syntax:variable(CState#cs.context_var)],
+    Ast = erl_syntax:application(
+                         erl_syntax:atom(FilterModule),
+                         erl_syntax:atom(FilterName),
+                         Args),
     {Ws2, Ast}.
 
 

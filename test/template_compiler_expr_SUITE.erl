@@ -19,6 +19,7 @@ groups() ->
     [{basic, [], 
         [expr_test
         ,expr_op_test
+        ,expr_filter
         ]}].
 
 init_per_suite(Config) ->
@@ -53,4 +54,11 @@ expr_test(_Config) ->
 expr_op_test(_Config) ->
     {ok, Bin1} = template_compiler:render("expr_op.tpl", #{ a => 10, b => 5 }, [], undefined),
     <<"15|5|50|5|2.0">> = iolist_to_binary(Bin1),
+    ok.
+
+expr_filter(_Config) ->
+    {ok, Bin1} = template_compiler:render("expr_filter.tpl", #{ v => 10 }, [], undefined),
+    <<"a20b">> = iolist_to_binary(Bin1),
+    {ok, Bin2} = template_compiler:render("expr_filter_2.tpl", #{ a => 1, b => 2, c => 3 }, [], undefined),
+    <<"*1:2*1:3:2*">> = iolist_to_binary(Bin2),
     ok.

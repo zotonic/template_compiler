@@ -37,7 +37,7 @@
 -type template() :: binary()
                   | string()
                   | {cat, binary()|string()}
-                  | {overrides, ContextName::term(), binary()|string()}.
+                  | {overrides, binary()|string(), Filename::filename:filename()}.
 -type template_key() :: {ContextName::term(), Runtime::atom(), template()}.
 -type render_result() :: binary() | string() | term() | list(render_result()).
 
@@ -65,15 +65,20 @@ render(Template0, Vars, Options, Context) ->
             Error
     end.
 
-%% @doc Map all string() values in a template to binary().
+%% @doc Map all string() template names to binary().
+-spec normalize_template(template()) -> template().
 normalize_template(Template) when is_binary(Template) ->
     Template;
+normalize_template({cat, Template} = T) when is_binary(Template) ->
+    T;
+normalize_template({overrides, Template, _Filename} = T) when is_binary(Template) -> 
+    T;
 normalize_template(Template) when is_list(Template) ->
     unicode:characters_to_binary(Template);
 normalize_template({cat, Template}) when is_list(Template) ->
     {cat, unicode:characters_to_binary(Template)};
-normalize_template({overrides, Ctx, Template}) when is_list(Template) -> 
-    {overrides, Ctx, unicode:characters_to_binary(Template)}.
+normalize_template({overrides, Template, Filename}) when is_list(Template) -> 
+    {overrides, unicode:characters_to_binary(Template), Filename}.
 
 %% @doc Recursive lookup of blocks via the extends-chain of a template.
 block_lookup(Template, BlockMap, ExtendsStack, Options, Context) ->
@@ -217,7 +222,8 @@ compile_tokens({ok, {overrides, Elements}}, CState) ->
 compile_tokens({ok, {base, Elements}}, CState) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
-    {_Ws, TemplateAsts} = template_compiler_element:compile(Elements, CState, Ws),
+    CStateElts = CState#cs{blocks = BlockAsts},
+    {_Ws, TemplateAsts} = template_compiler_element:compile(Elements, CStateElts, Ws),
     {ok, {undefined, BlockAsts, TemplateAsts}};
 compile_tokens({error, _} = Error, _CState) ->
     Error.
@@ -227,29 +233,32 @@ compile_blocks(Blocks, CState) ->
     Ws = #ws{},
     lists:foldl(
         fun(Block, {WsAcc, BlockAcc}) ->
-            {WsAcc1, B} = compile_block(Block, CState, WsAcc),
+            CState1 = CState#cs{blocks = BlockAcc},
+            {WsAcc1, B} = compile_block(Block, CState1, WsAcc),
             {WsAcc1, [B|BlockAcc]}
         end,
         {Ws,[]},
         Blocks).
 
-
 %% @doc Compile a block definition to a function name and its body elements.
--spec compile_block(block_element(), #cs{}, #ws{}) -> {#ws{}, {atom(), erl_syntax:syntaxTree()}}.
+-spec compile_block(block_element(), #cs{}, #ws{}) -> {#ws{}, {atom(), erl_syntax:syntaxTree(), #ws{}}}.
 compile_block({block, {identifier, _Pos, Name}, Elts}, CState, Ws) ->
     BlockName = template_compiler_utils:to_atom(Name),
-    {Ws1, Body} = template_compiler_element:compile(Elts, CState#cs{block=BlockName}, Ws),
-    {Ws1, {BlockName, Body}}.
+    {Ws1, Body} = template_compiler_element:compile(Elts, CState#cs{block=BlockName}, reset_block_ws(Ws)),
+    {Ws1, {BlockName, Body, Ws1}}.
+
+reset_block_ws(Ws) ->
+    Ws#ws{is_forloop_var=false}.
 
 
-%% @doc Extract all block definitions from the parse tree, keep the tree as-is.
+%% @doc Extract all block definitions from the parse tree, returns deepest nested blocks first
 find_blocks(Elements) ->
     find_blocks(Elements, []).
 
 find_blocks(List, Acc) when is_list(List) ->
     lists:foldl(fun find_blocks/2, Acc, List);
 find_blocks({block, _Name, Elements} = Block, Acc) ->
-    [ Block| find_blocks(Elements, Acc) ];
+    find_blocks(Elements, [Block|Acc]);
 find_blocks(Element, Acc) ->
     find_blocks(block_elements(Element), Acc).
 

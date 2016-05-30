@@ -30,7 +30,7 @@ compile(Module, Filename, Runtime, Extends, BlockAsts, undefined) ->
     compile(Module, Filename, Runtime, Extends, BlockAsts, erl_syntax:abstract(<<>>));
 compile(Module, Filename, Runtime, Extends, BlockAsts, TemplateAst) ->
     Now = os:timestamp(),
-    BlockNames = [ BN || {BN,_} <- BlockAsts ],
+    BlockNames = [ BN || {BN,_Tree,_Ws} <- BlockAsts ],
     lists:flatten(
         ?Q(["-module('@Module@').",
             "-export([",
@@ -59,7 +59,7 @@ compile(Module, Filename, Runtime, Extends, BlockAsts, TemplateAst) ->
 blocksfun(Blocks) ->
     Clauses = [
         ?Q("(_@BlockName@, Vars, Blocks, Context) -> _@BlockAst")
-        || {BlockName, BlockAst} <- Blocks
+        || {BlockName, BlockAst, _BlockWs} <- Blocks
     ] ++ [
         ?Q("(_BlockName, _Vars, _Blocks, _Context) -> <<>>")
     ],
