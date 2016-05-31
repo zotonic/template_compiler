@@ -1,6 +1,7 @@
 Template Compiler for Erlang / Zotonic
 ======================================
 
+[![Build Status](https://travis-ci.org/zotonic/template_compiler.svg?branch=0.x)](https://travis-ci.org/zotonic/template_compiler)
 [![Join the chat at https://gitter.im/zotonic/zotonic](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/zotonic/zotonic?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 **WORK IN PROGRESS**
@@ -11,6 +12,11 @@ This compiler is a complete rewrite of the erlydtl fork used in Zotonic.
 
 Main difference is that this compiler does not generate monolithic Erlang modules but smaller functional blocks.
 These blocks can be re-used between different templates and sites.
+
+
+
+About Zotonic
+-------------
 
 Zotonic is the open source, high speed, real-time web framework  and content management system, built with Erlang. It is flexible, extensible and designed from the ground up to support dynamic, interactive websites and mobile solutions.
 
