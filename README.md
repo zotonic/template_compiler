@@ -1,7 +1,7 @@
 Template Compiler for Erlang / Zotonic
 ======================================
 
-[![Build Status](https://travis-ci.org/zotonic/template_compiler.svg?branch=0.x)](https://travis-ci.org/zotonic/template_compiler)
+[![Build Status](https://travis-ci.org/zotonic/template_compiler.svg?branch=master)](https://travis-ci.org/zotonic/template_compiler)
 [![Join the chat at https://gitter.im/zotonic/zotonic](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/zotonic/zotonic?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 **WORK IN PROGRESS**
