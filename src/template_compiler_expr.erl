@@ -77,7 +77,7 @@ compile({tuple_value, {identifier, _, Name}, Args}, Cs, Ws) ->
     {WsProps, PropsAst} = proplist_ast(Args, Cs, Ws),
     Ast = ?Q("{ _@TupleName, _@PropsAst }"),
     {WsProps, Ast};
-compile({list_value, Exprs}, Cs, Ws) ->
+compile({value_list, Exprs}, Cs, Ws) ->
     list_ast(Exprs, Cs, Ws);
 compile({expr, Op, Arg}, #cs{runtime=Runtime} = CState, Ws) when is_atom(Op) ->
     {Ws1, ArgAst} = compile(Arg, CState, Ws),
@@ -127,7 +127,8 @@ find_value_lookup([{identifier, _SrcPos, Var} = Idn], #cs{runtime=Runtime, vars_
             ]),
     {maybe_forloop_var(Ws, Idn), Ast};
 find_value_lookup(ValueLookup, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
-    {Ws1, ValueLookupAsts} = value_lookup_asts(ValueLookup, CState, Ws, []),
+    ValueLookup1 = Runtime:compile_map_nested_value(ValueLookup, CState#cs.context),
+    {Ws1, ValueLookupAsts} = value_lookup_asts(ValueLookup1, CState, Ws, []),
     ListAst = erl_syntax:list(ValueLookupAsts),
     Ast = ?Q("'@Runtime@':find_nested_value(_@ListAst, _@vars, _@context)",
             [
@@ -146,6 +147,8 @@ value_lookup_asts([], _CState, Ws, Acc) ->
 value_lookup_asts([{identifier, _, Var}|Vs], CState, Ws, Acc) ->
     VarName = template_compiler_utils:to_atom(Var),
     value_lookup_asts(Vs, CState, Ws, [erl_syntax:atom(VarName)|Acc]);
+value_lookup_asts([{ast, Ast}|Vs], CState, Ws, Acc) ->
+    value_lookup_asts(Vs, CState, Ws, [Ast|Acc]);
 value_lookup_asts([{expr, Expr}|Vs], CState, Ws, Acc) ->
     {Ws1, ExprAst} = compile(Expr, CState, Ws),
     value_lookup_asts(Vs, CState, Ws1, [ExprAst|Acc]).
@@ -163,7 +166,7 @@ filter_default(Expr, Arg, #cs{runtime=Runtime} = CState, Ws) ->
                     "true -> _@VAst",
                 "end",
               "end"],
-            [{context, erly_syntax:variable(CState#cs.context_var)}]),
+            [{context, erl_syntax:variable(CState#cs.context_var)}]),
     {Ws3, Ast}.
 
 

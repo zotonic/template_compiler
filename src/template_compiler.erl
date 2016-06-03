@@ -26,7 +26,8 @@
     flush_context_name/1,
     compile_file/3,
     compile_binary/4,
-    get_option/2
+    get_option/2,
+    is_template_module/1
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
@@ -36,8 +37,12 @@
 -type options() :: list(option()).
 -type template() :: binary()
                   | string()
+                  | {filename, filename:filename()}
                   | {cat, binary()|string()}
-                  | {overrides, binary()|string(), Filename::filename:filename()}.
+                  | {cat, binary()|string(), term()}
+                  | {overrules, binary()|string(), filename:filename()}.
+-type template1() :: binary()
+                  | {filename, filename:filename()}.
 -type template_key() :: {ContextName::term(), Runtime::atom(), template()}.
 -type render_result() :: binary() | string() | term() | list(render_result()).
 
@@ -51,6 +56,7 @@
         option/0,
         options/0,
         template/0,
+        template1/0,
         template_key/0,
         builtin_tag/0
     ]).
@@ -58,13 +64,16 @@
 
 %% @doc Render a template. This looks up the templates needed, ensures compilation and
 %%      returns the rendering result.
-%% @todo: map non-binary templates (cat, overrides) to a template name (use runtime routine)
--spec render(Template :: template(), Vars :: #{}, Options :: options(), Context :: term()) ->
+%% @todo: map non-binary templates (cat, overrules) to a template name (use runtime routine)
+-spec render(Template :: template(), Vars :: #{} | [], Options :: options(), Context :: term()) ->
         {ok, render_result()} | {error, term()}.
-render(Template0, Vars, Options, Context) ->
-    Template = normalize_template(Template0), 
-    % Check _admin to map template to module (compile if needed)
-    case block_lookup(Template, #{}, [], Options, Context) of
+render(Template, Vars, Options, Context) when is_list(Vars) ->
+    render(Template, maps:from_list(Vars), Options, Context);
+render(Template0, Vars, Options, Context) when is_map(Vars) ->
+    Template = normalize_template(Template0),
+    Runtime = proplists:get_value(runtime, Options, template_compiler_runtime),
+    Template1 = Runtime:map_template(Template, Vars, Context),
+    case block_lookup(Template1, #{}, [], Options, Vars, Runtime, Context) of
         {ok, BaseModule, ExtendsStack, BlockMap} ->
             % Start with the render function of the "base" template
             % Optionally add the unique prefix for this rendering.
@@ -87,19 +96,27 @@ render(Template0, Vars, Options, Context) ->
 -spec normalize_template(template()) -> template().
 normalize_template(Template) when is_binary(Template) ->
     Template;
+normalize_template({filename, Filename} = T) when is_binary(Filename) ->
+    T;
 normalize_template({cat, Template} = T) when is_binary(Template) ->
     T;
-normalize_template({overrides, Template, _Filename} = T) when is_binary(Template) -> 
+normalize_template({cat, Template, _} = T) when is_binary(Template) ->
+    T;
+normalize_template({overrules, Template, _Filename} = T) when is_binary(Template) -> 
     T;
 normalize_template(Template) when is_list(Template) ->
     unicode:characters_to_binary(Template);
+normalize_template({filename, Filename}) when is_list(Filename) ->
+    {filename, unicode:characters_to_binary(Filename)};
 normalize_template({cat, Template}) when is_list(Template) ->
     {cat, unicode:characters_to_binary(Template)};
-normalize_template({overrides, Template, Filename}) when is_list(Template) -> 
-    {overrides, unicode:characters_to_binary(Template), Filename}.
+normalize_template({cat, Template, IsA}) when is_list(Template) ->
+    {cat, unicode:characters_to_binary(Template), IsA};
+normalize_template({overrules, Template, Filename}) when is_list(Template) -> 
+    {overrules, unicode:characters_to_binary(Template), Filename}.
 
 %% @doc Recursive lookup of blocks via the extends-chain of a template.
-block_lookup(Template, BlockMap, ExtendsStack, Options, Context) ->
+block_lookup(Template, BlockMap, ExtendsStack, Options, Vars, Runtime, Context) ->
     case template_compiler_admin:lookup(Template, Options, Context) of
         {ok, Module} ->
             case lists:member(Module, ExtendsStack) of
@@ -111,11 +128,11 @@ block_lookup(Template, BlockMap, ExtendsStack, Options, Context) ->
                     case Module:extends() of
                         undefined ->
                             {ok, Module, ExtendsStack, BlockMap1};
-                        overrides ->
-                            Next = {overrides, Template, Module:filename()},
-                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], Options, Context);
+                        overrules ->
+                            Next = Runtime:map_template({overrules, Template, Module:filename()}, Vars, Context),
+                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], Options, Vars, Runtime, Context);
                         Extends when is_binary(Extends) ->
-                            block_lookup(Extends, BlockMap1, [Module|ExtendsStack], Options, Context)
+                            block_lookup(Extends, BlockMap1, [Module|ExtendsStack], Options, Vars, Runtime, Context)
                     end
             end;
         {error, _} = Error ->
@@ -192,12 +209,27 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
             Error
     end.
 
+%% @doc Check if the modulename looks like a module generated by the template compiler.
+-spec is_template_module(binary()|string()|atom()) -> boolean().
+is_template_module(<<"tpl_", _/binary>>) -> true;
+is_template_module("tpl_" ++ _) -> true;
+is_template_module(X) when is_binary(X) -> false;
+is_template_module(X) when is_list(X) -> false;
+is_template_module(Name) -> is_template_module(z_convert:to_binary(Name)).
+
+
 %%%% --------------------------------- Internal ----------------------------------
 
 module_name(Runtime, Tokens) ->
-    TokenChecksum = crypto:hash(sha, term_to_binary({?COMPILER_VERSION, Runtime, Tokens})),
+    Tokens1 = remove_srcpos(Tokens),
+    TokenChecksum = crypto:hash(sha, term_to_binary({?COMPILER_VERSION, Runtime, Tokens1})),
     Hex = z_string:to_lower(z_url:hex_encode(TokenChecksum)),
     binary_to_atom(iolist_to_binary(["tpl_",Hex]), 'utf8').
+
+% Ensure that duplicate files have the same checksum by removing the filename.
+remove_srcpos(Tokens) ->
+    [ {Token, V} || {Token, _SrcPos, V} <- Tokens ].
+
 
 compile_forms(Filename, Forms) ->
     % case compile:forms(Forms, [nowarn_shadow_vars]) of
@@ -235,10 +267,10 @@ compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState) -
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
     {ok, {Extend, BlockAsts, undefined, Ws#ws.is_autoid_var}};
-compile_tokens({ok, {overrides, Elements}}, CState) ->
+compile_tokens({ok, {overrules, Elements}}, CState) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
-    {ok, {overrides, BlockAsts, undefined, Ws#ws.is_autoid_var}};
+    {ok, {overrules, BlockAsts, undefined, Ws#ws.is_autoid_var}};
 compile_tokens({ok, {base, Elements}}, CState) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
@@ -293,14 +325,14 @@ block_elements({filter, _, Elts}) -> Elts;
 block_elements(_) -> [].
 
 
-%% @doc Optionally drop text before {% extends %} or {% overrides %}.
+%% @doc Optionally drop text before {% extends %} or {% overrules %}.
 maybe_drop_text([{text, _SrcRef, _Text}|Rest], OrgTks) ->
     maybe_drop_text(Rest, OrgTks);
 maybe_drop_text([{comment, _Text}|Rest], OrgTks) ->
     maybe_drop_text(Rest, OrgTks);
 maybe_drop_text([{open_tag, _, _}, {extends_keyword, _, _}|_] = Tks, _OrgTks) ->
     Tks;
-maybe_drop_text([{open_tag, _, _}, {overrides_keyword, _, _}|_] = Tks, _OrgTks) ->
+maybe_drop_text([{open_tag, _, _}, {overrules_keyword, _, _}|_] = Tks, _OrgTks) ->
     Tks;
 maybe_drop_text(_, [{open_tag, SrcRef, _}|_] = OrgTks) ->
     [{text, SrcRef, <<>>}|OrgTks];
@@ -323,7 +355,7 @@ expand_translation({trans_literal, SrcPos, Text}, Runtime, Context) ->
     Unescaped = template_compiler_utils:unescape_string_literal(Text),
     case Runtime:get_translations(Unescaped, Context) of
         {trans, _} = Tr -> {trans_literal, SrcPos, Tr};
-        B when is_binary(B) -> {text, SrcPos, B}
+        B when is_binary(B) -> {string_literal, SrcPos, template_compiler_utils:unescape_string_literal(B)}
     end;
 expand_translation({string_literal, SrcPos, Text}, _Runtime, _Context) ->
     Text1 = template_compiler_utils:unescape_string_literal(Text),

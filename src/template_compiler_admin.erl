@@ -59,7 +59,7 @@
 
 
 %% @doc Find a template, start a compilation if not found
--spec lookup(binary()|{overrides, binary(), filename:filename()}, template_compiler:options(), any()) -> {ok, atom()} | {error, term()}.
+-spec lookup(template_compiler:template1(), template_compiler:options(), any()) -> {ok, atom()} | {error, term()}.
 lookup(Template, Options, Context) ->
     Runtime = template_compiler:get_option(runtime, Options),
     ContextName = Runtime:context_name(Context),
@@ -91,10 +91,10 @@ lookup(Template, Options, Context) ->
 flush_file(Filename) ->
     gen_server:cast(?MODULE, {flush_file, Filename}).
 
-%% @doc Ping that a template has been changed
+%% @doc Ping that a context has changed
 -spec flush_context_name(ContextName::term()) -> ok.
 flush_context_name(ContextName) ->
-    gen_server:cast(?MODULE, {flush_context, ContextName}).
+    gen_server:cast(?MODULE, {flush_context_name, ContextName}).
 
 -spec start_link() -> {ok, pid()} | {error, any()}.
 start_link() ->

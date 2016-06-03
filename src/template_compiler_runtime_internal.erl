@@ -139,7 +139,6 @@ block_inherit(Module, Block, Vars, BlockMap, Context) ->
 
 
 %% @doc Include a template.
-%% @todo Add support for 'all' option
 -spec include(normal|optional|all, template_compiler:template(), list({atom(),term()}), atom(), #{}, term()) -> 
         template_compiler:render_result().
 include(Method, Template, Args, Runtime, Vars, Context) ->
@@ -149,13 +148,26 @@ include(Method, Template, Args, Runtime, Vars, Context) ->
                 end,
                 Vars,
                 Args),
+    include_1(Method, Template, Runtime, Vars1, Context).
+
+include_1(all, Template, Runtime, Vars1, Context) ->
+    Templates = Runtime:map_template_all(Template, Vars1, Context),
+    lists:map(
+            fun(Tpl) ->
+                include_1(optional, Tpl, Runtime, Vars1, Context)
+            end,
+            Templates);
+include_1(Method, Template, Runtime, Vars1, Context) ->
     case template_compiler:render(Template, Vars1, [{runtime, Runtime}], Context) of
         {ok, Result} ->
             Result;
-        {error, notfound} when Method =/= optional ->
+        {error, enoent} when Method =:= normal ->
             lager:error("Missing included template ~p", [Template]),
             <<>>;
-        {error, _} ->
+        {error, enoent} ->
+            <<>>;
+        {error, _} =Error ->
+            lager:error("Error ~p", [Error]),
             <<>>
     end.
 

@@ -21,48 +21,71 @@
 -author('Marc Worrell <marc@worrell.nl>').
 
 -export([
+    map_template/3,
+    map_template_all/3,
     find_template/3,
     context_name/1,
+    compile_map_nested_value/2,
     find_nested_value/3,
     find_value/4,
     get_translations/2,
     lookup_translation/3,
     custom_tag/4,
     builtin_tag/5,
-    cache_tag/5,
+    cache_tag/6,
     javascript_tag/3,
     spaceless_tag/3,
     to_bool/2,
     to_list/2,
-    to_iolist/3,
+    to_render_result/3,
     escape/2
     ]).
 
+
+-callback map_template(template_compiler:template(), #{}, term()) -> template_compiler:template1().
+-callback map_template_all(template_compiler:template(), #{}, term()) -> [template_compiler:template1()].
+-callback find_template(template_compiler:template(), ContextName::term(), Context::term()) -> 
+        {ok, filename:filename()} | {error, enoent|term()}.
+-callback context_name(Context :: term()) -> term().
+
+-callback compile_map_nested_value(Tokens :: list(), Context :: term()) -> NewTokens :: list().
 -callback find_nested_value(Keys :: list(), TplVars :: term(), Context :: term()) -> term().
 -callback find_value(Key :: term(), Vars :: term(), TplVars :: #{}, Context :: term()) -> term().
 
 -callback get_translations(Text :: binary(), Context :: term()) -> binary() | {trans, [{atom(), binary()}]}.
 -callback lookup_translation({trans, list({atom(), binary()})}, TplVars :: #{}, Context :: term()) -> binary().
 
--callback find_template(binary(), ContextName::term(), Vars::#{}, Context::term()) ->
-                {ok, filename:filename()} | {error, notfound|term()}.
-
--callback context_name(Context :: term()) -> term().
-
--callback custom_tag(Module::atom(), Args::#{}, TplVars::#{}, Context::term()) -> template_compiler:render_result().
--callback builtin_tag(template_compiler:builtin_tag(), term(), Args::#{}, TplVars::#{}, Context::term()) -> template_compiler:render_result().
--callback cache_tag(Seconds::integer(), Args::#{}, function(), TplVars::#{}, Context::term()) -> template_compiler:render_result().
+-callback custom_tag(Module::atom(), Args::list(), TplVars::#{}, Context::term()) -> template_compiler:render_result().
+-callback builtin_tag(template_compiler:builtin_tag(), term(), Args::list(), TplVars::#{}, Context::term()) -> template_compiler:render_result().
+-callback cache_tag(Seconds::integer(), Name::binary(), Args::list(), function(), TplVars::#{}, Context::term()) -> template_compiler:render_result().
 -callback javascript_tag(template_compiler:render_result(), #{}, term()) -> template_compiler:render_result().
 -callback spaceless_tag(template_compiler:render_result(), #{}, term()) -> template_compiler:render_result().
 
 -callback to_bool(Value :: term(), Context :: term()) -> boolean().
 -callback to_list(Value :: term(), Context :: term()) -> list().
--callback to_iolist(Value :: term(), TplVars :: #{}, Context :: term()) -> iolist().
+-callback to_render_result(Value :: term(), TplVars :: #{}, Context :: term()) -> template_compiler:render_result().
 -callback escape(iolist(), Context :: term()) -> iolist().
 
-%% @doc Map a template name to a template file.
+
+%% @doc Dynamic mapping of a template to a template name, context sensitive on the template vars.
+-spec map_template(template_compiler:template(), #{}, Context::term()) -> template_compiler:template1().
+map_template({cat, Template}, _Vars, _Context) ->
+    Template;
+map_template({cat, Template, _}, _Vars, _Context) ->
+    Template;
+map_template(Template, _Vars, _Context) ->
+    Template.
+
+%% @doc Dynamically find all templates matching the template
+-spec map_template_all(template_compiler:template(), #{}, Context::term()) -> [template_compiler:template1()].
+map_template_all(Template, _Vars, _Context) ->
+    [Template].
+
+%% @doc Map a template name to a template file, this is a static mapping with respect to the context.
 -spec find_template(binary(), ContextName::term(), Context::term()) ->
-            {ok, filename:filename()} | {error, notfound|term()}.
+            {ok, filename:filename()} | {error, enoent|term()}.
+find_template({filename, Filename}, _ContextName, _Context) ->
+    {ok, Filename};
 find_template(Template, _ContextName, _Context) ->
     case application:get_env(template_compiler, template_dir) of
         {ok, {App, SubDir}} when is_atom(App) ->
@@ -74,8 +97,8 @@ find_template(Template, _ContextName, _Context) ->
             end;
         {ok, Dir} when is_list(Dir), is_binary(Dir) ->
             {ok, filename:join([Dir, Template])};
-        undefind ->
-            {error, notfound}
+        undefined ->
+            {error, enoent}
     end.
 
 %% @doc Fetch the name to tag template lookups. This should make the name of the template unique with
@@ -84,6 +107,11 @@ find_template(Template, _ContextName, _Context) ->
 context_name(_Context) ->
     default.
 
+
+%% @doc Compile time mapping of nested value lookup
+-spec compile_map_nested_value(Tokens :: list(), Context :: term()) -> NewTokens :: list().
+compile_map_nested_value(Ts, _Context) ->
+    Ts.
 
 %% @doc Find a list of values at once, easier and more efficient than a nested find_value/4
 %%      Add pattern matching here for nested lookups.
@@ -174,22 +202,27 @@ lookup_translation({trans, Tr}, #{} = TplVars, _Context) ->
 
 
 %% @doc Render a custom tag (Zotonic scomp) - this can be changed to more complex runtime lookups.
--spec custom_tag(Tag::atom(), Args::#{}, Vars::#{}, Context::term()) -> template_compiler:render_result().
+-spec custom_tag(Tag::atom(), Args::list(), Vars::#{}, Context::term()) -> template_compiler:render_result().
 custom_tag(Tag, Args, Vars, Context) ->
     Tag:render(Args, Vars, Context).
 
 
 %% @doc Render image/image_url/media/url/lib tag. The Expr is the media item or dispatch rule.
--spec builtin_tag(template_compiler:builtin_tag(), Expr::term(), Args::#{}, Vars::#{}, Context::term()) -> 
+-spec builtin_tag(template_compiler:builtin_tag(), Expr::term(), Args::list(), Vars::#{}, Context::term()) -> 
             template_compiler:render_result().
 builtin_tag(_Tag, _Expr, _Args, _Vars, _Context) ->
     <<>>.
 
 
 %% @doc Render a block, cache the result for some time. Caching should be implemented by the runtime.
--spec cache_tag(Seconds::integer(), Args::#{}, function(), TplVars::#{}, Context::term()) -> template_compiler:render_result().
-cache_tag(_Seconds, Args, Fun, TplVars, Context) ->
-    FunVars = maps:merge(TplVars, Args),
+-spec cache_tag(Seconds::integer(), Name::binary(), Args::list(), function(), TplVars::#{}, Context::term()) -> template_compiler:render_result().
+cache_tag(_Seconds, _Name, Args, Fun, TplVars, Context) ->
+    FunVars = lists:foldl(
+                    fun({K,V}, Acc) ->
+                        Acc#{K => V}
+                    end,
+                    TplVars,
+                    Args),
     Fun(FunVars, Context).
 
 
@@ -200,8 +233,8 @@ javascript_tag(_Javascript, _TplVars, _Context) ->
 
 %% @doc Remove spaces between HTML tags
 -spec spaceless_tag(template_compiler:render_result(), #{}, term()) -> template_compiler:render_result().
-spaceless_tag(Value, TplVars, Context) ->
-    Contents1 = re:replace(to_iolist(Value, TplVars, Context), "^[ \t\n\f\r]+<", "<"),
+spaceless_tag(Value, _TplVars, _Context) ->
+    Contents1 = re:replace(iolist_to_binary(Value), "^[ \t\n\f\r]+<", "<"),
     Contents2 = re:replace(Contents1, ">[ \t\n\f\r]+$", ">"),
     re:replace(Contents2, ">[ \t\n\f\r]+<", "><", [global]).
 
@@ -209,7 +242,7 @@ spaceless_tag(Value, TplVars, Context) ->
 %% @doc Convert a value to a boolean.
 -spec to_bool(Value :: term(), Context :: term()) -> boolean().
 to_bool(Value, _Context) ->
-    z_convert:to_bool(Value).
+    z_convert:to_bool_strict(Value).
 
 %% @doc Convert a value to a list.
 -spec to_list(Value :: term(), Context :: term()) -> list().
@@ -221,36 +254,38 @@ to_list({trans, Tr}, _Context) when is_list(Tr) ->
     Tr;
 to_list(Tuple, _Context) when is_tuple(Tuple) ->
     tuple_to_list(Tuple);
+to_list(B, _Context) when is_binary(B) ->
+    [B];
 to_list(Value, _Context) ->
     z_convert:to_list(Value).
 
 
-%% @doc Convert a value to an iolist, used for converting values in {{ ... }} expressions.
--spec to_iolist(Value::term(), TplVars:: #{}, Context::term()) -> iolist().
-to_iolist(undefined, _TplVars, _Context) -> <<>>;
-to_iolist(B, _TplVars, _Context) when is_binary(B) -> 
+%% @doc Convert a value to an render_result, used for converting values in {{ ... }} expressions.
+-spec to_render_result(Value::term(), TplVars:: #{}, Context::term()) -> template_compiler:render_result().
+to_render_result(undefined, _TplVars, _Context) -> <<>>;
+to_render_result(B, _TplVars, _Context) when is_binary(B) -> 
     B;
-to_iolist(A, _TplVars, _Context) when is_atom(A) -> 
+to_render_result(A, _TplVars, _Context) when is_atom(A) -> 
     atom_to_binary(A, 'utf8');
-to_iolist(N, _TplVars, _Context) when is_integer(N) -> 
+to_render_result(N, _TplVars, _Context) when is_integer(N) -> 
     integer_to_binary(N);
-to_iolist(F, _TplVars, _Context) when is_float(F) -> 
+to_render_result(F, _TplVars, _Context) when is_float(F) -> 
     io_lib:format("~p", [F]);
-to_iolist({{Y,M,D},{H,I,S}} = Date, TplVars, _Context)
+to_render_result({{Y,M,D},{H,I,S}} = Date, TplVars, _Context)
     when is_integer(Y), is_integer(M), is_integer(D),
          is_integer(H), is_integer(I), is_integer(S) ->
     Options = [
         {tz, maps:get(tz, TplVars, "GMT")}
     ],
     z_dateformat:format(Date, "Y-m-d H:i:s", Options);
-to_iolist(T, _TplVars, _Context) when is_tuple(T) -> 
+to_render_result(T, _TplVars, _Context) when is_tuple(T) -> 
     io_lib:format("~p", [T]);
-to_iolist(L, TplVars, Context) when is_list(L) ->
+to_render_result(L, TplVars, Context) when is_list(L) ->
     try
         unicode:characters_to_binary(L)
     catch
         error:badarg ->
-            [ to_iolist(C, TplVars, Context) || C <- L ]
+            [ to_render_result(C, TplVars, Context) || C <- L ]
     end.
 
 %% @doc HTML escape a value

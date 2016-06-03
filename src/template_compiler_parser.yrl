@@ -308,6 +308,7 @@ OverrulesTag -> open_tag overrules_keyword close_tag : overrules.
 InheritTag -> open_tag inherit_keyword close_tag : inherit.
 
 TransTag -> open_trans trans_text close_trans : '$2'.
+TransTag -> open_trans text close_trans : '$2'.
 TransExtTag -> open_tag __keyword string_literal TransArgs close_tag : {trans_ext, '$3', '$4'}.
 
 IncludeTag -> open_tag OptionalPrefix include_keyword E OptWith WithArgs close_tag : {include, '$2', '$4', '$6'}.
@@ -381,14 +382,14 @@ EndIfBraced -> open_tag endif_keyword close_tag.
 OptAsPart -> '$empty' : undefined.
 OptAsPart -> as_keyword identifier : '$2'.
 
-IfEqualBlock -> IfEqualBraced Elements ElseBraced Elements EndIfEqualBraced : {'if', '$1', '$2', '$4'}.
-IfEqualBlock -> IfEqualBraced Elements EndIfEqualBraced : {'if', '$1', '$2', []}.
+IfEqualBlock -> IfEqualBraced Elements ElseBraced Elements EndIfEqualBraced : {'if', {'as', '$1', undefined}, '$2', '$4'}.
+IfEqualBlock -> IfEqualBraced Elements EndIfEqualBraced : {'if', {'as', '$1', undefined}, '$2', []}.
 IfEqualBraced -> open_tag ifequal_keyword IfEqualExpression E close_tag : {expr, 'eq', '$3', '$4'}.
 IfEqualExpression -> E : '$1'.
 EndIfEqualBraced -> open_tag endifequal_keyword close_tag.
 
-IfNotEqualBlock -> IfNotEqualBraced Elements ElseBraced Elements EndIfNotEqualBraced : {'if', '$1', '$2', '$4'}.
-IfNotEqualBlock -> IfNotEqualBraced Elements EndIfNotEqualBraced : {'if', '$1', '$2', []}.
+IfNotEqualBlock -> IfNotEqualBraced Elements ElseBraced Elements EndIfNotEqualBraced : {'if', {'as', '$1', undefined}, '$2', '$4'}.
+IfNotEqualBlock -> IfNotEqualBraced Elements EndIfNotEqualBraced : {'if', {'as', '$1', undefined}, '$2', []}.
 IfNotEqualBraced -> open_tag ifnotequal_keyword IfNotEqualExpression E close_tag : {expr, 'ne', '$3', '$4'}.
 IfNotEqualExpression -> E : '$1'.
 EndIfNotEqualBraced -> open_tag endifnotequal_keyword close_tag.

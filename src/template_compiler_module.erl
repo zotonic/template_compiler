@@ -29,6 +29,7 @@
 compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, undefined) ->
     compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, erl_syntax:abstract(<<>>));
 compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, TemplateAst) ->
+    Mtime = filelib:last_modified(Filename),
     Now = os:timestamp(),
     BlockNames = [ BN || {BN,_Tree,_Ws} <- BlockAsts ],
     lists:flatten(
@@ -41,6 +42,7 @@ compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, TemplateAst) ->
                 "module/0,",
                 "extends/0,",
                 "filename/0,",
+                "mtime/0,",
                 "is_autoid/0,"
                 "runtime/0",
             "]).",
@@ -50,6 +52,7 @@ compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, TemplateAst) ->
             "module() -> _@Module@.",
             "extends() -> _@Extends@.",
             "filename() -> _@Filename@.",
+            "mtime() -> _@Mtime@.",
             "is_autoid() -> _@IsAutoid@.",
             "runtime() -> _@Runtime@.",
             "'@_functions'() -> _."

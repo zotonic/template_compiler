@@ -52,10 +52,10 @@ custom_tag_test(_Config) ->
 % Called by custom_tag.tpl
 render(Args, Vars, _Context) ->
     [
-        maps:get(a, Args),
+        proplists:get_value(a, Args),
         $-, maps:get(v, Vars),
-        $-, z_convert:to_binary(maps:get(b, Args)),
-        $-, z_convert:to_binary(maps:get(c, Args))
+        $-, z_convert:to_binary(proplists:get_value(b, Args)),
+        $-, z_convert:to_binary(proplists:get_value(c, Args))
     ].
 
 filter_tag_test(_Config) ->
