@@ -23,6 +23,7 @@
 
 -export([
     lookup/3,
+    flush/0,
     flush_file/1,
     flush_context_name/1
     ]).
@@ -85,6 +86,11 @@ lookup(Template, Options, Context) ->
                     Error
             end
     end.
+
+%% @doc Flush all template mappings
+-spec flush() -> ok.
+flush() ->
+    gen_server:cast(?MODULE, flush).
 
 %% @doc Ping that a template has been changed
 -spec flush_file(filename:filename()) -> ok.
@@ -152,6 +158,12 @@ handle_cast({compile_done, Result, TplKey}, State) ->
             end,
             Waiters),
     {noreply, State2};
+handle_cast(flush, State) ->
+    true = ets:delete_all_objects(?MODULE),
+    State1 = State#state{
+        filename_keys = []
+    },
+    {noreply, State1};
 handle_cast({flush_file, Filename}, State) ->
     {ChangedKeys, FnKeys} = lists:partition(
                                 fun ({F,_}) ->

@@ -25,7 +25,7 @@
     map_template_all/3,
     find_template/3,
     context_name/1,
-    compile_map_nested_value/2,
+    compile_map_nested_value/3,
     find_nested_value/3,
     find_value/4,
     get_translations/2,
@@ -48,7 +48,7 @@
         {ok, filename:filename()} | {error, enoent|term()}.
 -callback context_name(Context :: term()) -> term().
 
--callback compile_map_nested_value(Tokens :: list(), Context :: term()) -> NewTokens :: list().
+-callback compile_map_nested_value(Tokens :: list(), ContextVar::string(), Context :: term()) -> NewTokens :: list().
 -callback find_nested_value(Keys :: list(), TplVars :: term(), Context :: term()) -> term().
 -callback find_value(Key :: term(), Vars :: term(), TplVars :: #{}, Context :: term()) -> term().
 
@@ -109,8 +109,8 @@ context_name(_Context) ->
 
 
 %% @doc Compile time mapping of nested value lookup
--spec compile_map_nested_value(Tokens :: list(), Context :: term()) -> NewTokens :: list().
-compile_map_nested_value(Ts, _Context) ->
+-spec compile_map_nested_value(Tokens :: list(), _ContextVar::string(), Context :: term()) -> NewTokens :: list().
+compile_map_nested_value(Ts, _ContextVar, _Context) ->
     Ts.
 
 %% @doc Find a list of values at once, easier and more efficient than a nested find_value/4

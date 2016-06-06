@@ -22,12 +22,14 @@
 -export([
     render/4,
     lookup/3,
+    flush/0,
     flush_file/1,
     flush_context_name/1,
     compile_file/3,
     compile_binary/4,
     get_option/2,
-    is_template_module/1
+    is_template_module/1,
+    translations/1
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
@@ -68,7 +70,7 @@
 -spec render(Template :: template(), Vars :: #{} | [], Options :: options(), Context :: term()) ->
         {ok, render_result()} | {error, term()}.
 render(Template, Vars, Options, Context) when is_list(Vars) ->
-    render(Template, maps:from_list(Vars), Options, Context);
+    render(Template, props_to_map(Vars, #{}), Options, Context);
 render(Template0, Vars, Options, Context) when is_map(Vars) ->
     Template = normalize_template(Template0),
     Runtime = proplists:get_value(runtime, Options, template_compiler_runtime),
@@ -91,6 +93,13 @@ render(Template0, Vars, Options, Context) when is_map(Vars) ->
         {error, _} = Error ->
             Error
     end.
+
+props_to_map([], Map) -> 
+    Map;
+props_to_map([{K,V}|Rest], Map) ->
+    props_to_map(Rest, Map#{K => V});
+props_to_map([K|Rest], Map) ->
+    props_to_map(Rest, Map#{K => true}).
 
 %% @doc Map all string() template names to binary().
 -spec normalize_template(template()) -> template().
@@ -160,6 +169,11 @@ lookup(Filename, Options, Context) ->
     template_compiler_admin:lookup(Filename, Options, Context).
 
 
+%% @doc Remove all template lookups, forces recheck.
+-spec flush() -> ok.
+flush() ->
+    template_compiler_admin:flush().
+
 %% @doc Ping that a template has been changed
 -spec flush_file(filename:filename()) -> ok.
 flush_file(Filename) ->
@@ -217,6 +231,21 @@ is_template_module(X) when is_binary(X) -> false;
 is_template_module(X) when is_list(X) -> false;
 is_template_module(Name) -> is_template_module(z_convert:to_binary(Name)).
 
+
+%% @doc Fetch all translatable strings from a template.
+-spec translations(filename:filename()) -> list(binary()).
+translations(Filename) ->
+    case file:read_file(Filename) of
+        {ok, Bin} ->
+            case template_compiler_scanner:scan(Filename, Bin) of
+                {ok, Tokens} ->
+                    extract_translations(Tokens);
+                {error, _} = Error ->
+                    Error
+            end;
+        {error, _} = Error ->
+            Error
+    end.
 
 %%%% --------------------------------- Internal ----------------------------------
 
@@ -362,3 +391,18 @@ expand_translation({string_literal, SrcPos, Text}, _Runtime, _Context) ->
     {string_literal, SrcPos, Text1};
 expand_translation(Token, _Runtime, _Context) ->
     Token.
+
+
+%% @doc Fetch all translatable strings from the tokens
+extract_translations(Tokens) ->
+    lists:foldl(
+        fun
+            ({trans_text, _, Text}, Acc) ->
+                [ template_compiler_utils:unescape_string_literal(Text) | Acc ];
+            ({trans_literal, _, Text}, Acc) ->
+                [ template_compiler_utils:unescape_string_literal(Text) | Acc ];
+            (_Token, Acc) ->
+                Acc
+        end,
+        [],
+        Tokens).

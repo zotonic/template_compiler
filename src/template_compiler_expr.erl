@@ -56,13 +56,13 @@ compile({find_value, LookupList}, CState, Ws) ->
     find_value_lookup(LookupList, CState, Ws);
 compile({auto_id, {{identifier, _, Name}, {identifier, _, Var}}}, #cs{runtime=Runtime} = CState, Ws) ->
     VarName = erl_syntax:atom(template_compiler_utils:to_atom(Var)),
-    Ast = ?Q(["[ ",
+    Ast = ?Q(["iolist_to_binary([ ",
                 "maps:get('$autoid', _@vars),",
                 "$-, _@Name@,",
                 "$-, z_convert:to_binary(",
                         "'@Runtime@':find_value(_@VarName, _@vars, _@vars, _@context)"
                     ")"
-              "]"],
+              "])"],
               [
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {vars, erl_syntax:variable(CState#cs.vars_var)}
@@ -70,7 +70,7 @@ compile({auto_id, {{identifier, _, Name}, {identifier, _, Var}}}, #cs{runtime=Ru
     {Ws#ws{is_autoid_var=true}, Ast};
 compile({auto_id, {identifier, _, Name}}, #cs{vars_var=Vars}, Ws) ->
     VarsAst = erl_syntax:variable(Vars),
-    Ast = ?Q("[ maps:get('$autoid', _@VarsAst), $-, _@Name@ ]"),
+    Ast = ?Q("iolist_to_binary([ maps:get('$autoid', _@VarsAst), $-, _@Name@ ])"),
     {Ws#ws{is_autoid_var=true}, Ast};
 compile({tuple_value, {identifier, _, Name}, Args}, Cs, Ws) ->
     TupleName = erl_syntax:atom(template_compiler_utils:to_atom(Name)),
@@ -127,15 +127,19 @@ find_value_lookup([{identifier, _SrcPos, Var} = Idn], #cs{runtime=Runtime, vars_
             ]),
     {maybe_forloop_var(Ws, Idn), Ast};
 find_value_lookup(ValueLookup, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
-    ValueLookup1 = Runtime:compile_map_nested_value(ValueLookup, CState#cs.context),
-    {Ws1, ValueLookupAsts} = value_lookup_asts(ValueLookup1, CState, Ws, []),
-    ListAst = erl_syntax:list(ValueLookupAsts),
-    Ast = ?Q("'@Runtime@':find_nested_value(_@ListAst, _@vars, _@context)",
-            [
-                {context, erl_syntax:variable(CState#cs.context_var)},
-                {vars, erl_syntax:variable(Vars)}
-            ]),
-    {maybe_forloop_var(Ws1, hd(ValueLookup)), Ast}.
+    case Runtime:compile_map_nested_value(ValueLookup, CState#cs.context_var, CState#cs.context) of
+        [{ast, Ast}] ->
+            {maybe_forloop_var(Ws, hd(ValueLookup)), Ast};
+        ValueLookup1 ->
+            {Ws1, ValueLookupAsts} = value_lookup_asts(ValueLookup1, CState, Ws, []),
+            ListAst = erl_syntax:list(ValueLookupAsts),
+            Ast = ?Q("'@Runtime@':find_nested_value(_@ListAst, _@vars, _@context)",
+                    [
+                        {context, erl_syntax:variable(CState#cs.context_var)},
+                        {vars, erl_syntax:variable(Vars)}
+                    ]),
+            {maybe_forloop_var(Ws1, hd(ValueLookup)), Ast}
+    end.
 
 maybe_forloop_var(Ws, {identifier, _, <<"forloop">>}) ->
     Ws#ws{is_forloop_var=true};
