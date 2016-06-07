@@ -96,7 +96,7 @@ map_template(Template, _Vars, _Context) ->
                         filename=filename:join([PrivDir, SubDir, Template])
                     }}
             end;
-        {ok, Dir} when is_list(Dir), is_binary(Dir) ->
+        {ok, Dir} when is_list(Dir); is_binary(Dir) ->
             {ok, #template_file{
                 template=Template, 
                 filename=filename:join([Dir, Template])

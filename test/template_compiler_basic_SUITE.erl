@@ -28,6 +28,7 @@ groups() ->
 
 init_per_suite(Config) ->
     {ok, _} = application:ensure_all_started(template_compiler),
+    application:set_env(template_compiler, template_dir, test_data_dir(Config)),
     Config.
 
 end_per_suite(_Config) ->
@@ -74,3 +75,8 @@ raw_test(_Config) ->
     {ok, Bin} = template_compiler:render("raw.tpl", #{}, [], undefined),
     <<"Before This is {%%} raw  After">> = iolist_to_binary(Bin),
     ok.
+
+test_data_dir(Config) ->
+    filename:join([
+        filename:dirname(filename:dirname(?config(data_dir, Config))),
+        "test-data"]).

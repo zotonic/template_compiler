@@ -27,6 +27,7 @@ groups() ->
 
 init_per_suite(Config) ->
     {ok, _} = application:ensure_all_started(template_compiler),
+    application:set_env(template_compiler, template_dir, test_data_dir(Config)),
     Config.
 
 end_per_suite(_Config) ->
@@ -83,4 +84,9 @@ spaceless_test(_Config) ->
     {ok, Bin1} = template_compiler:render("spaceless_tag.tpl", #{}, [], undefined),
     <<"a-<a> x<span>xxx </span></a>-b">> = iolist_to_binary(Bin1),
     ok.
+
+test_data_dir(Config) ->
+    filename:join([
+        filename:dirname(filename:dirname(?config(data_dir, Config))),
+        "test-data"]).
 

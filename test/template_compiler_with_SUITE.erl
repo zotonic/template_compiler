@@ -25,6 +25,7 @@ groups() ->
 
 init_per_suite(Config) ->
     {ok, _} = application:ensure_all_started(template_compiler),
+    application:set_env(template_compiler, template_dir, test_data_dir(Config)),
     Config.
 
 end_per_suite(_Config) ->
@@ -56,3 +57,8 @@ with_value_test(_Config) ->
     {ok, Bin1} = template_compiler:render("with_value.tpl", #{ v => 1 }, [], undefined),
     <<"1">> = iolist_to_binary(Bin1),
     ok.
+
+test_data_dir(Config) ->
+    filename:join([
+        filename:dirname(filename:dirname(?config(data_dir, Config))),
+        "test-data"]).

@@ -26,6 +26,7 @@ groups() ->
 
 init_per_suite(Config) ->
     {ok, _} = application:ensure_all_started(template_compiler),
+    application:set_env(template_compiler, template_dir, test_data_dir(Config)),
     Config.
 
 end_per_suite(_Config) ->
@@ -93,3 +94,8 @@ expr_autoid(_Config) ->
     {ok, Bin2} = template_compiler:render("expr_autoid_2.tpl", #{ foo => 20 }, [], undefined),
     {match, _} = re:run(iolist_to_binary(Bin2), "x:[a-z0-9]+-id-20:y").
 
+
+test_data_dir(Config) ->
+    filename:join([
+        filename:dirname(filename:dirname(?config(data_dir, Config))),
+        "test-data"]).
