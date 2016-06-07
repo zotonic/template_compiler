@@ -23,8 +23,6 @@
 -export([
     map_template/3,
     map_template_all/3,
-    find_template/3,
-    context_name/1,
     compile_map_nested_value/3,
     find_nested_value/3,
     find_value/4,
@@ -42,11 +40,9 @@
     ]).
 
 
--callback map_template(template_compiler:template(), #{}, term()) -> template_compiler:template1().
--callback map_template_all(template_compiler:template(), #{}, term()) -> [template_compiler:template1()].
--callback find_template(template_compiler:template(), ContextName::term(), Context::term()) -> 
-        {ok, filename:filename()} | {error, enoent|term()}.
--callback context_name(Context :: term()) -> term().
+-callback map_template(template_compiler:template(), #{}, term()) -> 
+        {ok, template_compiler:template_file()} | {error, enoent|term()}.
+-callback map_template_all(template_compiler:template(), #{}, term()) -> [template_compiler:template_file()].
 
 -callback compile_map_nested_value(Tokens :: list(), ContextVar::string(), Context :: term()) -> NewTokens :: list().
 -callback find_nested_value(Keys :: list(), TplVars :: term(), Context :: term()) -> term().
@@ -66,46 +62,45 @@
 -callback to_render_result(Value :: term(), TplVars :: #{}, Context :: term()) -> template_compiler:render_result().
 -callback escape(iolist(), Context :: term()) -> iolist().
 
+-include("template_compiler.hrl").
 
 %% @doc Dynamic mapping of a template to a template name, context sensitive on the template vars.
--spec map_template(template_compiler:template(), #{}, Context::term()) -> template_compiler:template1().
-map_template({cat, Template}, _Vars, _Context) ->
-    Template;
-map_template({cat, Template, _}, _Vars, _Context) ->
-    Template;
+-spec map_template(template_compiler:template(), #{}, Context::term()) -> 
+        {ok, template_compiler:template_file()} | {error, enoent|term()}.
+map_template(#template_file{} = TplFile, _Vars, _Context) ->
+    {ok, TplFile};
+map_template({cat, Template}, Vars, Context) ->
+    map_template(Template, Vars, Context);
+map_template({cat, Template, _}, Vars, Context) ->
+    map_template(Template, Vars, Context);
 map_template(Template, _Vars, _Context) ->
-    Template.
-
-%% @doc Dynamically find all templates matching the template
--spec map_template_all(template_compiler:template(), #{}, Context::term()) -> [template_compiler:template1()].
-map_template_all(Template, _Vars, _Context) ->
-    [Template].
-
-%% @doc Map a template name to a template file, this is a static mapping with respect to the context.
--spec find_template(binary(), ContextName::term(), Context::term()) ->
-            {ok, filename:filename()} | {error, enoent|term()}.
-find_template({filename, Filename}, _ContextName, _Context) ->
-    {ok, Filename};
-find_template(Template, _ContextName, _Context) ->
     case application:get_env(template_compiler, template_dir) of
         {ok, {App, SubDir}} when is_atom(App) ->
             case code:priv_dir(App) of
                 {error, _} = Error ->
                     Error;
                 PrivDir ->
-                    {ok, filename:join([PrivDir, SubDir, Template])}
+                    {ok, #template_file{
+                        template=Template, 
+                        filename=filename:join([PrivDir, SubDir, Template])
+                    }}
             end;
         {ok, Dir} when is_list(Dir), is_binary(Dir) ->
-            {ok, filename:join([Dir, Template])};
+            {ok, #template_file{
+                template=Template, 
+                filename=filename:join([Dir, Template])
+            }};
         undefined ->
             {error, enoent}
     end.
 
-%% @doc Fetch the name to tag template lookups. This should make the name of the template unique with
-%%      respect to the mapping of a template to a filename.  Example: {site, ua_class}
--spec context_name(Context::term()) -> term().
-context_name(_Context) ->
-    default.
+%% @doc Dynamically find all templates matching the template
+-spec map_template_all(template_compiler:template(), #{}, Context::term()) -> [template_compiler:template_file()].
+map_template_all(Template, Vars, Context) ->
+    case map_template(Template, Vars, Context) of
+        {ok, Tpl} -> [Tpl];
+        {error, _} -> []
+    end.
 
 
 %% @doc Compile time mapping of nested value lookup

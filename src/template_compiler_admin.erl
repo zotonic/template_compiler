@@ -40,6 +40,7 @@
 
 
 -include("template_compiler.hrl").
+-include("template_compiler_internal.hrl").
 
 -type gen_server_from() :: {pid(),term()}.
 
@@ -60,28 +61,22 @@
 
 
 %% @doc Find a template, start a compilation if not found
--spec lookup(template_compiler:template1(), template_compiler:options(), any()) -> {ok, atom()} | {error, term()}.
-lookup(Template, Options, Context) ->
+-spec lookup(filename:filename(), template_compiler:options(), any()) -> {ok, atom()} | {error, term()}.
+lookup(Filename, Options, Context) ->
     Runtime = template_compiler:get_option(runtime, Options),
-    ContextName = Runtime:context_name(Context),
-    TplKey = {ContextName, Runtime, Template},
+    TplKey = {Runtime, Filename},
     case ets:lookup(?MODULE, TplKey) of
         [#tpl{module=Module}] ->
             {ok, Module};
         [] ->
-            case Runtime:find_template(Template, ContextName, Context) of
-                {ok, Filename} when is_binary(Filename) ->
-                    case gen_server:call(?MODULE, {compile_request, TplKey, Filename}, infinity) of
-                        {ok, {compile, TplKey}} ->
-                            % Unknown, compile the template
-                            Result = template_compiler:compile_file(Filename, Options, Context),
-                            ok = gen_server:cast(?MODULE, {compile_done, Result, TplKey}),
-                            Result;
-                        {ok, Module} when is_atom(Module) ->
-                            {ok, Module};
-                        {error, _} = Error ->
-                            Error
-                    end;
+            case gen_server:call(?MODULE, {compile_request, TplKey, Filename}, infinity) of
+                {ok, {compile, TplKey}} ->
+                    % Unknown, compile the template
+                    Result = template_compiler:compile_file(Filename, Options, Context),
+                    ok = gen_server:cast(?MODULE, {compile_done, Result, TplKey}),
+                    Result;
+                {ok, Module} when is_atom(Module) ->
+                    {ok, Module};
                 {error, _} = Error ->
                     Error
             end

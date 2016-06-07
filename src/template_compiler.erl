@@ -33,18 +33,19 @@
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
+-include("template_compiler_internal.hrl").
 -include("template_compiler.hrl").
+
 
 -type option() :: {runtime, atom()}.
 -type options() :: list(option()).
+-type template_file() :: #template_file{}.
 -type template() :: binary()
                   | string()
-                  | {filename, filename:filename()}
                   | {cat, binary()|string()}
                   | {cat, binary()|string(), term()}
-                  | {overrules, binary()|string(), filename:filename()}.
--type template1() :: binary()
-                  | {filename, filename:filename()}.
+                  | {overrules, binary()|string(), filename:filename()}
+                  | template_file().
 -type template_key() :: {ContextName::term(), Runtime::atom(), template()}.
 -type render_result() :: binary() | string() | term() | list(render_result()).
 
@@ -58,7 +59,7 @@
         option/0,
         options/0,
         template/0,
-        template1/0,
+        template_file/0,
         template_key/0,
         builtin_tag/0
     ]).
@@ -66,7 +67,6 @@
 
 %% @doc Render a template. This looks up the templates needed, ensures compilation and
 %%      returns the rendering result.
-%% @todo: map non-binary templates (cat, overrules) to a template name (use runtime routine)
 -spec render(Template :: template(), Vars :: #{} | [], Options :: options(), Context :: term()) ->
         {ok, render_result()} | {error, term()}.
 render(Template, Vars, Options, Context) when is_list(Vars) ->
@@ -74,8 +74,7 @@ render(Template, Vars, Options, Context) when is_list(Vars) ->
 render(Template0, Vars, Options, Context) when is_map(Vars) ->
     Template = normalize_template(Template0),
     Runtime = proplists:get_value(runtime, Options, template_compiler_runtime),
-    Template1 = Runtime:map_template(Template, Vars, Context),
-    case block_lookup(Template1, #{}, [], Options, Vars, Runtime, Context) of
+    case block_lookup(Runtime:map_template(Template, Vars, Context), #{}, [], Options, Vars, Runtime, Context) of
         {ok, BaseModule, ExtendsStack, BlockMap} ->
             % Start with the render function of the "base" template
             % Optionally add the unique prefix for this rendering.
@@ -105,7 +104,7 @@ props_to_map([K|Rest], Map) ->
 -spec normalize_template(template()) -> template().
 normalize_template(Template) when is_binary(Template) ->
     Template;
-normalize_template({filename, Filename} = T) when is_binary(Filename) ->
+normalize_template(#template_file{filename=Fn, template=Tpl} = T) when is_binary(Fn), is_binary(Tpl)  ->
     T;
 normalize_template({cat, Template} = T) when is_binary(Template) ->
     T;
@@ -115,8 +114,11 @@ normalize_template({overrules, Template, _Filename} = T) when is_binary(Template
     T;
 normalize_template(Template) when is_list(Template) ->
     unicode:characters_to_binary(Template);
-normalize_template({filename, Filename}) when is_list(Filename) ->
-    {filename, unicode:characters_to_binary(Filename)};
+normalize_template(#template_file{filename=Fn, template=Tpl}) ->
+    #template_file{
+        filename=unicode:characters_to_binary(Fn),
+        template=unicode:characters_to_binary(Tpl)
+    };
 normalize_template({cat, Template}) when is_list(Template) ->
     {cat, unicode:characters_to_binary(Template)};
 normalize_template({cat, Template, IsA}) when is_list(Template) ->
@@ -125,8 +127,8 @@ normalize_template({overrules, Template, Filename}) when is_list(Template) ->
     {overrules, unicode:characters_to_binary(Template), Filename}.
 
 %% @doc Recursive lookup of blocks via the extends-chain of a template.
-block_lookup(Template, BlockMap, ExtendsStack, Options, Vars, Runtime, Context) ->
-    case template_compiler_admin:lookup(Template, Options, Context) of
+block_lookup({ok, TplFile}, BlockMap, ExtendsStack, Options, Vars, Runtime, Context) ->
+    case template_compiler_admin:lookup(TplFile#template_file.filename, Options, Context) of
         {ok, Module} ->
             case lists:member(Module, ExtendsStack) of
                 true ->
@@ -138,15 +140,20 @@ block_lookup(Template, BlockMap, ExtendsStack, Options, Vars, Runtime, Context) 
                         undefined ->
                             {ok, Module, ExtendsStack, BlockMap1};
                         overrules ->
+                            Template = TplFile#template_file.template,
                             Next = Runtime:map_template({overrules, Template, Module:filename()}, Vars, Context),
                             block_lookup(Next, BlockMap1, [Module|ExtendsStack], Options, Vars, Runtime, Context);
                         Extends when is_binary(Extends) ->
-                            block_lookup(Extends, BlockMap1, [Module|ExtendsStack], Options, Vars, Runtime, Context)
+                            Next = Runtime:map_template(Extends, Vars, Context),
+                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], Options, Vars, Runtime, Context)
                     end
             end;
         {error, _} = Error ->
             Error
-    end.
+    end;
+block_lookup({error, _} = Error, _BlockMap, _ExtendsStack, _Options, _Vars, _Runtime, _Context) ->
+    Error.
+
 
 add_blocks([], _Module, BlockMap) ->
     BlockMap;

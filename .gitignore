@@ -1,6 +1,7 @@
 .DS_Store
 erl_crash.dump
 rebar3
+.rebar3
 
 *~
 

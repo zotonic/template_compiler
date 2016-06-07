@@ -28,6 +28,7 @@
     ]).
 
 -include("template_compiler.hrl").
+-include("template_compiler_internal.hrl").
 
 
 %% @doc Generate an unique variable name

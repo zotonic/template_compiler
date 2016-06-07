@@ -25,6 +25,7 @@
 
 -include_lib("syntax_tools/include/merl.hrl").
 -include("template_compiler.hrl").
+-include("template_compiler_internal.hrl").
 
 compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, undefined) ->
     compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, erl_syntax:abstract(<<>>));
