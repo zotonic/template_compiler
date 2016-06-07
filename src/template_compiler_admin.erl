@@ -67,19 +67,25 @@ lookup(Filename, Options, Context) ->
     TplKey = {Runtime, Filename},
     case ets:lookup(?MODULE, TplKey) of
         [#tpl{module=Module}] ->
-            {ok, Module};
+            case Runtime:is_modified(Filename, Module:mtime(), Context) of
+                true -> compile_file(Filename, TplKey, Options, Context);
+                false -> {ok, Module}
+            end;
         [] ->
-            case gen_server:call(?MODULE, {compile_request, TplKey, Filename}, infinity) of
-                {ok, {compile, TplKey}} ->
-                    % Unknown, compile the template
-                    Result = template_compiler:compile_file(Filename, Options, Context),
-                    ok = gen_server:cast(?MODULE, {compile_done, Result, TplKey}),
-                    Result;
-                {ok, Module} when is_atom(Module) ->
-                    {ok, Module};
-                {error, _} = Error ->
-                    Error
-            end
+            compile_file(Filename, TplKey, Options, Context)
+    end.
+
+compile_file(Filename, TplKey, Options, Context) ->
+    case gen_server:call(?MODULE, {compile_request, TplKey, Filename}, infinity) of
+        {ok, {compile, TplKey}} ->
+            % Unknown, compile the template
+            Result = template_compiler:compile_file(Filename, Options, Context),
+            ok = gen_server:cast(?MODULE, {compile_done, Result, TplKey}),
+            Result;
+        {ok, Module} when is_atom(Module) ->
+            {ok, Module};
+        {error, _} = Error ->
+            Error
     end.
 
 %% @doc Flush all template mappings

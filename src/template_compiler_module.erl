@@ -20,17 +20,16 @@
 -author('Marc Worrell <marc@worrell.nl>').
 
 -export([
-    compile/7
+    compile/8
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
 -include("template_compiler.hrl").
 -include("template_compiler_internal.hrl").
 
-compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, undefined) ->
-    compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, erl_syntax:abstract(<<>>));
-compile(Module, Filename, IsAutoid, Runtime, Extends, BlockAsts, TemplateAst) ->
-    Mtime = filelib:last_modified(Filename),
+compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, undefined) ->
+    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, erl_syntax:abstract(<<>>));
+compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, TemplateAst) ->
     Now = os:timestamp(),
     BlockNames = [ BN || {BN,_Tree,_Ws} <- BlockAsts ],
     lists:flatten(

@@ -206,6 +206,7 @@ compile_file(Filename, Options, Context) ->
 %% @doc Compile a in-memory template to a module.
 -spec compile_binary(binary(), filename:filename(), options(), term()) -> {ok, atom()} | {error, term()}.
 compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
+    Mtime = filelib:last_modified(Filename),
     case template_compiler_scanner:scan(Filename, Tpl) of
         {ok, Tokens} ->
             Runtime = get_option(runtime, Options),
@@ -219,7 +220,7 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
                     case compile_tokens(template_compiler_parser:parse(Tokens2), cs(Module, Filename, Options, Context)) of
                         {ok, {Extends, BlockAsts, TemplateAst, IsAutoid}} ->
                             Forms = template_compiler_module:compile(
-                                                Module, Filename, IsAutoid, Runtime, 
+                                                Module, Filename, Mtime, IsAutoid, Runtime, 
                                                 Extends, BlockAsts, TemplateAst),
                             compile_forms(Filename, Forms);
                         {error, _} = Error ->

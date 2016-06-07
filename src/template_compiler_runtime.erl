@@ -23,6 +23,7 @@
 -export([
     map_template/3,
     map_template_all/3,
+    is_modified/3,
     compile_map_nested_value/3,
     find_nested_value/3,
     find_value/4,
@@ -43,6 +44,8 @@
 -callback map_template(template_compiler:template(), #{}, term()) -> 
         {ok, template_compiler:template_file()} | {error, enoent|term()}.
 -callback map_template_all(template_compiler:template(), #{}, term()) -> [template_compiler:template_file()].
+
+-callback is_modified(filename:filename(), calendar:datetime(), term()) -> boolean().
 
 -callback compile_map_nested_value(Tokens :: list(), ContextVar::string(), Context :: term()) -> NewTokens :: list().
 -callback find_nested_value(Keys :: list(), TplVars :: term(), Context :: term()) -> term().
@@ -102,6 +105,10 @@ map_template_all(Template, Vars, Context) ->
         {error, _} -> []
     end.
 
+%% @doc Check if a file has been modified
+-spec is_modified(filename:filename(), calendar:datetime(), term()) -> boolean().
+is_modified(Filename, Mtime, _Context) ->
+    filelib:last_modified(Filename) /= Mtime.
 
 %% @doc Compile time mapping of nested value lookup
 -spec compile_map_nested_value(Tokens :: list(), _ContextVar::string(), Context :: term()) -> NewTokens :: list().
