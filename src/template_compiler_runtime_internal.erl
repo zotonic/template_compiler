@@ -22,14 +22,15 @@
 -export([
     forloop/8,
     with_vars/3,
-    block_call/4,
-    block_inherit/5,
-    include/6,
+    block_call/6,
+    block_inherit/7,
+    include/7,
     call/4,
     print/1,
     unique/0
     ]).
 
+-include("template_compiler.hrl").
 
 %% @doc Runtime implementation of a forloop. Two variations: one with 
 -spec forloop(IsForloopVar :: boolean(), ListExpr :: term(), LoopVars :: [atom()],
@@ -111,24 +112,42 @@ with_vars(Vs, Es, Vars) ->
 
 %% @doc Call the block function, lookup the function in the BlockMap to find
 %%      the correct module.
--spec block_call(atom(), #{}, #{}, term()) -> term().
-block_call(Block, Vars, BlockMap, Context) ->
+-spec block_call({binary(), integer(), integer()}, atom(), #{}, #{}, atom(), term()) -> term().
+block_call(SrcPos, Block, Vars, BlockMap, Runtime, Context) ->
     case maps:find(Block, BlockMap) of
         {ok, [Module|_]} when is_atom(Module) ->
-            Module:render_block(Block, Vars, BlockMap, Context);
+            case Runtime:trace_block(SrcPos, Block, Module, Context) of
+                ok ->
+                    Module:render_block(Block, Vars, BlockMap, Context);
+                {ok, Before, After} ->
+                    [
+                        Before,
+                        Module:render_block(Block, Vars, BlockMap, Context),
+                        After
+                    ]
+            end;
         error ->
             % No such block, return empty data.
             <<>>
     end.
 
 %% @doc Call the block function of the template the current module extends.
--spec block_inherit(atom(), atom(), #{}, #{}, term()) -> term().
-block_inherit(Module, Block, Vars, BlockMap, Context) ->
+-spec block_inherit({binary(), integer(), integer()}, atom(), atom(), #{}, #{}, atom(), term()) -> term().
+block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
     case maps:find(Block, BlockMap) of
         {ok, Modules} ->
             case lists:dropwhile(fun(M) -> M =/= Module end, Modules) of
                 [Module, Next|_] ->
-                    Next:render_block(Block, Vars, BlockMap, Context);
+                    case Runtime:trace_block(SrcPos, Block, Next, Context) of
+                        ok ->
+                            Next:render_block(Block, Vars, BlockMap, Context);
+                        {ok, Before, After} ->
+                            [
+                                Before,
+                                Next:render_block(Block, Vars, BlockMap, Context),
+                                After
+                            ]
+                    end;
                 _ ->
                     <<>>
             end;
@@ -139,26 +158,31 @@ block_inherit(Module, Block, Vars, BlockMap, Context) ->
 
 
 %% @doc Include a template.
--spec include(normal|optional|all, template_compiler:template(), list({atom(),term()}), atom(), #{}, term()) -> 
+-spec include({File::binary(), Line::integer(), Col::integer()}, normal|optional|all, 
+        template_compiler:template(), list({atom(),term()}), atom(), #{}, term()) -> 
         template_compiler:render_result().
-include(Method, Template, Args, Runtime, Vars, Context) ->
+include(SrcPos, Method, Template, Args, Runtime, Vars, Context) ->
     Vars1 = lists:foldl(
                 fun({V,E}, Acc) ->
                     Acc#{V => E}
                 end,
                 Vars,
                 Args),
-    include_1(Method, Template, Runtime, Vars1, Context).
+    include_1(SrcPos, Method, Template, Runtime, Vars1, Context).
 
-include_1(all, Template, Runtime, Vars1, Context) ->
+include_1(SrcPos, all, Template, Runtime, Vars1, Context) ->
     Templates = Runtime:map_template_all(Template, Vars1, Context),
     lists:map(
             fun(Tpl) ->
-                include_1(optional, Tpl, Runtime, Vars1, Context)
+                include_1(SrcPos, optional, Tpl, Runtime, Vars1, Context)
             end,
             Templates);
-include_1(Method, Template, Runtime, Vars1, Context) ->
-    case template_compiler:render(Template, Vars1, [{runtime, Runtime}], Context) of
+include_1(SrcPos, Method, Template, Runtime, Vars1, Context) ->
+    Options = [
+        {runtime, Runtime},
+        {trace_position, SrcPos}
+    ],
+    case template_compiler:render(Template, Vars1, Options, Context) of
         {ok, Result} ->
             Result;
         {error, enoent} when Method =:= normal ->

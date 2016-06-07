@@ -104,41 +104,45 @@ compile({load, Names}, _CState, Ws) ->
     % We don't do anything with this. Present for compatibility only.
     CustomTags = [ Name || {identifier, _, Name} <- Names ],
     {Ws#ws{custom_tags=CustomTags ++ Ws#ws.custom_tags}, <<>>};
-compile({block, {identifier, _Pos, Name}, _Elts}, CState, Ws) ->
+compile({block, {identifier, SrcPos, Name}, _Elts}, CState, Ws) ->
     BlockName = template_compiler_utils:to_atom(Name),
     Ast = erl_syntax:application(
             erl_syntax:atom(template_compiler_runtime_internal),
             erl_syntax:atom(block_call),
             [
+                erl_syntax:abstract(SrcPos),
                 erl_syntax:atom(BlockName),
                 erl_syntax:variable(CState#cs.vars_var),
                 erl_syntax:variable("Blocks"),
+                erl_syntax:atom(CState#cs.runtime),
                 erl_syntax:variable(CState#cs.context_var)
             ]),
     {value, {BlockName, _Tree, BlockWs}} = lists:keysearch(BlockName, 1, CState#cs.blocks), 
     Ws1 = Ws#ws{is_forloop_var = Ws#ws.is_forloop_var or BlockWs#ws.is_forloop_var}, 
     {Ws1, Ast};
-compile(inherit, #cs{block=undefined}, Ws) ->
+compile({inherit, {_, _SrcPos, _}}, #cs{block=undefined}, Ws) ->
     {Ws, erl_syntax:abstract(<<>>)};
-compile(inherit, #cs{block=Block, module=Module} = CState, Ws) ->
+compile({inherit, {_, SrcPos, _}}, #cs{block=Block, module=Module} = CState, Ws) ->
     Ast = erl_syntax:application(
             erl_syntax:atom(template_compiler_runtime_internal),
             erl_syntax:atom(block_inherit),
             [
+                erl_syntax:abstract(SrcPos),
                 erl_syntax:atom(Module),
                 erl_syntax:atom(Block),
                 erl_syntax:variable(CState#cs.vars_var),
                 erl_syntax:variable("Blocks"),
+                erl_syntax:atom(CState#cs.runtime),
                 erl_syntax:variable(CState#cs.context_var)
             ]),
     {Ws#ws{is_forloop_var=true}, Ast};
-compile({'include', Method, Template, Args}, CState, Ws) ->
+compile({'include', TagPos, Method, Template, Args}, CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
-    include(Method, Template, ArgsList, CState, Ws1);
-compile({'catinclude', Method, Template, IdExpr, Args}, CState, Ws) ->
+    include(TagPos, Method, Template, ArgsList, CState, Ws1);
+compile({'catinclude', TagPos, Method, Template, IdExpr, Args}, CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
     {Ws2, IdAst} = template_compiler_expr:compile(IdExpr, CState, Ws1),
-    catinclude(Method, Template, IdAst, ArgsList, CState, Ws2);
+    catinclude(TagPos, Method, Template, IdAst, ArgsList, CState, Ws2);
 compile({'call', {identifier, _, Name}, Args}, CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
     Module = template_compiler_utils:to_atom(Name),
@@ -424,11 +428,12 @@ compile({cycle, Exprs}, CState, Ws) ->
     compile({value, {ast, Ast}, []}, CState, Ws2#ws{is_forloop_var=true}).
 
 
-include(Method, Template, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
+include({_, SrcPos, _}, Method, Template, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
     {Ws1, TemplateAst} = template_compiler_expr:compile(Template, CState, Ws),
     ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList ]),
     Ast = ?Q([
             "template_compiler_runtime_internal:include(",
+                    "_@SrcPos@,",
                     "_@Method@,",
                     "_@TemplateAst,",
                     "_@ArgsListAst,",
@@ -443,12 +448,13 @@ include(Method, Template, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_a
     {Ws1, Ast}.
 
 
-catinclude(Method, Template, IdAst, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
+catinclude({_, SrcPos, _}, Method, Template, IdAst, ArgsList, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
     {Ws1, TemplateAst} = template_compiler_expr:compile(Template, CState, Ws),
     ArgsList1 = [ {erl_syntax:atom(id),IdAst} | ArgsList ],
     ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList1 ]),
     Ast = ?Q([
             "template_compiler_runtime_internal:include(",
+                    "_@SrcPos@,",
                     "_@Method@,",
                     "{cat, _@TemplateAst},",
                     "_@ArgsListAst,",

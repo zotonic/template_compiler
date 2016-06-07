@@ -305,14 +305,14 @@ OptWith -> with_keyword Args : '$2'.
 
 ExtendsTag -> open_tag extends_keyword string_literal close_tag : '$3'.
 OverrulesTag -> open_tag overrules_keyword close_tag : overrules.
-InheritTag -> open_tag inherit_keyword close_tag : inherit.
+InheritTag -> open_tag inherit_keyword close_tag : {inherit, '$1'}.
 
 TransTag -> open_trans trans_text close_trans : '$2'.
 TransTag -> open_trans text close_trans : '$2'.
 TransExtTag -> open_tag __keyword string_literal TransArgs close_tag : {trans_ext, '$3', '$4'}.
 
-IncludeTag -> open_tag OptionalPrefix include_keyword E OptWith WithArgs close_tag : {include, '$2', '$4', '$6'}.
-CatIncludeTag -> open_tag OptionalAll catinclude_keyword E E WithArgs close_tag : {catinclude, '$2', '$4', '$5', '$6'}.
+IncludeTag -> open_tag OptionalPrefix include_keyword E OptWith WithArgs close_tag : {include, '$1', '$2', '$4', '$6'}.
+CatIncludeTag -> open_tag OptionalAll catinclude_keyword E E WithArgs close_tag : {catinclude, '$1', '$2', '$4', '$5', '$6'}.
 NowTag -> open_tag now_keyword string_literal close_tag : {date, now, '$3'}.
 
 OptionalPrefix -> optional_keyword : optional.

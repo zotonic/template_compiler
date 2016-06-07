@@ -37,7 +37,10 @@
     to_bool/2,
     to_list/2,
     to_render_result/3,
-    escape/2
+    escape/2,
+    trace_compile/4,
+    trace_render/3,
+    trace_block/4
     ]).
 
 
@@ -64,6 +67,11 @@
 -callback to_list(Value :: term(), Context :: term()) -> list().
 -callback to_render_result(Value :: term(), TplVars :: #{}, Context :: term()) -> template_compiler:render_result().
 -callback escape(iolist(), Context :: term()) -> iolist().
+
+-callback trace_compile(atom(), binary(), template_compiler:options(), term()) -> ok.
+-callback trace_render(binary(), template_compiler:options(), term()) -> ok.
+-callback trace_block({binary(),integer(),integer()}, atom(), atom(), term()) -> ok | {ok, iolist(), iolist()}.
+
 
 -include("template_compiler.hrl").
 
@@ -294,4 +302,36 @@ to_render_result(L, TplVars, Context) when is_list(L) ->
 -spec escape(Value :: iolist(), Context :: term()) -> iolist().
 escape(Value, _Context) ->
     z_html:escape(iolist_to_binary(Value)).
+
+
+%% @doc Called when compiling a module
+-spec trace_compile(atom(), binary(), template_compiler:options(), term()) -> ok.
+trace_compile(_Module, Filename, Options, _Context) ->
+    case proplists:get_value(trace_position, Options) of
+        {File, Line, _Col} ->
+            lager:debug("[template_compiler] Compiling \"~s\" (called from \"~s:~p\")",
+                        [Filename, File, Line]);
+        undefined ->
+            lager:debug("[template_compiler] Compiling \"~s\"",
+                        [Filename])
+    end,
+    ok.
+
+%% @block Called when a template is rendered (could be from an include)
+-spec trace_render(binary(), template_compiler:options(), term()) -> ok | {ok, iolist(), iolist()}.
+trace_render(Filename, Options, _Context) ->
+    case proplists:get_value(trace_position, Options) of
+        {File, Line, _Col} ->
+            lager:debug("[template_compiler] Include by \"~s:~p\" of \"~s\"",
+                        [File, Line, Filename]);
+        undefined ->
+            lager:debug("[template_compiler] Render \"~s\"",
+                        [Filename])
+    end,
+    ok.
+
+%% @block Called when a block function is called
+-spec trace_block({binary(), integer(), integer()}, atom(), atom(), term()) -> ok | {ok, iolist(), iolist()}.
+trace_block(_SrcPos, _Name, _Module, _Context) ->
+    ok.
 

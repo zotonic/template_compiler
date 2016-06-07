@@ -37,7 +37,8 @@
 -include("template_compiler.hrl").
 
 
--type option() :: {runtime, atom()}.
+-type option() :: {runtime, atom()}
+                | {trace_position, {Filename::binary(), Line::integer(), Col::integer()}}.
 -type options() :: list(option()).
 -type template_file() :: #template_file{}.
 -type template() :: binary()
@@ -74,8 +75,8 @@ render(Template, Vars, Options, Context) when is_list(Vars) ->
 render(Template0, Vars, Options, Context) when is_map(Vars) ->
     Template = normalize_template(Template0),
     Runtime = proplists:get_value(runtime, Options, template_compiler_runtime),
-    case block_lookup(Runtime:map_template(Template, Vars, Context), #{}, [], Options, Vars, Runtime, Context) of
-        {ok, BaseModule, ExtendsStack, BlockMap} ->
+    case block_lookup(Runtime:map_template(Template, Vars, Context), #{}, [], [], Options, Vars, Runtime, Context) of
+        {ok, BaseModule, ExtendsStack, BlockMap, OptDebugWrap} ->
             % Start with the render function of the "base" template
             % Optionally add the unique prefix for this rendering.
             Vars1 = case BaseModule:is_autoid() 
@@ -88,10 +89,17 @@ render(Template0, Vars, Options, Context) when is_map(Vars) ->
                         false ->
                             Vars
                     end,
-            {ok, BaseModule:render(Vars1, BlockMap, Context)};
+            {ok, maybe_wrap(BaseModule:render(Vars1, BlockMap, Context), OptDebugWrap)};
         {error, _} = Error ->
             Error
     end.
+
+maybe_wrap(RenderResult, []) ->
+    RenderResult;
+maybe_wrap(RenderResult, [ok|Rest]) ->
+    maybe_wrap(RenderResult, Rest);
+maybe_wrap(RenderResult, [{ok, Before, After}|Rest]) ->
+    maybe_wrap([Before, RenderResult, After], Rest).
 
 props_to_map([], Map) -> 
     Map;
@@ -127,31 +135,34 @@ normalize_template({overrules, Template, Filename}) when is_list(Template) ->
     {overrules, unicode:characters_to_binary(Template), Filename}.
 
 %% @doc Recursive lookup of blocks via the extends-chain of a template.
-block_lookup({ok, TplFile}, BlockMap, ExtendsStack, Options, Vars, Runtime, Context) ->
+block_lookup({ok, TplFile}, BlockMap, ExtendsStack, DebugTrace, Options, Vars, Runtime, Context) ->
+    Trace = Runtime:trace_render(TplFile#template_file.filename, Options, Context),
     case template_compiler_admin:lookup(TplFile#template_file.filename, Options, Context) of
         {ok, Module} ->
             case lists:member(Module, ExtendsStack) of
                 true ->
-                    {error, {recursion, [Module:filename() | [ M:filename() || M <- ExtendsStack ]]}};
+                    FileTrace = [Module:filename() | [ M:filename() || M <- ExtendsStack ]],
+                    lager:error("[template_compiler] Template recursion: ~p", [FileTrace]),
+                    {error, {recursion, Trace}};
                 false ->
                     % Check extended/overruled templates (build block map)
                     BlockMap1 = add_blocks(Module:blocks(), Module, BlockMap),
                     case Module:extends() of
                         undefined ->
-                            {ok, Module, ExtendsStack, BlockMap1};
+                            {ok, Module, ExtendsStack, BlockMap1, [Trace|DebugTrace]};
                         overrules ->
                             Template = TplFile#template_file.template,
                             Next = Runtime:map_template({overrules, Template, Module:filename()}, Vars, Context),
-                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], Options, Vars, Runtime, Context);
+                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options, Vars, Runtime, Context);
                         Extends when is_binary(Extends) ->
                             Next = Runtime:map_template(Extends, Vars, Context),
-                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], Options, Vars, Runtime, Context)
+                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options, Vars, Runtime, Context)
                     end
             end;
         {error, _} = Error ->
             Error
     end;
-block_lookup({error, _} = Error, _BlockMap, _ExtendsStack, _Options, _Vars, _Runtime, _Context) ->
+block_lookup({error, _} = Error, _BlockMap, _ExtendsStack, _DebugTrace, _Options, _Vars, _Runtime, _Context) ->
     Error.
 
 
@@ -217,6 +228,7 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
                 true ->
                     {ok, Module};
                 false ->
+                    Runtime:trace_compile(Module, Filename, Options, Context),
                     case compile_tokens(template_compiler_parser:parse(Tokens2), cs(Module, Filename, Options, Context)) of
                         {ok, {Extends, BlockAsts, TemplateAst, IsAutoid}} ->
                             Forms = template_compiler_module:compile(
