@@ -57,6 +57,7 @@
         context = undefined :: term(),
         vars_var = "Vars" :: string(),
         context_var = "Context" :: string(),
-        is_autoescape = false
+        context_vars = [] :: list(binary()),
+        is_autoescape = false :: boolean()
     }).
 

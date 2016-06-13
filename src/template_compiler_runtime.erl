@@ -27,6 +27,7 @@
     compile_map_nested_value/3,
     find_nested_value/3,
     find_value/4,
+    set_context_vars/2,
     get_translations/2,
     lookup_translation/3,
     custom_tag/4,
@@ -53,6 +54,8 @@
 -callback compile_map_nested_value(Tokens :: list(), ContextVar::string(), Context :: term()) -> NewTokens :: list().
 -callback find_nested_value(Keys :: list(), TplVars :: term(), Context :: term()) -> term().
 -callback find_value(Key :: term(), Vars :: term(), TplVars :: #{}, Context :: term()) -> term().
+
+-callback set_context_vars(#{}|[], Context::term()) -> Context::term().
 
 -callback get_translations(Text :: binary(), Context :: term()) -> binary() | {trans, [{atom(), binary()}]}.
 -callback lookup_translation({trans, list({atom(), binary()})}, TplVars :: #{}, Context :: term()) -> binary().
@@ -187,6 +190,12 @@ find_value(Key, F, TplVars, Context) when is_function(F, 3) ->
     F(Key, TplVars, Context);
 find_value(_Key, _Vars, _TplVars, _Context) ->
     undefined.
+
+
+%% @doc Set any contextual arguments from the map or argument list. User for sudo/anondo and language settings
+-spec set_context_vars(#{}|[], term()) -> term().
+set_context_vars(Args, Context) when is_map(Args); is_list(Args) ->
+    Context.
 
 
 %% @doc Fetch the translations for the given text.

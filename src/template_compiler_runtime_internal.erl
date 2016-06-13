@@ -20,11 +20,11 @@
 -author('Marc Worrell <marc@worrell.nl>').
 
 -export([
-    forloop/8,
+    forloop/9,
     with_vars/3,
     block_call/6,
     block_inherit/7,
-    include/7,
+    include/9,
     call/4,
     print/1,
     unique/0
@@ -35,20 +35,21 @@
 %% @doc Runtime implementation of a forloop. Two variations: one with 
 -spec forloop(IsForloopVar :: boolean(), ListExpr :: term(), LoopVars :: [atom()],
               LoopBody :: fun(), EmptyPart :: fun(),
-              Runtime :: atom(), Vars :: #{}, Context :: term()) -> term().
-forloop(IsLoopVar, ListExpr, Idents, BodyFun, EmptyFun, Runtime, Vars, Context) ->
+              Runtime :: atom(), IsContextVars :: boolean(),
+              Vars :: #{}, Context :: term()) -> term().
+forloop(IsLoopVar, ListExpr, Idents, BodyFun, EmptyFun, Runtime, IsContextVars, Vars, Context) ->
     case Runtime:to_list(ListExpr, Context) of
         [] ->
             EmptyFun();
         List when IsLoopVar ->
-            forloop_fold(List, Idents, BodyFun, Vars);
+            forloop_fold(List, Idents, BodyFun, Runtime, IsContextVars, Vars, Context);
         List when not IsLoopVar ->
-            forloop_map(List, Idents, BodyFun, Vars)
+            forloop_map(List, Idents, BodyFun, Runtime, IsContextVars, Vars, Context)
     end.
 
 % For loop with a forloop variable in the body, use a fold with a forloop state
 % variable.
-forloop_fold(List, Idents, Fun, Vars) ->
+forloop_fold(List, Idents, Fun, Runtime, IsContextVars, Vars, Context) ->
     Len = length(List),
     {Result, _} = lists:foldl(
             fun(Val, {Acc, Counter}) ->
@@ -62,15 +63,26 @@ forloop_fold(List, Idents, Fun, Vars) ->
                     parentloop => maps:get(forloop, Vars, undefined)
                 },
                 Vars1 = assign_vars(Idents, Val, Vars#{forloop => Forloop}),
-                {[Fun(Vars1) | Acc], Counter+1}
+                Context1 = case IsContextVars of
+                                true -> Runtime:set_context_vars(Vars1, Context);
+                                false -> Context
+                           end,
+                {[Fun(Vars1, Context1) | Acc], Counter+1}
             end,
             {[], 1},
             List),
     lists:reverse(Result).
 
 % For loop without any forloop variable, use a direct map
-forloop_map(List, Idents, Fun, Vars) ->
-    [ Fun(assign_vars(Idents, Val, Vars)) || Val <- List ].
+forloop_map(List, Idents, Fun, Runtime, true, Vars, Context) ->
+    [ 
+        begin
+            Vars1 = assign_vars(Idents, Val, Vars),
+            Fun(Vars1, Runtime:set_context_vars(Vars1, Context))
+        end || Val <- List
+    ];
+forloop_map(List, Idents, Fun, _Runtime, false, Vars, Context) ->
+    [ Fun(assign_vars(Idents, Val, Vars), Context) || Val <- List ].
 
 
 %% @doc Used with forloops, assign variables from an expression value
@@ -159,28 +171,33 @@ block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
 
 %% @doc Include a template.
 -spec include({File::binary(), Line::integer(), Col::integer()}, normal|optional|all, 
-        template_compiler:template(), list({atom(),term()}), atom(), #{}, term()) -> 
+        template_compiler:template(), list({atom(),term()}), atom(), list(binary()), boolean(), #{}, term()) -> 
         template_compiler:render_result().
-include(SrcPos, Method, Template, Args, Runtime, Vars, Context) ->
+include(SrcPos, Method, Template, Args, Runtime, ContextVars, IsContextVars, Vars, Context) ->
     Vars1 = lists:foldl(
                 fun({V,E}, Acc) ->
                     Acc#{V => E}
                 end,
                 Vars,
                 Args),
-    include_1(SrcPos, Method, Template, Runtime, Vars1, Context).
+    Context1 = case IsContextVars of
+        true -> Runtime:set_context_vars(Args, Context);
+        false -> Context
+    end,
+    include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context1).
 
-include_1(SrcPos, all, Template, Runtime, Vars1, Context) ->
+include_1(SrcPos, all, Template, Runtime, ContextVars, Vars1, Context) ->
     Templates = Runtime:map_template_all(Template, Vars1, Context),
     lists:map(
             fun(Tpl) ->
-                include_1(SrcPos, optional, Tpl, Runtime, Vars1, Context)
+                include_1(SrcPos, optional, Tpl, Runtime, ContextVars, Vars1, Context)
             end,
             Templates);
-include_1(SrcPos, Method, Template, Runtime, Vars1, Context) ->
+include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
     Options = [
         {runtime, Runtime},
-        {trace_position, SrcPos}
+        {trace_position, SrcPos},
+        {context_vars, ContextVars}
     ],
     case template_compiler:render(Template, Vars1, Options, Context) of
         {ok, Result} ->

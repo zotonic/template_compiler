@@ -38,7 +38,8 @@
 
 
 -type option() :: {runtime, atom()}
-                | {trace_position, {Filename::binary(), Line::integer(), Col::integer()}}.
+                | {trace_position, {Filename::binary(), Line::integer(), Col::integer()}}
+                | {context_vars, list(binary())}.
 -type options() :: list(option()).
 -type template_file() :: #template_file{}.
 -type template() :: binary()
@@ -174,11 +175,12 @@ add_blocks([Block|Blocks], Module, BlockMap) ->
     add_blocks(Blocks, Module, BlockMap1).
 
 
-%% @doc Extract the runtime to be used from the options.
+%% @doc Extract compiler options and handle possible defauts.
 -spec get_option(Option :: atom(), Options :: options()) -> term().
 get_option(runtime, Options) ->
-    proplists:get_value(runtime, Options, template_compiler_runtime).
-
+    proplists:get_value(runtime, Options, template_compiler_runtime);
+get_option(context_vars, Options) ->
+    proplists:get_value(context_vars, Options, []).
 
 %% @doc Find the module of a compiled template, if not yet compiled then
 %% compile the template.
@@ -221,9 +223,10 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
     case template_compiler_scanner:scan(Filename, Tpl) of
         {ok, Tokens} ->
             Runtime = get_option(runtime, Options),
+            ContextVars = get_option(context_vars, Options),
             Tokens1 = maybe_drop_text(Tokens, Tokens),
             Tokens2 = expand_translations(Tokens1, Runtime, Context),
-            Module = module_name(Runtime, Tokens2),
+            Module = module_name(Runtime, ContextVars, Tokens2),
             case erlang:module_loaded(Module) of
                 true ->
                     {ok, Module};
@@ -269,9 +272,9 @@ translations(Filename) ->
 
 %%%% --------------------------------- Internal ----------------------------------
 
-module_name(Runtime, Tokens) ->
+module_name(Runtime, SpecialContextArgs, Tokens) ->
     Tokens1 = remove_srcpos(Tokens),
-    TokenChecksum = crypto:hash(sha, term_to_binary({?COMPILER_VERSION, Runtime, Tokens1})),
+    TokenChecksum = crypto:hash(sha, term_to_binary({?COMPILER_VERSION, Runtime, SpecialContextArgs, Tokens1})),
     Hex = z_string:to_lower(z_url:hex_encode(TokenChecksum)),
     binary_to_atom(iolist_to_binary(["tpl_",Hex]), 'utf8').
 
@@ -308,7 +311,8 @@ cs(Module, Filename, Options, Context) ->
     #cs{
         filename=Filename,
         module=Module,
-        runtime=proplists:get_value(runtime, Options, template_compiler_runtime),
+        runtime=get_option(runtime, Options),
+        context_vars=get_option(context_vars, Options),
         context=Context
     }.
 
