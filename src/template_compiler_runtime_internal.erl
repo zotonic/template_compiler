@@ -36,7 +36,7 @@
 -spec forloop(IsForloopVar :: boolean(), ListExpr :: term(), LoopVars :: [atom()],
               LoopBody :: fun(), EmptyPart :: fun(),
               Runtime :: atom(), IsContextVars :: boolean(),
-              Vars :: #{}, Context :: term()) -> term().
+              Vars :: map(), Context :: term()) -> term().
 forloop(IsLoopVar, ListExpr, Idents, BodyFun, EmptyFun, Runtime, IsContextVars, Vars, Context) ->
     case Runtime:to_list(ListExpr, Context) of
         [] ->
@@ -115,7 +115,7 @@ assign_vars_tuple(Vs, Es, Vars) ->
 
 
 %% @doc Assign variables from a with statement. Care has to be taken for unpacking tuples and lists.
--spec with_vars([atom()], [term()], #{}) -> #{}.
+-spec with_vars([atom()], [term()], map()) -> map().
 with_vars([_,_|_] = Vs, [E], Vars) ->
     assign_vars(Vs, E, Vars);
 with_vars(Vs, Es, Vars) ->
@@ -124,7 +124,7 @@ with_vars(Vs, Es, Vars) ->
 
 %% @doc Call the block function, lookup the function in the BlockMap to find
 %%      the correct module.
--spec block_call({binary(), integer(), integer()}, atom(), #{}, #{}, atom(), term()) -> term().
+-spec block_call({binary(), integer(), integer()}, atom(), map(), map(), atom(), term()) -> term().
 block_call(SrcPos, Block, Vars, BlockMap, Runtime, Context) ->
     case maps:find(Block, BlockMap) of
         {ok, [Module|_]} when is_atom(Module) ->
@@ -144,7 +144,7 @@ block_call(SrcPos, Block, Vars, BlockMap, Runtime, Context) ->
     end.
 
 %% @doc Call the block function of the template the current module extends.
--spec block_inherit({binary(), integer(), integer()}, atom(), atom(), #{}, #{}, atom(), term()) -> term().
+-spec block_inherit({binary(), integer(), integer()}, atom(), atom(), map(), map(), atom(), term()) -> term().
 block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
     case maps:find(Block, BlockMap) of
         {ok, Modules} ->
@@ -171,7 +171,7 @@ block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
 
 %% @doc Include a template.
 -spec include({File::binary(), Line::integer(), Col::integer()}, normal|optional|all, 
-        template_compiler:template(), list({atom(),term()}), atom(), list(binary()), boolean(), #{}, term()) -> 
+        template_compiler:template(), list({atom(),term()}), atom(), list(binary()), boolean(), map(), term()) -> 
         template_compiler:render_result().
 include(SrcPos, Method, Template, Args, Runtime, ContextVars, IsContextVars, Vars, Context) ->
     Vars1 = lists:foldl(
@@ -214,7 +214,7 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
 
 
 %% @doc Call a module's render function.
--spec call(Module::atom(), Args::#{}, Vars::#{}, Context::term()) -> template_compiler:render_result().
+-spec call(Module::atom(), Args::map(), Vars::map(), Context::term()) -> template_compiler:render_result().
 call(Module, Args, Vars, Context) ->
     case Module:render(Args, Vars, Context) of
         {ok, Result} -> Result;

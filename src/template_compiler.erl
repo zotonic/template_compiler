@@ -69,7 +69,7 @@
 
 %% @doc Render a template. This looks up the templates needed, ensures compilation and
 %%      returns the rendering result.
--spec render(Template :: template(), Vars :: #{} | [], Options :: options(), Context :: term()) ->
+-spec render(Template :: template(), Vars :: map() | list(), Options :: options(), Context :: term()) ->
         {ok, render_result()} | {error, term()}.
 render(Template, Vars, Options, Context) when is_list(Vars) ->
     render(Template, props_to_map(Vars, #{}), Options, Context);
