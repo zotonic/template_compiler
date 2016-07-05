@@ -21,6 +21,7 @@
 
 -export([
     render/4,
+    render_block/5,
     lookup/3,
     flush/0,
     flush_file/1,
@@ -94,6 +95,35 @@ render(Template0, Vars, Options, Context) when is_map(Vars) ->
         {error, _} = Error ->
             Error
     end.
+
+%% @doc Render a named block, defined in a template
+-spec render_block(Block :: atom(), Template :: template(), Vars :: map() | list(), 
+                   Options :: options(), Context :: term()) ->
+        {ok, render_result()} | {error, term()}.
+render_block(Block, Template, Vars, Options, Context) when is_list(Vars) ->
+    render_block(Block, Template, props_to_map(Vars, #{}), Options, Context);
+render_block(Block, Template0, Vars, Options, Context) when is_map(Vars) ->
+    Template = normalize_template(Template0),
+    Runtime = proplists:get_value(runtime, Options, template_compiler_runtime),
+    case block_lookup(Runtime:map_template(Template, Vars, Context), #{}, [], [], Options, Vars, Runtime, Context) of
+        {ok, BaseModule, ExtendsStack, BlockMap, _OptDebugWrap} ->
+            % Optionally add the unique prefix for this rendering.
+            Vars1 = case BaseModule:is_autoid() 
+                        orelse lists:any(fun(M) -> M:is_autoid() end, ExtendsStack)
+                    of
+                        true ->
+                            Vars#{
+                                '$autoid' => template_compiler_runtime_internal:unique()
+                            };
+                        false ->
+                            Vars
+                    end,
+            % Render the specific block
+            {ok, template_compiler_runtime_internal:block_call({<<>>,1,1}, Block, Vars1, BlockMap, Runtime, Context)};
+        {error, _} = Error ->
+            Error
+    end.
+
 
 maybe_wrap(RenderResult, []) ->
     RenderResult;

@@ -23,6 +23,7 @@ groups() ->
         ,hello_world_block2_test
         ,hello_world_block3_test
         ,hello_world_comment_test
+        ,block_render_test
         ,raw_test
         ]}].
 
@@ -69,6 +70,13 @@ hello_world_block3_test(_Config) ->
 hello_world_comment_test(_Config) ->
     {ok, Bin} = template_compiler:render("hello_world_comment.tpl", #{}, [], undefined),
     <<"Hello World!">> = iolist_to_binary(Bin),
+    ok.
+
+block_render_test(_Config) ->
+    {ok, BinA} = template_compiler:render_block(a, "block_render.tpl", #{}, [], undefined),
+    <<"A">> = iolist_to_binary(BinA),
+    {ok, BinB} = template_compiler:render_block(b, "block_render.tpl", #{}, [], undefined),
+    <<"B">> = iolist_to_binary(BinB),
     ok.
 
 raw_test(_Config) ->
