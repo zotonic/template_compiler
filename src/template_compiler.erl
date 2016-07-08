@@ -39,6 +39,7 @@
 
 
 -type option() :: {runtime, atom()}
+                | {context_name, term()}
                 | {trace_position, {Filename::binary(), Line::integer(), Col::integer()}}
                 | {context_vars, list(binary())}.
 -type options() :: list(option()).
@@ -209,6 +210,8 @@ add_blocks([Block|Blocks], Module, BlockMap) ->
 -spec get_option(Option :: atom(), Options :: options()) -> term().
 get_option(runtime, Options) ->
     proplists:get_value(runtime, Options, template_compiler_runtime);
+get_option(context_name, Options) ->
+    proplists:get_value(context_name, Options, undefined);
 get_option(context_vars, Options) ->
     proplists:get_value(context_vars, Options, []).
 

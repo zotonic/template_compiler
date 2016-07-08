@@ -64,7 +64,8 @@
 -spec lookup(filename:filename(), template_compiler:options(), any()) -> {ok, atom()} | {error, term()}.
 lookup(Filename, Options, Context) ->
     Runtime = template_compiler:get_option(runtime, Options),
-    TplKey = {Runtime, Filename},
+    ContextName = template_compiler:get_option(context_name, Options),
+    TplKey = {ContextName, Runtime, Filename},
     case ets:lookup(?MODULE, TplKey) of
         [#tpl{module=Module}] ->
             case Runtime:is_modified(Filename, Module:mtime(), Context) of
