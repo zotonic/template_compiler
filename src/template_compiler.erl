@@ -291,7 +291,7 @@ is_template_module(Name) -> is_template_module(z_convert:to_binary(Name)).
 %% @doc Fetch all translatable strings from a template.
 -spec translations(filename:filename()) -> list(binary()).
 translations(Filename) ->
-    case file:read_file(Filename) of
+    Translations = case file:read_file(Filename) of
         {ok, Bin} ->
             case template_compiler_scanner:scan(Filename, Bin) of
                 {ok, Tokens} ->
@@ -301,7 +301,8 @@ translations(Filename) ->
             end;
         {error, _} = Error ->
             Error
-    end.
+    end,
+    {Filename, Translations}.
 
 %%%% --------------------------------- Internal ----------------------------------
 
@@ -454,10 +455,10 @@ expand_translation(Token, _Runtime, _Context) ->
 extract_translations(Tokens) ->
     lists:foldl(
         fun
-            ({trans_text, _, Text}, Acc) ->
-                [ template_compiler_utils:unescape_string_literal(Text) | Acc ];
-            ({trans_literal, _, Text}, Acc) ->
-                [ template_compiler_utils:unescape_string_literal(Text) | Acc ];
+            ({trans_text, LineAndNumber, Text}, Acc) ->
+                [ {template_compiler_utils:unescape_string_literal(Text), [], [LineAndNumber]} | Acc ];
+            ({trans_literal, LineAndNumber, Text}, Acc) ->
+                [ {template_compiler_utils:unescape_string_literal(Text), [], [LineAndNumber]} | Acc ];
             (_Token, Acc) ->
                 Acc
         end,
