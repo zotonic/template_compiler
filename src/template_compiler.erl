@@ -289,20 +289,19 @@ is_template_module(Name) -> is_template_module(z_convert:to_binary(Name)).
 
 
 %% @doc Fetch all translatable strings from a template.
--spec translations(filename:filename()) -> list(binary()).
+-spec translations(filename:filename()) -> {ok, list(binary())} | {error, term()}.
 translations(Filename) ->
-    Translations = case file:read_file(Filename) of
+    case file:read_file(Filename) of
         {ok, Bin} ->
             case template_compiler_scanner:scan(Filename, Bin) of
                 {ok, Tokens} ->
-                    extract_translations(Tokens);
+                    {ok, extract_translations(Tokens)};
                 {error, _} = Error ->
                     Error
             end;
         {error, _} = Error ->
             Error
-    end,
-    {Filename, Translations}.
+    end.
 
 %%%% --------------------------------- Internal ----------------------------------
 
