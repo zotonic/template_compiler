@@ -455,9 +455,9 @@ extract_translations(Tokens) ->
     lists:foldl(
         fun
             ({trans_text, LineAndNumber, Text}, Acc) ->
-                [ {template_compiler_utils:unescape_string_literal(Text), [], [LineAndNumber]} | Acc ];
+                [ {template_compiler_utils:unescape_string_literal(Text), [], LineAndNumber} | Acc ];
             ({trans_literal, LineAndNumber, Text}, Acc) ->
-                [ {template_compiler_utils:unescape_string_literal(Text), [], [LineAndNumber]} | Acc ];
+                [ {template_compiler_utils:unescape_string_literal(Text), [], LineAndNumber} | Acc ];
             (_Token, Acc) ->
                 Acc
         end,
