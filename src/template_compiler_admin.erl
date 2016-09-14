@@ -80,8 +80,15 @@ compile_file(Filename, TplKey, Options, Context) ->
     case gen_server:call(?MODULE, {compile_request, TplKey, Filename}, infinity) of
         {ok, {compile, TplKey}} ->
             % Unknown, compile the template
-            Result = template_compiler:compile_file(Filename, Options, Context),
-            ok = gen_server:cast(?MODULE, {compile_done, Result, TplKey}),
+            Result = try
+                        template_compiler:compile_file(Filename, Options, Context)
+                     catch 
+                        What:Error ->
+                            lager:error("Error compiling template ~p: ~p:~p",
+                                        [Filename, What, Error]),
+                            {error, Error}
+                     end,
+            ok = gen_server:call(?MODULE, {compile_done, Result, TplKey}, infinity),
             Result;
         {ok, Module} when is_atom(Module) ->
             {ok, Module};
@@ -136,12 +143,9 @@ handle_call({compile_request, TplKey, Filename}, From, State) ->
                     end,
             {noreply, start_compile(TplKey, From, State1)}
     end;
-handle_call(Msg, _From, State) ->
-    {stop, {unknown_call, Msg}, State}.
-
-handle_cast({compile_done, Result, TplKey}, State) ->
+handle_call({compile_done, Result, TplKey}, _From, State) ->
     State1 = case lists:keytake(TplKey, 2, State#state.compiling) of
-                {value, {MRef, _TplKey, _From}, Compiling1} ->
+                {value, {MRef, _TplKey, _CFrom}, Compiling1} ->
                     erlang:demonitor(MRef),
                     State#state{compiling=Compiling1};
                 false ->
@@ -159,7 +163,10 @@ handle_cast({compile_done, Result, TplKey}, State) ->
                 gen_server:reply(Waiter, Result)
             end,
             Waiters),
-    {noreply, State2};
+    {reply, ok, State2};
+handle_call(Msg, _From, State) ->
+    {stop, {unknown_call, Msg}, State}.
+
 handle_cast(flush, State) ->
     true = ets:delete_all_objects(?MODULE),
     State1 = State#state{
