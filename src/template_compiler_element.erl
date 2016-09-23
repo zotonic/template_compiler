@@ -702,6 +702,8 @@ split_string(<<>>, Acc, Parts) ->
     lists:reverse([Acc|Parts]);
 split_string(<<"{{", T/binary>>, Acc, Parts) ->
     split_string(T, <<Acc/binary, ${>>, Parts);
+split_string(<<"}}", T/binary>>, Acc, Parts) ->
+    split_string(T, <<Acc/binary, $}>>, Parts);
 split_string(<<"{", T/binary>>, Acc, Parts) ->
     split_string_name(T, <<>>, [Acc|Parts]);
 split_string(<<C/utf8, T/binary>>, Acc, Parts) ->

@@ -1,0 +1,1 @@
+{% trans "Hello {{foo}} {foo} Bye" foo=v %}
