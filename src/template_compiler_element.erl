@@ -51,14 +51,8 @@ compile({trans_text, _Pos, Tr}, #cs{runtime=Runtime} = CState, Ws) ->
                 erl_syntax:variable(CState#cs.context_var)
             ]),
     {Ws, Ast};
-compile({trans_ext, {string_literal, Pos, Text}, Args}, CState, Ws) ->
-    Trans = lists:map(
-            fun({{identifier,_,Lang}, {string_literal,_,String}}) ->
-                {template_compiler_utils:to_atom(Lang), String}
-            end,
-            Args),
-    Trans1 = {trans, lists:sort([{en,Text} | Trans])},
-    compile({trans_text, Pos, Trans1}, CState, Ws);
+compile({trans_ext, Tr, Args}, CState, Ws) ->
+    trans_ext(Tr, Args, CState, Ws);
 compile({value, Expr, []}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
     Ast = ?Q("'@Runtime@':to_render_result(_@ExprAst, _@vars, _@context)",
@@ -652,3 +646,70 @@ idents_as_atoms(Idents) ->
 
 ident_as_atom({identifier, _SrcPos, Ident}) ->
     template_compiler_utils:to_atom(Ident).
+
+trans_ext({string_literal, _, Text}, Args, CState, Ws) ->
+    Unescaped = template_compiler_utils:unescape_string_literal(Text),
+    trans_ext_1({trans, [{en, Unescaped}]}, Args, CState, Ws);
+trans_ext({trans_literal, _, Tr}, Args, CState, Ws) ->
+    trans_ext_1(Tr, Args, CState, Ws).
+
+trans_ext_1({trans, Tr}, Args, #cs{runtime=Runtime} = CState, Ws) ->
+    Split = [ {Lang, split_string(Txt, <<>>, [])} || {Lang, Txt} <- Tr ],
+    {FunAsts, Ws1} = lists:foldl(
+                    fun({Lang, Parts}, {FAcc, WsAcc}) ->
+                        {WsAcc1, Fun} = trans_ext_fun(Parts, Args, CState, WsAcc),
+                        {[{Lang, Fun}|FAcc], WsAcc1}
+                    end,
+                    {[], Ws},
+                    Split),
+    FunListAst = erl_syntax:list(
+                    lists:map(
+                        fun ({Lng,FunAst}) ->
+                            erl_syntax:tuple([
+                                    erl_syntax:atom(Lng),
+                                    FunAst
+                                ])
+                        end,
+                        FunAsts)),
+    Ast = ?Q("(_@Runtime@:lookup_translation({trans, _@FunListAst}, _@vars, _@context))()",
+              [
+                {context, erl_syntax:variable(CState#cs.context_var)},
+                {vars, erl_syntax:variable(CState#cs.vars_var)}
+              ]),
+    {Ws1, Ast}.
+
+trans_ext_fun(Parts, Args, CState, Ws) ->
+    Parts1 = [ P || P <- Parts, P =/= <<>> ],
+    Args1 = [{Ident,ArgExpr} || {{identifier, _, Ident}, ArgExpr} <- Args],
+    {Asts,Ws1} = lists:foldr(
+                    fun
+                        (B, {Acc, WsAcc}) when is_binary(B) ->
+                            {[erl_syntax:abstract(B)|Acc], WsAcc};
+                        ({var, Name}, {Acc, WsAcc}) ->
+                            case proplists:get_value(Name, Args1) of
+                                undefined ->
+                                    {Acc, WsAcc};
+                                Expr ->
+                                    {WsAcc1, ExprAst} = compile({value, Expr, []}, CState, WsAcc),
+                                    {[ExprAst|Acc], WsAcc1}
+                            end
+                    end,
+                    {[], Ws},
+                    Parts1),
+    {Ws1, ?Q("fun() -> _@list end", [{list, erl_syntax:list(Asts)}])}.
+
+split_string(<<>>, Acc, Parts) ->
+    lists:reverse([Acc|Parts]);
+split_string(<<"{{", T/binary>>, Acc, Parts) ->
+    split_string(T, <<Acc/binary, ${>>, Parts);
+split_string(<<"{", T/binary>>, Acc, Parts) ->
+    split_string_name(T, <<>>, [Acc|Parts]);
+split_string(<<C/utf8, T/binary>>, Acc, Parts) ->
+    split_string(T, <<Acc/binary, C/utf8>>, Parts).
+
+split_string_name(<<>>, Acc, Parts) ->
+    lists:reverse([Acc|Parts]);
+split_string_name(<<"}", T/binary>>, Acc, Parts) ->
+    split_string(T, <<>>, [{var, z_string:trim(Acc)}|Parts]);
+split_string_name(<<C/utf8, T/binary>>, Acc, Parts) ->
+    split_string_name(T, <<Acc/binary, C/utf8>>, Parts).

@@ -428,7 +428,18 @@ maybe_drop_text(_, OrgTks) ->
 
 %% @doc Expand all translations in the tokens. Translations are always looked up at compile time.
 expand_translations(Tokens, Runtime, Context) ->
-    [ expand_translation(Token, Runtime, Context) || Token <- Tokens ].
+    Tokens1 = map_trans_tokens(Tokens, []),
+    [ expand_translation(Token, Runtime, Context) || Token <- Tokens1 ].
+
+
+map_trans_tokens([], Acc) ->
+    lists:reverse(Acc);
+map_trans_tokens([{trans_keyword, _, _}=Trans, {string_literal, SrcPos, Text}|Ts], Acc) ->
+    Acc1 = [{trans_literal, SrcPos, Text},Trans|Acc],
+    map_trans_tokens(Ts, Acc1);
+map_trans_tokens([T|Ts], Acc) ->
+    map_trans_tokens(Ts, [T|Acc]).
+
 
 expand_translation({trans_text, SrcPos, Text}, Runtime, Context) ->
     Unescaped = template_compiler_utils:unescape_string_literal(Text),
@@ -441,7 +452,7 @@ expand_translation({trans_literal, SrcPos, Text}, Runtime, Context) ->
     Unescaped = template_compiler_utils:unescape_string_literal(Text),
     case Runtime:get_translations(Unescaped, Context) of
         {trans, _} = Tr -> {trans_literal, SrcPos, Tr};
-        B when is_binary(B) -> {string_literal, SrcPos, template_compiler_utils:unescape_string_literal(B)}
+        B when is_binary(B) -> {trans_literal, SrcPos, [{en, B}]}
     end;
 expand_translation({string_literal, SrcPos, Text}, _Runtime, _Context) ->
     Text1 = template_compiler_utils:unescape_string_literal(Text),

@@ -80,9 +80,9 @@ identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc})
         <<"ifequal">>, <<"endifequal">>, <<"ifnotequal">>, <<"endifnotequal">>, <<"now">>,
         <<"regroup">>, <<"rsc">>, <<"spaceless">>, <<"endspaceless">>, <<"ssi">>,
         <<"templatetag">>, <<"load">>, <<"call">>, <<"url">>, <<"print">>, <<"image">>,
-        <<"image_url">>, <<"media">>, <<"_">>, <<"with">>, <<"endwith">>, <<"all">>, <<"lib">>,
+        <<"image_url">>, <<"media">>, <<"with">>, <<"endwith">>, <<"all">>, <<"lib">>,
         <<"cache">>, <<"endcache">>, <<"filter">>, <<"endfilter">>, <<"javascript">>,
-        <<"endjavascript">>, <<"optional">>
+        <<"endjavascript">>, <<"optional">>, <<"trans">>
     ],
     Type = case lists:member(String, Keywords) of
         true -> 

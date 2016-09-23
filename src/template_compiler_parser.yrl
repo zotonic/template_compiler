@@ -126,7 +126,6 @@ Nonterminals
     WithArgs
     Args
     SpacelessBlock
-    TransArgs
 
     CallTag
     CallWithTag
@@ -212,6 +211,7 @@ Terminals
     overrules_keyword
     pipe
     print_keyword
+    trans_keyword
     javascript_keyword
     spaceless_keyword
     string_literal
@@ -229,7 +229,6 @@ Terminals
     or_keyword
     xor_keyword
     and_keyword
-    __keyword
     hash
     '==' '/=' '<' '>' '=<' '>='
     '++' '--'
@@ -309,7 +308,8 @@ InheritTag -> open_tag inherit_keyword close_tag : {inherit, '$1'}.
 
 TransTag -> open_trans trans_text close_trans : '$2'.
 TransTag -> open_trans text close_trans : '$2'.
-TransExtTag -> open_tag __keyword string_literal TransArgs close_tag : {trans_ext, '$3', '$4'}.
+
+TransExtTag -> open_tag trans_keyword trans_literal WithArgs close_tag : {trans_ext, '$3', '$4'}.
 
 IncludeTag -> open_tag OptionalPrefix include_keyword E OptWith WithArgs close_tag : {include, '$1', '$2', '$4', '$6'}.
 CatIncludeTag -> open_tag OptionalAll catinclude_keyword E E WithArgs close_tag : {catinclude, '$1', '$2', '$4', '$5', '$6'}.
@@ -432,9 +432,6 @@ MediaTag -> open_tag media_keyword E Args close_tag : {media, '$3', '$4' }.
 UrlTag -> open_tag url_keyword E Args close_tag : {url, '$3', '$4'}.
 
 PrintTag -> open_tag print_keyword E close_tag : {print, '$3'}.
-
-TransArgs -> '$empty' : [].
-TransArgs -> TransArgs identifier equal string_literal : '$1' ++ [{'$2', '$4'}].
 
 WithArgs -> with_keyword Args identifier : '$2' ++ [{'$3', true}].
 WithArgs -> with_keyword Args identifier equal E : '$2' ++ [{'$3', '$5'}].
