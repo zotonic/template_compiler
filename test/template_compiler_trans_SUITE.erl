@@ -19,6 +19,7 @@ groups() ->
     [{basic, [],
         [trans_test
         ,trans_escape_test
+        ,trans_string_test
         ]}].
 
 init_per_suite(Config) ->
@@ -46,6 +47,11 @@ trans_test(_Config) ->
 trans_escape_test(_Config) ->
     {ok, Bin1} = template_compiler:render("trans_escape.tpl", #{ v => "bar" }, [], undefined),
     <<"Hello {foo} bar Bye">> = iolist_to_binary(Bin1),
+    ok.
+
+trans_string_test(_Config) ->
+    {ok, Bin1} = template_compiler:render("trans_string.tpl", #{}, [], undefined),
+    <<"Hello">> = iolist_to_binary(Bin1),
     ok.
 
 test_data_dir(Config) ->
