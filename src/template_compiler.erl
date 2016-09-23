@@ -452,7 +452,7 @@ expand_translation({trans_literal, SrcPos, Text}, Runtime, Context) ->
     Unescaped = template_compiler_utils:unescape_string_literal(Text),
     case Runtime:get_translations(Unescaped, Context) of
         {trans, _} = Tr -> {trans_literal, SrcPos, Tr};
-        B when is_binary(B) -> {trans_literal, SrcPos, [{en, B}]}
+        B when is_binary(B) -> {trans_literal, SrcPos, {trans, [{en, B}]}}
     end;
 expand_translation({string_literal, SrcPos, Text}, _Runtime, _Context) ->
     Text1 = template_compiler_utils:unescape_string_literal(Text),

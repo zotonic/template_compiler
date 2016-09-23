@@ -84,8 +84,9 @@ compile_file(Filename, TplKey, Options, Context) ->
                         template_compiler:compile_file(Filename, Options, Context)
                      catch 
                         What:Error ->
-                            lager:error("Error compiling template ~p: ~p:~p",
-                                        [Filename, What, Error]),
+                            Stack = erlang:get_stacktrace(),
+                            lager:error("Error compiling template ~p: ~p:~p at ~p",
+                                        [Filename, What, Error, Stack]),
                             {error, Error}
                      end,
             ok = gen_server:call(?MODULE, {compile_done, Result, TplKey}, infinity),
