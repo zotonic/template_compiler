@@ -295,7 +295,8 @@ translations(Filename) ->
         {ok, Bin} ->
             case template_compiler_scanner:scan(Filename, Bin) of
                 {ok, Tokens} ->
-                    {ok, extract_translations(Tokens)};
+                    Tokens1 = map_text_tokens(Tokens, []),
+                    {ok, extract_translations(Tokens1)};
                 {error, _} = Error ->
                     Error
             end;
@@ -428,35 +429,42 @@ maybe_drop_text(_, OrgTks) ->
 
 %% @doc Expand all translations in the tokens. Translations are always looked up at compile time.
 expand_translations(Tokens, Runtime, Context) ->
-    Tokens1 = map_trans_tokens(Tokens, []),
+    Tokens1 = map_text_tokens(Tokens, []),
     [ expand_translation(Token, Runtime, Context) || Token <- Tokens1 ].
 
 
-map_trans_tokens([], Acc) ->
+map_text_tokens([], Acc) ->
     lists:reverse(Acc);
-map_trans_tokens([{trans_keyword, _, _}=Trans, {string_literal, SrcPos, Text}|Ts], Acc) ->
-    Acc1 = [{trans_literal, SrcPos, Text},Trans|Acc],
-    map_trans_tokens(Ts, Acc1);
-map_trans_tokens([T|Ts], Acc) ->
-    map_trans_tokens(Ts, [T|Acc]).
+map_text_tokens([{trans_keyword, _, _}=Trans, {string_literal, SrcPos, Text}|Ts], Acc) ->
+    Acc1 = [{trans_literal, SrcPos, unescape_trim(Text)},Trans|Acc],
+    map_text_tokens(Ts, Acc1);
+map_text_tokens([{trans_text, SrcPos, Text}|Ts], Acc) ->
+    Acc1 = [{trans_text, SrcPos, unescape_trim(Text)}|Acc],
+    map_text_tokens(Ts, Acc1);
+map_text_tokens([{trans_literal, SrcPos, Text}|Ts], Acc) ->
+    Acc1 = [{trans_literal, SrcPos, unescape_trim(Text)}|Acc],
+    map_text_tokens(Ts, Acc1);
+map_text_tokens([{string_literal, SrcPos, Text}|Ts], Acc) ->
+    Acc1 = [{string_literal, SrcPos, template_compiler_utils:unescape_string_literal(Text)}|Acc],
+    map_text_tokens(Ts, Acc1);
+map_text_tokens([T|Ts], Acc) ->
+    map_text_tokens(Ts, [T|Acc]).
+
+unescape_trim(Text) ->
+    Unescaped = template_compiler_utils:unescape_string_literal(Text),
+    z_string:trim(Unescaped).
 
 
 expand_translation({trans_text, SrcPos, Text}, Runtime, Context) ->
-    Unescaped = template_compiler_utils:unescape_string_literal(Text),
-    Trimmed = z_string:trim(Unescaped),
-    case Runtime:get_translations(Trimmed, Context) of
+    case Runtime:get_translations(Text, Context) of
         {trans, _} = Tr -> {trans_text, SrcPos, Tr};
         B when is_binary(B) -> {text, SrcPos, B}
     end;
 expand_translation({trans_literal, SrcPos, Text}, Runtime, Context) ->
-    Unescaped = template_compiler_utils:unescape_string_literal(Text),
-    case Runtime:get_translations(Unescaped, Context) of
+    case Runtime:get_translations(Text, Context) of
         {trans, _} = Tr -> {trans_literal, SrcPos, Tr};
         B when is_binary(B) -> {trans_literal, SrcPos, {trans, [{en, B}]}}
     end;
-expand_translation({string_literal, SrcPos, Text}, _Runtime, _Context) ->
-    Text1 = template_compiler_utils:unescape_string_literal(Text),
-    {string_literal, SrcPos, Text1};
 expand_translation(Token, _Runtime, _Context) ->
     Token.
 
@@ -466,9 +474,9 @@ extract_translations(Tokens) ->
     lists:foldl(
         fun
             ({trans_text, LineAndNumber, Text}, Acc) ->
-                [ {template_compiler_utils:unescape_string_literal(Text), [], LineAndNumber} | Acc ];
+                [ {Text, [], LineAndNumber} | Acc ];
             ({trans_literal, LineAndNumber, Text}, Acc) ->
-                [ {template_compiler_utils:unescape_string_literal(Text), [], LineAndNumber} | Acc ];
+                [ {Text, [], LineAndNumber} | Acc ];
             (_Token, Acc) ->
                 Acc
         end,
