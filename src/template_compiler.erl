@@ -7,9 +7,9 @@
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
-%% 
+%%
 %%     http://www.apache.org/licenses/LICENSE-2.0
-%% 
+%%
 %% Unless required by applicable law or agreed to in writing, software
 %% distributed under the License is distributed on an "AS IS" BASIS,
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -59,14 +59,24 @@
                      | url
                      | lib.
 
+-type translation_message() :: {
+    Text :: binary(),
+    Args :: proplists:proplist(), {
+        Filename :: file:filename(),
+        Line :: pos_integer(),
+        Column :: pos_integer()
+    }
+}.
+
 -export_type([
-        option/0,
-        options/0,
-        template/0,
-        template_file/0,
-        template_key/0,
-        builtin_tag/0
-    ]).
+    option/0,
+    options/0,
+    template/0,
+    template_file/0,
+    template_key/0,
+    builtin_tag/0,
+    translation_message/0
+]).
 
 
 %% @doc Render a template. This looks up the templates needed, ensures compilation and
@@ -82,7 +92,7 @@ render(Template0, Vars, Options, Context) when is_map(Vars) ->
         {ok, BaseModule, ExtendsStack, BlockMap, OptDebugWrap} ->
             % Start with the render function of the "base" template
             % Optionally add the unique prefix for this rendering.
-            Vars1 = case BaseModule:is_autoid() 
+            Vars1 = case BaseModule:is_autoid()
                         orelse lists:any(fun(M) -> M:is_autoid() end, ExtendsStack)
                     of
                         true ->
@@ -98,7 +108,7 @@ render(Template0, Vars, Options, Context) when is_map(Vars) ->
     end.
 
 %% @doc Render a named block, defined in a template
--spec render_block(Block :: atom(), Template :: template(), Vars :: map() | list(), 
+-spec render_block(Block :: atom(), Template :: template(), Vars :: map() | list(),
                    Options :: options(), Context :: term()) ->
         {ok, render_result()} | {error, term()}.
 render_block(Block, Template, Vars, Options, Context) when is_list(Vars) ->
@@ -109,7 +119,7 @@ render_block(Block, Template0, Vars, Options, Context) when is_map(Vars) ->
     case block_lookup(Runtime:map_template(Template, Vars, Context), #{}, [], [], Options, Vars, Runtime, Context) of
         {ok, BaseModule, ExtendsStack, BlockMap, _OptDebugWrap} ->
             % Optionally add the unique prefix for this rendering.
-            Vars1 = case BaseModule:is_autoid() 
+            Vars1 = case BaseModule:is_autoid()
                         orelse lists:any(fun(M) -> M:is_autoid() end, ExtendsStack)
                     of
                         true ->
@@ -133,7 +143,7 @@ maybe_wrap(RenderResult, [ok|Rest]) ->
 maybe_wrap(RenderResult, [{ok, Before, After}|Rest]) ->
     maybe_wrap([Before, RenderResult, After], Rest).
 
-props_to_map([], Map) -> 
+props_to_map([], Map) ->
     Map;
 props_to_map([{K,V}|Rest], Map) ->
     props_to_map(Rest, Map#{K => V});
@@ -150,7 +160,7 @@ normalize_template({cat, Template} = T) when is_binary(Template) ->
     T;
 normalize_template({cat, Template, _} = T) when is_binary(Template) ->
     T;
-normalize_template({overrules, Template, _Filename} = T) when is_binary(Template) -> 
+normalize_template({overrules, Template, _Filename} = T) when is_binary(Template) ->
     T;
 normalize_template(Template) when is_list(Template) ->
     unicode:characters_to_binary(Template);
@@ -163,7 +173,7 @@ normalize_template({cat, Template}) when is_list(Template) ->
     {cat, unicode:characters_to_binary(Template)};
 normalize_template({cat, Template, IsA}) when is_list(Template) ->
     {cat, unicode:characters_to_binary(Template), IsA};
-normalize_template({overrules, Template, Filename}) when is_list(Template) -> 
+normalize_template({overrules, Template, Filename}) when is_list(Template) ->
     {overrules, unicode:characters_to_binary(Template), Filename}.
 
 %% @doc Recursive lookup of blocks via the extends-chain of a template.
@@ -268,7 +278,7 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
                     case compile_tokens(template_compiler_parser:parse(Tokens2), cs(Module, Filename, Options, Context)) of
                         {ok, {Extends, BlockAsts, TemplateAst, IsAutoid}} ->
                             Forms = template_compiler_module:compile(
-                                                Module, Filename, Mtime, IsAutoid, Runtime, 
+                                                Module, Filename, Mtime, IsAutoid, Runtime,
                                                 Extends, BlockAsts, TemplateAst),
                             compile_forms(Filename, Forms);
                         {error, _} = Error ->
@@ -289,7 +299,7 @@ is_template_module(Name) -> is_template_module(z_convert:to_binary(Name)).
 
 
 %% @doc Fetch all translatable strings from a template.
--spec translations(filename:filename()) -> {ok, list(binary())} | {error, term()}.
+-spec translations(filename:filename()) -> {ok, [translation_message()]} | {error, term()}.
 translations(Filename) ->
     case file:read_file(Filename) of
         {ok, Bin} ->
