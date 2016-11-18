@@ -24,11 +24,13 @@
     next_vars_var/2,
     next_context_var/2,
     to_atom/1,
-    unescape_string_literal/1
+    unescape_string_literal/1,
+    file_mtime/1
     ]).
 
 -include("template_compiler.hrl").
 -include("template_compiler_internal.hrl").
+-include_lib("kernel/include/file.hrl").
 
 
 %% @doc Generate an unique variable name
@@ -74,4 +76,14 @@ unescape_string_literal_1(<<$\\, C/utf8, Rest/binary>>, Acc) ->
     unescape_string_literal_1(Rest, <<Acc/binary, C/utf8>>);
 unescape_string_literal_1(<<C/utf8, Rest/binary>>, Acc) ->
     unescape_string_literal_1(Rest, <<Acc/binary, C/utf8>>).
+
+
+%% @doc Return the (universal) modification time of file, 0 on enoent
+-spec file_mtime(filename:filename()) -> calendar:datetime() | 0.
+file_mtime(File) ->
+    case file:read_file_info(File, [{time, universal}]) of
+        {ok, #file_info{mtime=MTime}} -> MTime;
+        {error, enoent} -> 0;
+        {error, _} -> 0
+    end.
 

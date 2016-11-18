@@ -119,7 +119,7 @@ map_template_all(Template, Vars, Context) ->
 %% @doc Check if a file has been modified
 -spec is_modified(filename:filename(), calendar:datetime(), term()) -> boolean().
 is_modified(Filename, Mtime, _Context) ->
-    filelib:last_modified(Filename) /= Mtime.
+    template_compiler_utils:file_mtime(Filename) /= Mtime.
 
 %% @doc Compile time mapping of nested value lookup
 -spec compile_map_nested_value(Tokens :: list(), _ContextVar::string(), Context :: term()) -> NewTokens :: list().
