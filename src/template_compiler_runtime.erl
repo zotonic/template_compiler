@@ -147,6 +147,10 @@ find_value(_, undefined, _TplVars, _Context) ->
     undefined;
 find_value(Name, Vars, _TplVars, _Context) when is_map(Vars) ->
     maps:get(Name, Vars, undefined);
+find_value(Key, [{B,_}|_] = L, _TplVars, _Context) when is_list(B) ->
+    proplists:get_value(z_convert:to_list(Key), L);
+find_value(Key, [{B,_}|_] = L, _TplVars, _Context) when is_binary(B) ->
+    proplists:get_value(z_convert:to_binary(Key), L);
 find_value(Name, Vars, _TplVars, _Context) when is_atom(Name), is_list(Vars) ->
     proplists:get_value(Name, Vars);
 find_value(Nr, Vars, _TplVars, _Context) when is_integer(Nr), is_list(Vars) ->
@@ -164,10 +168,6 @@ find_value(Key, {struct, Props}, _TplVars, _Context) when is_list(Props) ->
         null -> undefined;
         V -> V
     end;
-find_value(Key, [{B,_}|_] = L, _TplVars, _Context) when is_list(B) ->
-    proplists:get_value(z_convert:to_list(Key), L);
-find_value(Key, [{B,_}|_] = L, _TplVars, _Context) when is_binary(B) ->
-    proplists:get_value(z_convert:to_binary(Key), L);
 find_value(Key, Tuple, _TplVars, _Context) when is_tuple(Tuple) ->
     case element(1, Tuple) of
         dict -> 
