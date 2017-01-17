@@ -119,18 +119,18 @@ compile({apply_filter, Expr, {filter, {identifier, _, Filter}, FilterArgs}}, CSt
 find_value_lookup([{identifier, _SrcPos, <<"now">>}], _CState, Ws) ->
     Ast = ?Q("erlang:universaltime()"),
     {Ws, Ast};
-find_value_lookup([{identifier, _SrcPos, Var} = Idn], #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
-    VarName = template_compiler_utils:to_atom(Var),
-    Ast = ?Q("'@Runtime@':find_value(_@VarName@, _@vars, _@vars, _@context)",
-            [
-                {context, erl_syntax:variable(CState#cs.context_var)},
-                {vars, erl_syntax:variable(Vars)}
-            ]),
-    {maybe_forloop_var(Ws, Idn), Ast};
 find_value_lookup(ValueLookup, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
     case Runtime:compile_map_nested_value(ValueLookup, CState#cs.context_var, CState#cs.context) of
         [{ast, Ast}] ->
             {maybe_forloop_var(Ws, hd(ValueLookup)), Ast};
+        [{identifier, _SrcPos, Var} = Idn] = ValueLookup ->
+            VarName = template_compiler_utils:to_atom(Var),
+            Ast = ?Q("'@Runtime@':find_value(_@VarName@, _@vars, _@vars, _@context)",
+                    [
+                        {context, erl_syntax:variable(CState#cs.context_var)},
+                        {vars, erl_syntax:variable(Vars)}
+                    ]),
+            {maybe_forloop_var(Ws, Idn), Ast};
         ValueLookup1 ->
             {Ws1, ValueLookupAsts} = value_lookup_asts(ValueLookup1, CState, Ws, []),
             ListAst = erl_syntax:list(ValueLookupAsts),
