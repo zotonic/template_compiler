@@ -51,8 +51,8 @@
 'and'(false, _, _Runtime, _Context) -> false;
 'and'(_, false, _Runtime, _Context) -> false;
 'and'(A, B, Runtime, Context) ->
-    Runtime:to_bool(Runtime:to_simple_value(A, Runtime, Context), Context)
-    andalso Runtime:to_bool(Runtime:to_simple_value(B, Runtime, Context), Context).
+    Runtime:to_bool(Runtime:to_simple_value(A, Context), Context)
+    andalso Runtime:to_bool(Runtime:to_simple_value(B, Context), Context).
 
 'not'(false, _Runtime, _Context) -> true;
 'not'(true, _Runtime, _Context) -> false;
@@ -63,22 +63,22 @@
 'or'(true, _, _Runtime, _Context) -> true;
 'or'(_, true, _Runtime, _Context) -> true;
 'or'(A, B, Runtime, Context) ->
-    Runtime:to_bool(Runtime:to_simple_value(A, Runtime, Context), Context) 
-    orelse Runtime:to_bool(Runtime:to_simple_value(B, Runtime, Context), Context).
+    Runtime:to_bool(Runtime:to_simple_value(A, Context), Context) 
+    orelse Runtime:to_bool(Runtime:to_simple_value(B, Context), Context).
 
 'xor'(A, A, _Runtime, _Context) -> false;
 'xor'(A, B, Runtime, Context) ->
-    A1 = Runtime:to_simple_value(A, Runtime, Context),
-    B1 = Runtime:to_simple_value(B, Runtime, Context),
+    A1 = Runtime:to_simple_value(A, Context),
+    B1 = Runtime:to_simple_value(B, Context),
     Runtime:to_bool(A1, Context) xor Runtime:to_bool(B1, Context).
 
 
 concat(A, undefined, _Runtime, _Context) when is_binary(A) -> A;
 concat(undefined, B, _Runtime, _Context) when is_binary(B) -> B;
 concat({trans, _} = Tr, B, Runtime, Context) ->
-    concat(Runtime:to_simple_value(Tr, Runtime, Context), B, Runtime, Context);
+    concat(Runtime:to_simple_value(Tr, Context), B, Runtime, Context);
 concat(A, {trans, _} = Tr, Runtime, Context) ->
-    concat(A, Runtime:to_simple_value(Tr, Runtime, Context), Runtime, Context);
+    concat(A, Runtime:to_simple_value(Tr, Context), Runtime, Context);
 concat(A, undefined, Runtime, Context) ->
     to_maybe_list(A, Runtime, Context);
 concat(undefined, B, Runtime, Context) ->
