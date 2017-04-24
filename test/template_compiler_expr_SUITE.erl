@@ -90,9 +90,9 @@ expr_nested(_Config) ->
 
 expr_autoid(_Config) ->
     {ok, Bin1} = template_compiler:render("expr_autoid.tpl", #{}, [], undefined),
-    {match, _} = re:run(iolist_to_binary(Bin1), "x:[a-z0-9]+-id:y"),
+    {match, _} = re:run(iolist_to_binary(Bin1), "x:[a-zA-Z0-9]+-id:y"),
     {ok, Bin2} = template_compiler:render("expr_autoid_2.tpl", #{ foo => 20 }, [], undefined),
-    {match, _} = re:run(iolist_to_binary(Bin2), "x:[a-z0-9]+-id-20:y").
+    {match, _} = re:run(iolist_to_binary(Bin2), "x:[a-zA-Z0-9]+-id-20:y").
 
 
 test_data_dir(Config) ->

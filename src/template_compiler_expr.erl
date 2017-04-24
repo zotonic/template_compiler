@@ -119,6 +119,10 @@ compile({apply_filter, Expr, {filter, {identifier, _, Filter}, FilterArgs}}, CSt
 find_value_lookup([{identifier, _SrcPos, <<"now">>}], _CState, Ws) ->
     Ast = ?Q("erlang:universaltime()"),
     {Ws, Ast};
+find_value_lookup([{identifier, _SrcPos, <<"true">>}], _CState, Ws) ->
+    {Ws, erl_syntax:atom(true)};
+find_value_lookup([{identifier, _SrcPos, <<"false">>}], _CState, Ws) ->
+    {Ws, erl_syntax:atom(false)};
 find_value_lookup(ValueLookup, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
     case Runtime:compile_map_nested_value(ValueLookup, CState#cs.context_var, CState#cs.context) of
         [{ast, Ast}] ->

@@ -37,6 +37,7 @@
     spaceless_tag/3,
     to_bool/2,
     to_list/2,
+    to_simple_value/2,
     to_render_result/3,
     escape/2,
     trace_compile/4,
@@ -68,6 +69,7 @@
 
 -callback to_bool(Value :: term(), Context :: term()) -> boolean().
 -callback to_list(Value :: term(), Context :: term()) -> list().
+-callback to_simple_value(Value :: term(), Context :: term()) -> term().
 -callback to_render_result(Value :: term(), TplVars :: map(), Context :: term()) -> template_compiler:render_result().
 -callback escape(iolist(), Context :: term()) -> iolist().
 
@@ -278,6 +280,10 @@ to_list(B, _Context) when is_binary(B) ->
 to_list(Value, _Context) ->
     z_convert:to_list(Value).
 
+%% @doc Convert a value to a more simpler value like binary, list, boolean.
+-spec to_simple_value(Value :: term(), Context :: term()) -> term().
+to_simple_value({trans, _} = Tr, Context) -> z_convert:to_binary(Tr, Context);
+to_simple_value(T, _Context) -> T.
 
 %% @doc Convert a value to an render_result, used for converting values in {{ ... }} expressions.
 -spec to_render_result(Value::term(), TplVars::map(), Context::term()) -> template_compiler:render_result().

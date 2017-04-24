@@ -234,7 +234,7 @@ print(Expr) ->
 
 
 %% @doc Make an unique string (about 11 characters). Used for expanding unique args in templates. The string only 
-%%      consists of the characters a-z and 0-9 and is safe to use as HTML element id.
+%%      consists of the characters A-Z and 0-9 and is safe to use as HTML element id.
 -spec unique() -> string().
 unique() ->
-    list_to_binary([ $u | string:to_lower(integer_to_list(crypto:rand_uniform(0,100000000000000000), 36)) ]).
+    <<"u", (integer_to_binary(crypto:rand_uniform(0,100000000000000000), 36))/binary>>.
