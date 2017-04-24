@@ -4,7 +4,7 @@
  {<<"lager">>,{pkg,<<"lager">>,<<"3.2.1">>},0},
  {<<"z_stdlib">>,
   {git,"git://github.com/zotonic/z_stdlib.git",
-       {ref,"ace6cf5e06b3ba9c3407c1de451953cbb1b48406"}},
+       {ref,"7b1dc61b3c4bfe51fc92ca03d008fe9b8b53a5da"}},
   0}]}.
 [
 {pkg_hash,[
