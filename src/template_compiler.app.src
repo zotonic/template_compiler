@@ -1,6 +1,6 @@
 {application, template_compiler,
  [{description, "Zotonic Template Compiler"},
-  {vsn, "0.1.0"},
+  {vsn, "git"},
   {registered, []},
   {mod, { template_compiler_app, []}},
   {applications, [
@@ -12,7 +12,7 @@
       {template_dir, {template_compiler, "templates"}}
   ]},
   {modules, []},
-  {maintainers, []},
-  {licenses, []},
-  {links, []}
+  {maintainers, ["Zotonic Team"]},
+  {licenses, ["Apache 2.0"]},
+  {links, [{"GitHub", "https://github.com/zotonic/template_compiler"}]}
  ]}.
