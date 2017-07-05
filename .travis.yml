@@ -1,23 +1,27 @@
 language: erlang
 otp_release:
-  - 18.3
-install: echo "hi" # stub command; otherwise travis runs 'rebar get-deps'
+  - 19.3
+  - 20.0
+jobs:
+  include:
+    - stage: deploy
+      otp_release: 19.3
+      script: skip
+      deploy:
+        provider: script
+        script: "bash -c 'source <(curl -s https://raw.githubusercontent.com/zotonic/hexpub/master/hexpub.sh)'"
+        skip_cleanup: true
+        on:
+          tags: true
+          all_branches: true
+
+install:
+  - wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
 script: make test
 sudo: false
-branches:
-  only:
-    - master
 notifications:
   email:
     # recipients:
     #   - zotonic-commits@googlegroups.com
     on_success: change #[always|never|change] # default: change
     on_failure: always #[always|never|change] # default: always
-  irc:
-    channels:
-      - "chat.freenode.net#zotonic"
-    on_success: change #[always|never|change] # default: change
-    on_failure: always #[always|never|change] # default: always
-    template:
-      - "New commit on %{repository_name}/%{branch} by %{author}:  %{message} (%{commit}) "
-      - "Build details: %{build_url}"
