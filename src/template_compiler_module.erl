@@ -31,7 +31,7 @@ compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, undefine
     compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, erl_syntax:abstract(<<>>));
 compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, TemplateAst) ->
     Now = os:timestamp(),
-    BlockNames = [ BN || {BN,_Tree,_Ws} <- BlockAsts ],
+    BlockNames = [ BN || {BN, _Tree, _Ws} <- BlockAsts ],
     Forms = lists:flatten(
         ?Q(["-module('@Module@').",
             "-export([",

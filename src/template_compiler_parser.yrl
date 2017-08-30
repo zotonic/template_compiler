@@ -320,7 +320,7 @@ OptionalPrefix -> OptionalAll : '$1'.
 OptionalAll -> all_keyword : all.
 OptionalAll -> '$empty' : normal.
 
-LibTag -> open_tag lib_keyword LibList Args close_tag : {lib, '$3', '$4'}.
+LibTag -> open_tag lib_keyword LibList Args close_tag : {lib, '$2', '$3', '$4'}.
 LibList -> string_literal : ['$1'].
 LibList -> LibList string_literal : '$1' ++ ['$2'].
 
@@ -347,11 +347,11 @@ CycleNamesCompat -> CycleNamesCompat identifier comma : '$1' ++ ['$2'].
 CycleNamesCompat -> CycleNamesCompat identifier : '$1' ++ ['$2'].
 
 FilterBlock -> FilterBraced Elements EndFilterBraced : {filter, '$1', '$2'}.
-FilterBraced -> open_tag filter_keyword Filters close_tag : '$3'.
+FilterBraced -> open_tag filter_keyword Filters close_tag : {'$1', '$3'}.
 EndFilterBraced -> open_tag endfilter_keyword close_tag.
 
-ScriptBlock -> ScriptBraced Elements EndScriptBraced : {javascript, '$2'}.
-ScriptBraced -> open_tag javascript_keyword close_tag.
+ScriptBlock -> ScriptBraced Elements EndScriptBraced : {javascript, '$1', '$2'}.
+ScriptBraced -> open_tag javascript_keyword close_tag : '$2'.
 EndScriptBraced -> open_tag endjavascript_keyword close_tag.
 
 Filters -> Filter : ['$1'].
@@ -362,7 +362,7 @@ ForBlock -> ForBraced Elements EmptyBraced Elements EndForBraced : {for, '$1', '
 EmptyBraced -> open_tag empty_keyword close_tag.
 ForBraced -> open_tag for_keyword ForExpression close_tag : '$3'.
 EndForBraced -> open_tag endfor_keyword close_tag.
-ForExpression -> ForGroup in_keyword E : {'in', '$1', '$3'}.
+ForExpression -> ForGroup in_keyword E : {'in', '$2', '$1', '$3'}.
 ForGroup -> identifier : ['$1'].
 ForGroup -> ForGroup comma identifier : '$1' ++ ['$3'].
 
@@ -374,8 +374,8 @@ ElsePart -> ElifList : '$1'.
 
 ElifList -> ElifBraced Elements ElsePart : {'if', '$1', '$2', '$3'}.
 
-IfBraced -> open_tag if_keyword E OptAsPart close_tag : {'as', '$3', '$4'}.
-ElifBraced -> open_tag elif_keyword E OptAsPart close_tag : {'as', '$3', '$4'}.
+IfBraced -> open_tag if_keyword E OptAsPart close_tag : {'as', '$2', '$3', '$4'}.
+ElifBraced -> open_tag elif_keyword E OptAsPart close_tag : {'as', '$2', '$3', '$4'}.
 ElseBraced -> open_tag else_keyword close_tag.
 EndIfBraced -> open_tag endif_keyword close_tag.
 
@@ -394,18 +394,18 @@ IfNotEqualBraced -> open_tag ifnotequal_keyword IfNotEqualExpression E close_tag
 IfNotEqualExpression -> E : '$1'.
 EndIfNotEqualBraced -> open_tag endifnotequal_keyword close_tag.
 
-SpacelessBlock -> open_tag spaceless_keyword close_tag Elements open_tag endspaceless_keyword close_tag : {spaceless, '$4'}.
+SpacelessBlock -> open_tag spaceless_keyword close_tag Elements open_tag endspaceless_keyword close_tag : {spaceless, '$1', '$4'}.
 
 AutoEscapeBlock -> AutoEscapeBraced Elements EndAutoEscapeBraced : {autoescape, '$1', '$2'}.
 AutoEscapeBraced -> open_tag autoescape_keyword identifier close_tag : '$3'.
 EndAutoEscapeBraced -> open_tag endautoescape_keyword close_tag.
 
 WithBlock -> WithBraced Elements EndWithBraced : {with, '$1', '$2'}.
-WithBraced -> open_tag with_keyword ValueList as_keyword ForGroup close_tag : {'$3', '$5'}.
+WithBraced -> open_tag with_keyword ValueList as_keyword ForGroup close_tag : {'$2', '$3', '$5'}.
 EndWithBraced -> open_tag endwith_keyword close_tag.
 
 CacheBlock -> CacheBraced Elements EndCacheBraced : {cache, '$1', '$2'}.
-CacheBraced -> open_tag cache_keyword OptCacheTime Args close_tag : {'$3', '$4'}.
+CacheBraced -> open_tag cache_keyword OptCacheTime Args close_tag : {'$2', '$3', '$4'}.
 EndCacheBraced -> open_tag endcache_keyword close_tag.
 
 OptCacheTime -> '$empty' : undefined.
@@ -425,13 +425,13 @@ CustomTag -> open_tag identifier Args close_tag : {custom_tag, '$2', '$3'}.
 CallTag -> open_tag call_keyword identifier Args close_tag : {call, '$3', '$4'}.
 CallWithTag -> open_tag call_keyword identifier with_keyword E close_tag : {call_with, '$3', '$5'}.
 
-ImageTag -> open_tag image_keyword E Args close_tag : {image, '$3', '$4' }.
-ImageUrlTag -> open_tag image_url_keyword E Args close_tag : {image_url, '$3', '$4' }.
-MediaTag -> open_tag media_keyword E Args close_tag : {media, '$3', '$4' }.
+ImageTag -> open_tag image_keyword E Args close_tag : {image, '$2', '$3', '$4' }.
+ImageUrlTag -> open_tag image_url_keyword E Args close_tag : {image_url, '$2', '$3', '$4' }.
+MediaTag -> open_tag media_keyword E Args close_tag : {media, '$2', '$3', '$4' }.
 
-UrlTag -> open_tag url_keyword E Args close_tag : {url, '$3', '$4'}.
+UrlTag -> open_tag url_keyword E Args close_tag : {url, '$2', '$3', '$4'}.
 
-PrintTag -> open_tag print_keyword E close_tag : {print, '$3'}.
+PrintTag -> open_tag print_keyword E close_tag : {print, '$2', '$3'}.
 
 WithArgs -> with_keyword Args identifier : '$2' ++ [{'$3', true}].
 WithArgs -> with_keyword Args identifier equal E : '$2' ++ [{'$3', '$5'}].
