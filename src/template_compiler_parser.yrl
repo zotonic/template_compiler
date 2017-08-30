@@ -297,7 +297,7 @@ Elements -> Elements ImageUrlTag : '$1' ++ ['$2'].
 Elements -> Elements MediaTag : '$1' ++ ['$2'].
 
 
-ValueBraced -> open_var E OptWith close_var : {value, '$2', '$3'}.
+ValueBraced -> open_var E OptWith close_var : {value, '$1', '$2', '$3'}.
 
 OptWith -> '$empty' : [].
 OptWith -> with_keyword Args : '$2'.
@@ -313,7 +313,7 @@ TransExtTag -> open_tag trans_keyword trans_literal WithArgs close_tag : {trans_
 
 IncludeTag -> open_tag OptionalPrefix include_keyword E OptWith WithArgs close_tag : {include, '$1', '$2', '$4', '$6'}.
 CatIncludeTag -> open_tag OptionalAll catinclude_keyword E E WithArgs close_tag : {catinclude, '$1', '$2', '$4', '$5', '$6'}.
-NowTag -> open_tag now_keyword string_literal close_tag : {date, now, '$3'}.
+NowTag -> open_tag now_keyword string_literal close_tag : {date, now, '$2', '$3'}.
 
 OptionalPrefix -> optional_keyword : optional.
 OptionalPrefix -> OptionalAll : '$1'.
@@ -336,8 +336,8 @@ CommentBlock -> CommentBraced Elements EndCommentBraced.
 CommentBraced -> open_tag comment_keyword close_tag.
 EndCommentBraced -> open_tag endcomment_keyword close_tag.
 
-CycleTag -> open_tag cycle_keyword CycleNamesCompat close_tag : {cycle_compat, '$3'}.
-CycleTag -> open_tag cycle_keyword CycleNames close_tag : {cycle, '$3'}.
+CycleTag -> open_tag cycle_keyword CycleNamesCompat close_tag : {cycle_compat, '$2', '$3'}.
+CycleTag -> open_tag cycle_keyword CycleNames close_tag : {cycle, '$2', '$3'}.
 
 CycleNames -> Value : ['$1'].
 CycleNames -> CycleNames Value : '$1' ++ ['$2'].
@@ -475,25 +475,25 @@ OptE -> E : '$1'.
 
 %%% Expressions
 
-E -> E or_keyword E  : {expr, 'or', '$1', '$3'}.
-E -> E xor_keyword E  : {expr, 'xor', '$1', '$3'}.
-E -> E and_keyword E  : {expr, 'and', '$1', '$3'}.
-E -> E '==' E  : {expr, 'eq', '$1', '$3'}.
-E -> E '/=' E  : {expr, 'ne', '$1', '$3'}.
-E -> E '<' E  : {expr, 'lt', '$1', '$3'}.
-E -> E '>' E  : {expr, 'gt', '$1', '$3'}.
-E -> E '=<' E  : {expr, 'le', '$1', '$3'}.
-E -> E '>=' E  : {expr, 'ge', '$1', '$3'}.
-E -> E '++' E  : {expr, 'concat', '$1', '$3'}.
-E -> E '--' E  : {expr, 'subtract', '$1', '$3'}.
-E -> E '+' E  : {expr, 'add', '$1', '$3'}.
-E -> E '-' E  : {expr, 'sub', '$1', '$3'}.
-E -> E '*' E  : {expr, 'multiply', '$1', '$3'}.
-E -> E '/' E  : {expr, 'divide', '$1', '$3'}.
-E -> E '%' E  : {expr, 'modulo', '$1', '$3'}.
+E -> E or_keyword E  : {expr, {'or', '$2'}, '$1', '$3'}.
+E -> E xor_keyword E  : {expr, {'xor', '$2'}, '$1', '$3'}.
+E -> E and_keyword E  : {expr, {'and', '$2'}, '$1', '$3'}.
+E -> E '==' E  : {expr, {'eq', '$2'}, '$1', '$3'}.
+E -> E '/=' E  : {expr, {'ne', '$2'}, '$1', '$3'}.
+E -> E '<' E  : {expr, {'lt', '$2'}, '$1', '$3'}.
+E -> E '>' E  : {expr, {'gt', '$2'}, '$1', '$3'}.
+E -> E '=<' E  : {expr, {'le', '$2'}, '$1', '$3'}.
+E -> E '>=' E  : {expr, {'ge', '$2'}, '$1', '$3'}.
+E -> E '++' E  : {expr, {'concat', '$2'}, '$1', '$3'}.
+E -> E '--' E  : {expr, {'subtract', '$2'}, '$1', '$3'}.
+E -> E '+' E  : {expr, {'add', '$2'}, '$1', '$3'}.
+E -> E '-' E  : {expr, {'sub', '$2'}, '$1', '$3'}.
+E -> E '*' E  : {expr, {'multiply', '$2'}, '$1', '$3'}.
+E -> E '/' E  : {expr, {'divide', '$2'}, '$1', '$3'}.
+E -> E '%' E  : {expr, {'modulo', '$2'}, '$1', '$3'}.
 E -> Uminus : '$1'.
 E -> Unot : '$1'.
 E -> Value : '$1'.
 
-Uminus -> '-' E : {expr, 'negate', '$2'}.
-Unot -> not_keyword E : {expr, 'not', '$2'}.
+Uminus -> '-' E : {expr, {'negate', '$1'}, '$2'}.
+Unot -> not_keyword E : {expr, {'not', '$1'}, '$2'}.

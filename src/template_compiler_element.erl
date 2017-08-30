@@ -39,9 +39,9 @@ compile(L, CState, Ws) when is_list(L) ->
                     {Ws,[]},
                     L),
     {Ws1, erl_syntax:list(Asts)};
-compile({text, _Pos, Text}, _CState, Ws) ->
-    {Ws, erl_syntax:abstract(Text)};
-compile({trans_text, _Pos, Tr}, #cs{runtime=Runtime} = CState, Ws) ->
+compile({text, SrcPos, Text}, _CState, Ws) ->
+    {Ws, template_compiler_utils:set_pos(SrcPos, erl_syntax:abstract(Text))};
+compile({trans_text, SrcPos, Tr}, #cs{runtime=Runtime} = CState, Ws) ->
     Ast = erl_syntax:application(
             erl_syntax:atom(Runtime),
             erl_syntax:atom(lookup_translation),
@@ -50,67 +50,88 @@ compile({trans_text, _Pos, Tr}, #cs{runtime=Runtime} = CState, Ws) ->
                 erl_syntax:variable(CState#cs.vars_var),
                 erl_syntax:variable(CState#cs.context_var)
             ]),
-    {Ws, Ast};
+    {Ws, template_compiler_utils:set_pos(SrcPos, Ast)};
 compile({trans_ext, Tr, Args}, CState, Ws) ->
     trans_ext(Tr, Args, CState, Ws);
-compile({value, Expr, []}, #cs{runtime=Runtime} = CState, Ws) ->
+compile({value, {_, SrcPos, _}, Expr, []}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
-    Ast = ?Q("'@Runtime@':to_render_result(_@ExprAst, _@vars, _@context)",
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "_@runtime:to_render_result(_@expr, _@vars, _@context)",
             [
+                {expr, ExprAst},
+                {runtime, erl_syntax:atom(Runtime)},
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {vars, erl_syntax:variable(CState#cs.vars_var)}
             ]),
     case CState#cs.is_autoescape of
         true ->
-            Ast2 = ?Q("'@Runtime@':escape(_@Ast, _@context)",
-                      [
+            Ast2 = merl:qquote(
+                    template_compiler_utils:pos(SrcPos),
+                    "_@runtime:escape(_@ast, _@context)",
+                    [
+                        {ast, Ast},
+                        {runtime, erl_syntax:atom(Runtime)},
                         {context, erl_syntax:variable(CState#cs.context_var)}
-                      ]),
+                    ]),
             {Ws1, Ast2};
         false ->
             {Ws1, Ast}
     end;
-compile({value, Expr, With}, #cs{runtime=Runtime} = CState, Ws) ->
+compile({value, {_, SrcPos, _} = TagSrc, Expr, With}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, WithExprAsts} = with_args(With, CState, Ws, false),
     {CState1, Ws2} = template_compiler_utils:next_vars_var(CState, Ws1),
-    MapAst = erl_syntax:map_expr(
-                erl_syntax:variable(CState#cs.vars_var),
-                [
-                    erl_syntax:map_field_assoc(WName, WExpr)
-                    || {WName, WExpr} <- WithExprAsts
-                ]),
+    MapAst = template_compiler_utils:set_pos(
+                SrcPos,
+                erl_syntax:map_expr(
+                    erl_syntax:variable(CState#cs.vars_var),
+                    [
+                        erl_syntax:map_field_assoc(WName, WExpr)
+                        || {WName, WExpr} <- WithExprAsts
+                    ])),
     case is_context_vars_arg(With, CState) of
         true ->
             {CState2, Ws3} = template_compiler_utils:next_context_var(CState1, Ws2),
-            {Ws4, WithAst} = compile({value, Expr, []}, CState2, Ws3),
-            Ast = ?Q([
-                "begin",
-                    "_@vars = _@MapAst,",
-                    "_@context1 = '@Runtime@':set_context_vars(_@vars, _@context),",
-                    "_@WithAst",
-                "end"],
+            {Ws4, WithAst} = compile({value, TagSrc, Expr, []}, CState2, Ws3),
+            Ast = merl:qquote(
+                template_compiler_utils:pos(SrcPos),
+                "begin "
+                    "_@vars = _@map,"
+                    "_@context1 = _@runtime:set_context_vars(_@vars, _@context),"
+                    "_@with "
+                "end",
                 [
                     {vars, erl_syntax:variable(CState1#cs.vars_var)},
+                    {map, MapAst},
+                    {with, WithAst},
+                    {runtime, erl_syntax:atom(Runtime)},
                     {context, erl_syntax:variable(CState#cs.context_var)},
                     {context1, erl_syntax:variable(CState2#cs.context_var)}
                 ]),
             {Ws4, Ast};
         false ->
-            {Ws3, WithAst} = compile({value, Expr, []}, CState1, Ws2),
-            Ast = ?Q([
-                "begin",
-                    "_@vars = _@MapAst,",
-                    "_@WithAst",
-                "end"],
+            {Ws3, WithAst} = compile({value, TagSrc, Expr, []}, CState1, Ws2),
+            Ast = merl:qquote(
+                template_compiler_utils:pos(SrcPos),
+                "begin "
+                    "_@vars = _@map,"
+                    "_@with "
+                "end",
                 [
-                    {vars, erl_syntax:variable(CState1#cs.vars_var)}
+                    {vars, erl_syntax:variable(CState1#cs.vars_var)},
+                    {map, MapAst},
+                    {with, WithAst}
                 ]),
             {Ws3, Ast}
     end;
-compile({date, now, {string_literal, _Pos, Format}}, CState, Ws) ->
-    FormatAst = erl_syntax:abstract(Format),
-    Ast = ?Q("filter_date:date(erlang:universaltime(), _@FormatAst, _@context)",
-            [{context, erl_syntax:variable(CState#cs.context_var)}]),
+compile({date, now, {_, SrcPos, _}, {string_literal, _SrcPos, Format}}, CState, Ws) ->
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "filter_date:date(erlang:universaltime(), _@format, _@context)",
+            [
+                {format, erl_syntax:abstract(Format)},
+                {context, erl_syntax:variable(CState#cs.context_var)}
+            ]),
     {Ws, Ast};
 compile({load, Names}, _CState, Ws) ->
     % We don't do anything with this. Present for compatibility only.
@@ -131,7 +152,7 @@ compile({block, {identifier, SrcPos, Name}, _Elts}, CState, Ws) ->
             ]),
     {value, {BlockName, _Tree, BlockWs}} = lists:keysearch(BlockName, 1, CState#cs.blocks), 
     Ws1 = Ws#ws{is_forloop_var = Ws#ws.is_forloop_var or BlockWs#ws.is_forloop_var}, 
-    {Ws1, Ast};
+    {Ws1, template_compiler_utils:set_pos(SrcPos, Ast)};
 compile({inherit, {_, _SrcPos, _}}, #cs{block=undefined}, Ws) ->
     {Ws, erl_syntax:abstract(<<>>)};
 compile({inherit, {_, SrcPos, _}}, #cs{block=Block, module=Module} = CState, Ws) ->
@@ -147,7 +168,7 @@ compile({inherit, {_, SrcPos, _}}, #cs{block=Block, module=Module} = CState, Ws)
                 erl_syntax:atom(CState#cs.runtime),
                 erl_syntax:variable(CState#cs.context_var)
             ]),
-    {Ws#ws{is_forloop_var=true}, Ast};
+    {Ws#ws{is_forloop_var=true}, template_compiler_utils:set_pos(SrcPos, Ast)};
 compile({'include', TagPos, Method, Template, Args}, CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
     IsContextVar = is_context_vars_arg(Args, CState),
@@ -321,7 +342,7 @@ compile({'if', {'as', Expr, undefined}, IfElts, ElseElts}, #cs{runtime=Runtime} 
     Ast = ?Q([
         "case '@Runtime@':to_bool(_@ExprAst, _@context) of ",
          "true -> _@IfClauseAst;",
-         "false -> _@ElseClauseAst",
+         "false -> _@ElseClauseAst ",
         "end"],
         [
             {context, erl_syntax:variable(CState#cs.context_var)}
@@ -339,7 +360,7 @@ compile({'if', {'as', Expr, {identifier, _Pos, Name} = Ident}, IfElts, ElseElts}
             {CsCtx, Ws5} = template_compiler_utils:next_context_var(CState1, Ws4),
             {Ws6, IfClauseAst} = compile(IfElts, CsCtx, Ws5),
             Ast = ?Q([
-                "begin",
+                "begin ",
                   "_@VAst = _@ExprAst,",
                   "case '@Runtime@':to_bool(_@VAst, _@context) of ",
                     "true -> ",
@@ -347,7 +368,7 @@ compile({'if', {'as', Expr, {identifier, _Pos, Name} = Ident}, IfElts, ElseElts}
                         "_@context1 = '@Runtime@':set_context_vars(_@vars1),",
                         "_@IfClauseAst;",
                     "false -> _@ElseClauseAst",
-                  "end",
+                  "end ",
                 "end"],
                [
                     {name, erl_syntax:atom(template_compiler_utils:to_atom(Name))},
@@ -360,12 +381,12 @@ compile({'if', {'as', Expr, {identifier, _Pos, Name} = Ident}, IfElts, ElseElts}
         false ->
             {Ws5, IfClauseAst} = compile(IfElts, CState1, Ws4),
             Ast = ?Q([
-                "begin",
+                "begin ",
                   "_@VAst = _@ExprAst,",
                   "case '@Runtime@':to_bool(_@VAst, _@context) of ",
                     "true -> _@vars1 = _@vars#{ _@name => _@VAst }, _@IfClauseAst;",
                     "false -> _@ElseClauseAst",
-                  "end",
+                  "end ",
                 "end"],
                [
                     {name, erl_syntax:atom(template_compiler_utils:to_atom(Name))},
@@ -417,13 +438,13 @@ compile({'with', {Exprs, Idents}, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
             {CsCtx, Ws3} = template_compiler_utils:next_context_var(CsWith, Ws2),
             {Ws4, BodyAst} = compile(Elts, CsCtx, Ws3),
             Ast = ?Q([
-                    "begin",
+                    "begin ",
                         "_@vars1 = template_compiler_runtime_internal:with_vars(",
                             "_@VarsAsts,",
                             "_@ExprListAst,",
                             "_@vars),",
                         "_@context1 = '@Runtime@':set_context_vars(_@vars1, _@context),"
-                        "_@BodyAst",
+                        "_@BodyAst ",
                     "end"
                 ],
                 [
@@ -436,12 +457,12 @@ compile({'with', {Exprs, Idents}, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
         false ->
             {Ws3, BodyAst} = compile(Elts, CsWith, Ws2),
             Ast = ?Q([
-                    "begin",
+                    "begin ",
                         "_@vars1 = template_compiler_runtime_internal:with_vars(",
                             "_@VarsAsts,",
                             "_@ExprListAst,",
                             "_@vars),",
-                        "_@BodyAst",
+                        "_@BodyAst ",
                     "end"
                 ],
                 [
@@ -516,53 +537,65 @@ compile({autoescape, {identifier, _, <<"off">>}, Elts}, CState, Ws) ->
     compile(Elts, CState#cs{is_autoescape = false}, Ws);
 compile({autoescape, {identifier, _, OnOff}, Elts}, CState, Ws) ->
     compile(Elts, CState#cs{is_autoescape = z_convert:to_bool(OnOff)}, Ws);
-compile({cycle_compat, Names}, CState, Ws) ->
+compile({cycle_compat, TagPos, Names}, CState, Ws) ->
     Exprs = [{string_literal, Pos, Name} || {identifier, Pos, Name} <- Names ],
-    compile({cycle, Exprs}, CState, Ws);
-compile({cycle, []}, _CState, Ws) ->
+    compile({cycle, TagPos, Exprs}, CState, Ws);
+compile({cycle, _TagPos, []}, _CState, Ws) ->
     {Ws, erl_syntax:list([])};
-compile({cycle, Exprs}, CState, Ws) ->
+compile({cycle, {_, SrcPos, _} = TagSrc, Exprs}, CState, Ws) ->
     {Ws1, Var} = template_compiler_utils:var(Ws),
     {Ws2, ExprList} = expr_list(Exprs, CState, Ws1),
     N = length(Exprs),
     Clauses = lists:zip(lists:seq(0,N-1), ExprList),
     ClauseAsts = [ erl_syntax:clause([erl_syntax:integer(Nr)], none, [Expr]) || {Nr,Expr} <- Clauses ],
-    ValueAst = ?Q("maps:get(counter0, _@v) rem _@N@", 
-                  [ {v, erl_syntax:variable(Var)} ]),
-    CaseAst = erl_syntax:case_expr(ValueAst, ClauseAsts),
-    Ast = ?Q([
-                "case maps:get(forloop, _@vars, undefined) of",
-                    "undefined -> _@first;",
-                    "_@v -> _@CaseAst",
-                "end"
-            ],
+    ValueAst = merl:qquote(
+                template_compiler_utils:pos(SrcPos),
+                "maps:get(counter0, _@v) rem _@n",
+                [
+                    {v, erl_syntax:variable(Var)},
+                    {n, erl_syntax:integer(N)}
+                ]),
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "case maps:get(forloop, _@vars, undefined) of "
+                "undefined -> _@first; "
+                "_@v -> _@caseast "
+            "end",
             [
                 {first, hd(ExprList)},
                 {v, erl_syntax:variable(Var)},
-                {vars, erl_syntax:variable(CState#cs.vars_var)}
+                {vars, erl_syntax:variable(CState#cs.vars_var)},
+                {caseast, erl_syntax:case_expr(ValueAst, ClauseAsts)}
             ]),
-    compile({value, {ast, Ast}, []}, CState, Ws2#ws{is_forloop_var=true}).
+    io:format("~n~n~p~n~n", [Ast]),
+    compile({value, TagSrc, {ast, Ast}, []}, CState, Ws2#ws{is_forloop_var=true}).
 
 
 include({_, SrcPos, _}, Method, Template, ArgsList, IsContextVars, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
     {Ws1, TemplateAst} = template_compiler_expr:compile(Template, CState, Ws),
     ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList ]),
-    Ast = ?Q([
-            "template_compiler_runtime_internal:include(",
-                    "_@SrcPos@,",
-                    "_@Method@,",
-                    "_@TemplateAst,",
-                    "_@ArgsListAst,",
-                    "_@Runtime@,",
-                    "_@context_vars,",
-                    "_@IsContextVars@,",
-                    "_@vars,",
-                    "_@context)"
-        ],
+    Ast = merl:qquote(
+        template_compiler_utils:pos(SrcPos),
+        "template_compiler_runtime_internal:include("
+            "_@srcpos,"
+            "_@method,"
+            "_@template,"
+            "_@args,"
+            "_@runtime,"
+            "_@context_vars,"
+            "_@is_context_vars,"
+            "_@vars,"
+            "_@context)",
         [
+            {srcpos, erl_syntax:abstract(SrcPos)},
+            {method, erl_syntax:abstract(Method)},
+            {template, TemplateAst},
+            {args, ArgsListAst},
             {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {runtime, erl_syntax:atom(Runtime)},
             {context, erl_syntax:variable(CState#cs.context_var)},
-            {context_vars, erl_syntax:abstract(CState#cs.context_vars)}
+            {context_vars, erl_syntax:abstract(CState#cs.context_vars)},
+            {is_context_vars, erl_syntax:abstract(IsContextVars)}
         ]),
     {Ws1, Ast}.
 
@@ -647,13 +680,13 @@ idents_as_atoms(Idents) ->
 ident_as_atom({identifier, _SrcPos, Ident}) ->
     template_compiler_utils:to_atom(Ident).
 
-trans_ext({string_literal, _, Text}, Args, CState, Ws) ->
+trans_ext({string_literal, SrcPos, Text}, Args, CState, Ws) ->
     Unescaped = template_compiler_utils:unescape_string_literal(Text),
-    trans_ext_1({trans, [{en, Unescaped}]}, Args, CState, Ws);
-trans_ext({trans_literal, _, Tr}, Args, CState, Ws) ->
-    trans_ext_1(Tr, Args, CState, Ws).
+    trans_ext_1({trans, [{en, Unescaped}]}, Args, SrcPos, CState, Ws);
+trans_ext({trans_literal, SrcPos, Tr}, Args, CState, Ws) ->
+    trans_ext_1(Tr, Args, SrcPos, CState, Ws).
 
-trans_ext_1({trans, Tr}, Args, #cs{runtime=Runtime} = CState, Ws) ->
+trans_ext_1({trans, Tr}, Args, SrcPos, #cs{runtime=Runtime} = CState, Ws) ->
     Split = [ {Lang, split_string(Txt, <<>>, [])} || {Lang, Txt} <- Tr ],
     {FunAsts, Ws1} = lists:foldl(
                     fun({Lang, Parts}, {FAcc, WsAcc}) ->
@@ -671,16 +704,20 @@ trans_ext_1({trans, Tr}, Args, #cs{runtime=Runtime} = CState, Ws) ->
                                 ])
                         end,
                         FunAsts)),
-    Ast = ?Q("(_@Runtime@:lookup_translation({trans, _@FunListAst}, _@vars, _@context))()",
-              [
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "(_@runtime:lookup_translation({trans, _@funlist}, _@vars, _@context))()",
+            [
+                {runtime, erl_syntax:atom(Runtime)},
+                {funlist, FunListAst},
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {vars, erl_syntax:variable(CState#cs.vars_var)}
-              ]),
+            ]),
     {Ws1, Ast}.
 
 trans_ext_fun(Parts, Args, CState, Ws) ->
     Parts1 = [ P || P <- Parts, P =/= <<>> ],
-    Args1 = [{Ident,ArgExpr} || {{identifier, _, Ident}, ArgExpr} <- Args],
+    Args1 = [{Ident, {TagSrc, ArgExpr}} || {{identifier, _, Ident} = TagSrc, ArgExpr} <- Args],
     {Asts,Ws1} = lists:foldr(
                     fun
                         (B, {Acc, WsAcc}) when is_binary(B) ->
@@ -689,8 +726,8 @@ trans_ext_fun(Parts, Args, CState, Ws) ->
                             case proplists:get_value(Name, Args1) of
                                 undefined ->
                                     {Acc, WsAcc};
-                                Expr ->
-                                    {WsAcc1, ExprAst} = compile({value, Expr, []}, CState, WsAcc),
+                                {TagSrc, Expr} ->
+                                    {WsAcc1, ExprAst} = compile({value, TagSrc, Expr, []}, CState, WsAcc),
                                     {[ExprAst|Acc], WsAcc1}
                             end
                     end,
