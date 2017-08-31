@@ -37,9 +37,9 @@ compile(false, _CState, Ws) ->
     {Ws, erl_syntax:atom(true)};
 compile(undefined, _CState, Ws) ->
     {Ws, erl_syntax:atom(undefined)};
-compile({string_literal, _SrcPos, Text}, _CState, Ws) when is_binary(Text) ->
-    {Ws, erl_syntax:abstract(Text)};
-compile({trans_literal, _SrcPos, {trans, _} = Tr}, #cs{runtime=Runtime} = CState, Ws) ->
+compile({string_literal, SrcPos, Text}, _CState, Ws) when is_binary(Text) ->
+    {Ws, template_compiler_utils:set_pos(SrcPos, erl_syntax:abstract(Text))};
+compile({trans_literal, SrcPos, {trans, _} = Tr}, #cs{runtime=Runtime} = CState, Ws) ->
     Ast = erl_syntax:application(
             erl_syntax:atom(Runtime),
             erl_syntax:atom(lookup_translation),
@@ -48,30 +48,39 @@ compile({trans_literal, _SrcPos, {trans, _} = Tr}, #cs{runtime=Runtime} = CState
                 erl_syntax:variable(CState#cs.vars_var),
                 erl_syntax:variable(CState#cs.context_var)
             ]),
-    {Ws, Ast};
+    {Ws, template_compiler_utils:set_pos(SrcPos, Ast)};
 compile({number_literal, _SrcPos, Nr}, _CState, Ws) ->
     {Ws, erl_syntax:abstract(z_convert:to_integer(Nr))};
 compile({atom_literal, _SrcPos, Atom}, _CState, Ws) ->
     {Ws, erl_syntax:abstract(template_compiler_utils:to_atom(Atom))};
 compile({find_value, LookupList}, CState, Ws) ->
     find_value_lookup(LookupList, CState, Ws);
-compile({auto_id, {{identifier, _, Name}, {identifier, _, Var}}}, #cs{runtime=Runtime} = CState, Ws) ->
-    VarName = erl_syntax:atom(template_compiler_utils:to_atom(Var)),
-    Ast = ?Q(["iolist_to_binary([ ",
-                "maps:get('$autoid', _@vars),",
-                "$-, _@Name@,",
-                "$-, z_convert:to_binary(",
-                        "'@Runtime@':find_value(_@VarName, _@vars, _@vars, _@context)"
+compile({auto_id, {{identifier, SrcPos, Name}, {identifier, _, Var}}}, #cs{runtime=Runtime} = CState, Ws) ->
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "iolist_to_binary([ "
+                "maps:get('$autoid', _@vars),"
+                "$-, _@name,"
+                "$-, z_convert:to_binary("
+                        "_@runtime:find_value(_@varname, _@vars, _@vars, _@context)"
                     ")"
-              "])"],
-              [
+            "])",
+            [
+                {runtime, erl_syntax:atom(Runtime)},
+                {name, erl_syntax:abstract(Name)},
+                {varname, erl_syntax:atom(template_compiler_utils:to_atom(Var))},
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {vars, erl_syntax:variable(CState#cs.vars_var)}
-              ]),
+            ]),
     {Ws#ws{is_autoid_var=true}, Ast};
-compile({auto_id, {identifier, _, Name}}, #cs{vars_var=Vars}, Ws) ->
-    VarsAst = erl_syntax:variable(Vars),
-    Ast = ?Q("iolist_to_binary([ maps:get('$autoid', _@VarsAst), $-, _@Name@ ])"),
+compile({auto_id, {identifier, SrcPos, Name}}, #cs{vars_var=Vars}, Ws) ->
+    Ast = merl:qquote(
+                template_compiler_utils:pos(SrcPos),
+                "iolist_to_binary([ maps:get('$autoid', _@vars), $-, _@name ])",
+                [
+                    {name, erl_syntax:abstract(Name)},
+                    {vars, erl_syntax:variable(Vars)}
+                ]),
     {Ws#ws{is_autoid_var=true}, Ast};
 compile({tuple_value, {identifier, _, Name}, Args}, Cs, Ws) ->
     TupleName = erl_syntax:atom(template_compiler_utils:to_atom(Name)),
@@ -80,68 +89,92 @@ compile({tuple_value, {identifier, _, Name}, Args}, Cs, Ws) ->
     {WsProps, Ast};
 compile({value_list, Exprs}, Cs, Ws) ->
     list_ast(Exprs, Cs, Ws);
-compile({expr, Op, Arg}, #cs{runtime=Runtime} = CState, Ws) when is_atom(Op) ->
+compile({expr, {Op, {_, SrcPos, _}}, Arg}, #cs{runtime=Runtime} = CState, Ws) when is_atom(Op) ->
     {Ws1, ArgAst} = compile(Arg, CState, Ws),
-    Ast = ?Q("template_compiler_operators:'@Op@'(_@ArgAst, _@runtime, _@context)",
-             [
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "template_compiler_operators:_@op(_@args, _@runtime, _@context)",
+            [
+                {op, erl_syntax:abstract(Op)},
+                {args, ArgAst},
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {runtime, erl_syntax:atom(Runtime)}
             ]),
     {Ws1, Ast};
-compile({expr, Op, Arg1, Arg2}, #cs{runtime=Runtime} = CState, Ws) when is_atom(Op) ->
+compile({expr, {Op, {_, SrcPos, _}}, Arg1, Arg2}, #cs{runtime=Runtime} = CState, Ws) when is_atom(Op) ->
     {Ws1, Arg1Ast} = compile(Arg1, CState, Ws),
     {Ws2, Arg2Ast} = compile(Arg2, CState, Ws1),
-    Ast = ?Q("template_compiler_operators:'@Op@'(_@Arg1Ast, _@Arg2Ast, _@runtime, _@context)",
-             [
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "template_compiler_operators:_@op(_@arg1, _@arg2, _@runtime, _@context)",
+            [
+                {op, erl_syntax:abstract(Op)},
+                {arg1, Arg1Ast},
+                {arg2, Arg2Ast},
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {runtime, erl_syntax:atom(Runtime)}
             ]),
     {Ws2, Ast};
-compile({apply_filter, Expr, {filter, {identifier, _, <<"default">>}, [Arg]}}, CState, Ws) ->
-    filter_default(Expr, Arg, CState, Ws);
-compile({apply_filter, Expr, {filter, {identifier, _, <<"default_if_none">>}, [Arg]}}, CState, Ws) ->
-    filter_default_if_none(Expr, Arg, CState, Ws);
-compile({apply_filter, Expr, {filter, {identifier, _, <<"default_if_undefined">>}, [Arg]}}, CState, Ws) ->
-    filter_default_if_none(Expr, Arg, CState, Ws);
-compile({apply_filter, Expr, {filter, {identifier, _, Filter}, FilterArgs}}, CState, Ws) ->
+compile({apply_filter, Expr, {filter, {identifier, SrcPos, <<"default">>}, [Arg]}}, CState, Ws) ->
+    filter_default(Expr, Arg, SrcPos, CState, Ws);
+compile({apply_filter, Expr, {filter, {identifier, SrcPos, <<"default_if_none">>}, [Arg]}}, CState, Ws) ->
+    filter_default_if_none(Expr, Arg, SrcPos, CState, Ws);
+compile({apply_filter, Expr, {filter, {identifier, SrcPos, <<"default_if_undefined">>}, [Arg]}}, CState, Ws) ->
+    filter_default_if_none(Expr, Arg, SrcPos, CState, Ws);
+compile({apply_filter, Expr, {filter, {identifier, SrcPos, Filter}, FilterArgs}}, CState, Ws) ->
     FilterName = template_compiler_utils:to_atom(Filter),
     FilterModule = template_compiler_utils:to_atom(<<"filter_", Filter/binary>>),
     {Ws1, ExprAst} = compile(Expr, CState, Ws),
     {Ws2, AstList} = list_1(FilterArgs, CState, Ws1, []),
     Args = [ExprAst | AstList ] ++ [erl_syntax:variable(CState#cs.context_var)],
-    Ast = erl_syntax:application(
+    Ast = template_compiler_utils:set_pos(
+                SrcPos,
+                erl_syntax:application(
                          erl_syntax:atom(FilterModule),
                          erl_syntax:atom(FilterName),
-                         Args),
+                         Args)),
     {Ws2, Ast}.
 
-
-find_value_lookup([{identifier, _SrcPos, <<"now">>}], _CState, Ws) ->
-    Ast = ?Q("erlang:universaltime()"),
+find_value_lookup([{identifier, SrcPos, <<"now">>}], _CState, Ws) ->
+    Ast = template_compiler_utils:set_pos(
+            SrcPos,
+            erl_syntax:application(
+                 erl_syntax:atom(erlang),
+                 erl_syntax:atom(universaltime),
+                 [])),
     {Ws, Ast};
-find_value_lookup([{identifier, _SrcPos, <<"true">>}], _CState, Ws) ->
-    {Ws, erl_syntax:atom(true)};
-find_value_lookup([{identifier, _SrcPos, <<"false">>}], _CState, Ws) ->
-    {Ws, erl_syntax:atom(false)};
+find_value_lookup([{identifier, SrcPos, <<"true">>}], _CState, Ws) ->
+    {Ws, template_compiler_utils:set_pos(SrcPos, erl_syntax:atom(true))};
+find_value_lookup([{identifier, SrcPos, <<"false">>}], _CState, Ws) ->
+    {Ws, template_compiler_utils:set_pos(SrcPos, erl_syntax:atom(false))};
+find_value_lookup([{identifier, SrcPos, <<"undefined">>}], _CState, Ws) ->
+    {Ws, template_compiler_utils:set_pos(SrcPos, erl_syntax:atom(undefined))};
 find_value_lookup(ValueLookup, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
     case Runtime:compile_map_nested_value(ValueLookup, CState#cs.context_var, CState#cs.context) of
         [{ast, Ast}] ->
             {maybe_forloop_var(Ws, hd(ValueLookup)), Ast};
-        [{identifier, _SrcPos, Var} = Idn] = ValueLookup ->
+        [{identifier, SrcPos, Var} = Idn] = ValueLookup ->
             VarName = template_compiler_utils:to_atom(Var),
-            Ast = ?Q("'@Runtime@':find_value(_@VarName@, _@vars, _@vars, _@context)",
+            Ast = merl:qquote(
+                    template_compiler_utils:pos(SrcPos),
+                    "_@runtime:find_value(_@varname, _@vars, _@vars, _@context)",
                     [
-                        {context, erl_syntax:variable(CState#cs.context_var)},
-                        {vars, erl_syntax:variable(Vars)}
+                        {runtime, erl_syntax:atom(Runtime)},
+                        {varname, erl_syntax:atom(VarName)},
+                        {vars, erl_syntax:variable(Vars)},
+                        {context, erl_syntax:variable(CState#cs.context_var)}
                     ]),
             {maybe_forloop_var(Ws, Idn), Ast};
         ValueLookup1 ->
             {Ws1, ValueLookupAsts} = value_lookup_asts(ValueLookup1, CState, Ws, []),
-            ListAst = erl_syntax:list(ValueLookupAsts),
-            Ast = ?Q("'@Runtime@':find_nested_value(_@ListAst, _@vars, _@context)",
+            Ast = merl:qquote(
+                    erl_syntax:get_pos(hd(ValueLookupAsts)),
+                    "_@runtime:find_nested_value(_@list, _@vars, _@context)",
                     [
-                        {context, erl_syntax:variable(CState#cs.context_var)},
-                        {vars, erl_syntax:variable(Vars)}
+                        {runtime, erl_syntax:atom(Runtime)},
+                        {list, erl_syntax:list(ValueLookupAsts)},
+                        {vars, erl_syntax:variable(Vars)},
+                        {context, erl_syntax:variable(CState#cs.context_var)}
                     ]),
             {maybe_forloop_var(Ws1, hd(ValueLookup)), Ast}
     end.
@@ -163,28 +196,41 @@ value_lookup_asts([{expr, Expr}|Vs], CState, Ws, Acc) ->
     value_lookup_asts(Vs, CState, Ws1, [ExprAst|Acc]).
 
 
-filter_default(Expr, Arg, #cs{runtime=Runtime} = CState, Ws) ->
+filter_default(Expr, Arg, SrcPos, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ExprAst} = compile(Expr, CState, Ws),
     {Ws2, ArgAst} = compile(Arg, CState, Ws1),
     {Ws3, V} = template_compiler_utils:var(Ws2),
-    VAst = erl_syntax:variable(V),
-    Ast = ?Q(["begin",
-                "_@VAst = _@ExprAst,",
-                "case '@Runtime@':to_bool(_@VAst, _@context) of",
-                    "false -> _@ArgAst;",
-                    "true -> _@VAst",
-                "end",
-              "end"],
-            [{context, erl_syntax:variable(CState#cs.context_var)}]),
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "begin "
+                "_@v = _@expr,"
+                "case _@runtime:to_bool(_@v, _@context) of "
+                    "false -> _@arg;"
+                    "true -> _@v "
+                "end "
+            "end",
+            [
+                {v, erl_syntax:variable(V)},
+                {expr, ExprAst},
+                {arg, ArgAst},
+                {runtime, erl_syntax:atom(Runtime)},
+                {context, erl_syntax:variable(CState#cs.context_var)}
+            ]),
     {Ws3, Ast}.
 
 
-filter_default_if_none(Expr, Arg, CState, Ws) ->
+filter_default_if_none(Expr, Arg, SrcPos, CState, Ws) ->
     {Ws1, ExprAst} = compile(Expr, CState, Ws),
     {Ws2, ArgAst} = compile(Arg, CState, Ws1),
     {Ws3, V} = template_compiler_utils:var(Ws2),
-    VAst = erl_syntax:variable(V),
-    Ast = ?Q("case _@ExprAst of undefined -> _@ArgAst; _@VAst -> _@VAst end"),
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "case _@expr of undefined -> _@arg; _@v -> _@v end",
+            [
+                {v, erl_syntax:variable(V)},
+                {expr, ExprAst},
+                {arg, ArgAst}
+            ]),
     {Ws3, Ast}.
 
 

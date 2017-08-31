@@ -82,11 +82,15 @@ compile_file(Filename, TplKey, Options, Context) ->
             % Unknown, compile the template
             Result = try
                         template_compiler:compile_file(Filename, Options, Context)
-                     catch 
+                     catch
                         What:Error ->
                             Stack = erlang:get_stacktrace(),
-                            lager:error("Error compiling template ~p: ~p:~p at ~p",
-                                        [Filename, What, Error, Stack]),
+                            % io:format("Error compiling template ~p: ~p:~n~p at~n ~p~n",
+                            %           [Filename, What, Error, Stack]),
+                            lager:error("Error compiling template ~p:~n~p",
+                                        [Filename, What, Error,
+                                         lager:pr_stacktrace(Stack, {What, Error})
+                                        ]),
                             {error, Error}
                      end,
             ok = gen_server:call(?MODULE, {compile_done, Result, TplKey}, infinity),

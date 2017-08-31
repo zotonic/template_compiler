@@ -25,7 +25,9 @@
     next_context_var/2,
     to_atom/1,
     unescape_string_literal/1,
-    file_mtime/1
+    file_mtime/1,
+    pos/1,
+    set_pos/2
     ]).
 
 -include("template_compiler.hrl").
@@ -86,4 +88,13 @@ file_mtime(File) ->
         {error, enoent} -> 0;
         {error, _} -> 0
     end.
+
+-spec set_pos({filename:filename_all(), pos_integer(), pos_integer()}, term()) -> term().
+set_pos(SrcPos, Tree) ->
+    erl_syntax:set_pos(Tree, pos(SrcPos)).
+
+-spec pos({filename:filename_all(), pos_integer(), pos_integer()}) -> {pos_integer(), pos_integer()}.
+pos({_File, Line, Column}) ->
+    {Line, Column}.
+
 

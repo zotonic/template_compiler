@@ -31,8 +31,8 @@ compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, undefine
     compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, erl_syntax:abstract(<<>>));
 compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, TemplateAst) ->
     Now = os:timestamp(),
-    BlockNames = [ BN || {BN,_Tree,_Ws} <- BlockAsts ],
-    lists:flatten(
+    BlockNames = [ BN || {BN, _Tree, _Ws} <- BlockAsts ],
+    Forms = lists:flatten(
         ?Q(["-module('@Module@').",
             "-export([",
                 "render/3,",
@@ -59,7 +59,11 @@ compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, Template
             ],
             [
                 {functions, blocksfun(BlockAsts)}
-            ])).
+            ])),
+    [
+        merl:quote(1, "-file(\""++unicode:characters_to_list(Filename)++"\", 1).")
+        | Forms
+    ].
 
 blocksfun(Blocks) ->
     Clauses = [
