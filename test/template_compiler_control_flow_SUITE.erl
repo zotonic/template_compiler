@@ -16,11 +16,13 @@ all() ->
     ].
 
 groups() ->
-    [{basic, [], 
+    [{basic, [],
         [if_test
         ,if_else_test
         ,if_var_test
         ,if_as_test
+        ,if_equal
+        ,if_notequal
         ,for_test
         ,for_forloop_test
         ,for_multivar_test
@@ -67,6 +69,20 @@ if_as_test(_Config) ->
     <<"2">> = iolist_to_binary(Bin1),
     {ok, Bin2} = template_compiler:render("if_as.tpl", #{ v => -1 }, [], undefined),
     <<"9">> = iolist_to_binary(Bin2),
+    ok.
+
+if_equal(_Config) ->
+    {ok, Bin1} = template_compiler:render("if_equal.tpl", #{ v => 1 }, [], undefined),
+    <<"eq">> = iolist_to_binary(Bin1),
+    {ok, Bin2} = template_compiler:render("if_equal.tpl", #{ v => 2 }, [], undefined),
+    <<"ne">> = iolist_to_binary(Bin2),
+    ok.
+
+if_notequal(_Config) ->
+    {ok, Bin1} = template_compiler:render("if_notequal.tpl", #{ v => 1 }, [], undefined),
+    <<"eq">> = iolist_to_binary(Bin1),
+    {ok, Bin2} = template_compiler:render("if_notequal.tpl", #{ v => 2 }, [], undefined),
+    <<"ne">> = iolist_to_binary(Bin2),
     ok.
 
 for_test(_Config) ->

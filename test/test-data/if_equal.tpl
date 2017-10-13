@@ -1,0 +1,1 @@
+{% ifequal v 1 %}eq{% else %}ne{% endifequal %}

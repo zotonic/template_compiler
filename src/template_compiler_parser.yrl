@@ -382,15 +382,15 @@ EndIfBraced -> open_tag endif_keyword close_tag.
 OptAsPart -> '$empty' : undefined.
 OptAsPart -> as_keyword identifier : '$2'.
 
-IfEqualBlock -> IfEqualBraced Elements ElseBraced Elements EndIfEqualBraced : {'if', {'as', '$1', undefined}, '$2', '$4'}.
-IfEqualBlock -> IfEqualBraced Elements EndIfEqualBraced : {'if', {'as', '$1', undefined}, '$2', []}.
-IfEqualBraced -> open_tag ifequal_keyword IfEqualExpression E close_tag : {expr, 'eq', '$3', '$4'}.
+IfEqualBlock -> IfEqualBraced Elements ElseBraced Elements EndIfEqualBraced : {'ifequal', '$1', '$2', '$4'}.
+IfEqualBlock -> IfEqualBraced Elements EndIfEqualBraced : {'ifequal', '$1', '$2', []}.
+IfEqualBraced -> open_tag ifequal_keyword IfEqualExpression E close_tag : {'$1', '$3', '$4'}.
 IfEqualExpression -> E : '$1'.
 EndIfEqualBraced -> open_tag endifequal_keyword close_tag.
 
-IfNotEqualBlock -> IfNotEqualBraced Elements ElseBraced Elements EndIfNotEqualBraced : {'if', {'as', '$1', undefined}, '$2', '$4'}.
-IfNotEqualBlock -> IfNotEqualBraced Elements EndIfNotEqualBraced : {'if', {'as', '$1', undefined}, '$2', []}.
-IfNotEqualBraced -> open_tag ifnotequal_keyword IfNotEqualExpression E close_tag : {expr, 'ne', '$3', '$4'}.
+IfNotEqualBlock -> IfNotEqualBraced Elements ElseBraced Elements EndIfNotEqualBraced : {'ifnotequal', '$1', '$2', '$4'}.
+IfNotEqualBlock -> IfNotEqualBraced Elements EndIfNotEqualBraced : {'ifnotequal', '$1', '$2', []}.
+IfNotEqualBraced -> open_tag ifnotequal_keyword IfNotEqualExpression E close_tag : {'$1', '$3', '$4'}.
 IfNotEqualExpression -> E : '$1'.
 EndIfNotEqualBraced -> open_tag endifnotequal_keyword close_tag.
 

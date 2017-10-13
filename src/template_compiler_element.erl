@@ -364,6 +364,10 @@ compile({print, {_, SrcPos, _}, Expr}, CState, Ws) ->
             {expr, ExprAst}
         ]),
     {Ws1, Ast};
+compile({'ifequal', {{_, _SrcPos, _} = Token, Expr1, Expr2}, IfElts, ElseElts}, CState, Ws) ->
+    compile({'if', {'as', Token, {expr, {'eq', Token}, Expr1, Expr2}, undefined}, IfElts, ElseElts}, CState, Ws);
+compile({'ifnotequal', {{_, _SrcPos, _} = Token, Expr1, Expr2}, IfElts, ElseElts}, CState, Ws) ->
+    compile({'if', {'as', Token, {expr, {'ne', Token}, Expr1, Expr2}, undefined}, IfElts, ElseElts}, CState, Ws);
 compile({'if', {'as', {_, SrcPos, _}, Expr, undefined}, IfElts, ElseElts}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
     {Ws2, IfClauseAst} = compile(IfElts, CState, Ws1),
