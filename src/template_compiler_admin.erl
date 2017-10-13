@@ -87,7 +87,7 @@ compile_file(Filename, TplKey, Options, Context) ->
                             Stack = erlang:get_stacktrace(),
                             % io:format("Error compiling template ~p: ~p:~n~p at~n ~p~n",
                             %           [Filename, What, Error, Stack]),
-                            lager:error("Error compiling template ~p:~n~p",
+                            lager:error("Error compiling template ~p: ~p:~n~p at~n ~p~n",
                                         [Filename, What, Error,
                                          lager:pr_stacktrace(Stack, {What, Error})
                                         ]),

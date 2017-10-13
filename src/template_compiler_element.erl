@@ -266,7 +266,7 @@ compile({Tag, {_, SrcPos, _}, Expr, Args}, #cs{runtime=Runtime} = CState, Ws) wh
         false ->
             Ast = merl:qquote(
                 template_compiler_utils:pos(SrcPos),
-                "_@runtime:builtin_tag(",
+                "_@runtime:builtin_tag("
                         "_@tag,"
                         "_@expr,"
                         "_@argslist,"
