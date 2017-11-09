@@ -149,8 +149,30 @@ find_value_lookup([{identifier, SrcPos, <<"false">>}], _CState, Ws) ->
     {Ws, template_compiler_utils:set_pos(SrcPos, erl_syntax:atom(false))};
 find_value_lookup([{identifier, SrcPos, <<"undefined">>}], _CState, Ws) ->
     {Ws, template_compiler_utils:set_pos(SrcPos, erl_syntax:atom(undefined))};
-find_value_lookup(ValueLookup, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
+find_value_lookup([{_, SrcPos, _}|_] = ValueLookup, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
     case Runtime:compile_map_nested_value(ValueLookup, CState#cs.context_var, CState#cs.context) of
+        [{mfa, M, F, As}] ->
+            {Ws1, ValueLookupAsts} = value_lookup_asts(As, CState, Ws, []),
+            {Ws2, V1} = template_compiler_utils:var(Ws1),
+            {Ws3, V2} = template_compiler_utils:var(Ws2),
+            Ast = merl:qquote(
+                    template_compiler_utils:pos(SrcPos),
+                    "case _@module:_@func(_@mfargs, _@context) of "
+                    "  {_@v1, []} -> _@v1;"
+                    "  {_@v1, _@v2} when is_list(_@v2) -> "
+                    "       _@runtime:find_nested_value([_@v1|_@v2], _@vars, _@context) "
+                    "end",
+                    [
+                        {module, erl_syntax:atom(M)},
+                        {func, erl_syntax:atom(F)},
+                        {mfargs, erl_syntax:list(ValueLookupAsts)},
+                        {v1, erl_syntax:variable(V1)},
+                        {v2, erl_syntax:variable(V2)},
+                        {runtime, erl_syntax:atom(Runtime)},
+                        {vars, erl_syntax:variable(Vars)},
+                        {context, erl_syntax:variable(CState#cs.context_var)}
+                    ]),
+            {maybe_forloop_var(Ws3, hd(ValueLookup)), Ast};
         [{ast, Ast}] ->
             {maybe_forloop_var(Ws, hd(ValueLookup)), Ast};
         [{identifier, SrcPos, Var} = Idn] = ValueLookup ->
