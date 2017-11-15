@@ -160,7 +160,7 @@ find_value_lookup([{_, SrcPos, _}|_] = ValueLookup, #cs{runtime=Runtime, vars_va
                     "case _@module:_@func(_@mfargs, _@context) of "
                     "  {_@v1, []} -> _@v1;"
                     "  {_@v1, _@v2} when is_list(_@v2) -> "
-                    "       _@runtime:find_nested_value([_@v1|_@v2], _@vars, _@context) "
+                    "       _@runtime:find_nested_value(_@v1, _@v2, _@vars, _@context) "
                     "end",
                     [
                         {module, erl_syntax:atom(M)},

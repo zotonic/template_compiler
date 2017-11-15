@@ -26,6 +26,7 @@
     is_modified/3,
     compile_map_nested_value/3,
     find_nested_value/3,
+    find_nested_value/4,
     find_value/4,
     set_context_vars/2,
     get_translations/2,
@@ -54,6 +55,7 @@
 
 -callback compile_map_nested_value(Tokens :: list(), ContextVar::string(), Context :: term()) -> NewTokens :: list().
 -callback find_nested_value(Keys :: list(), TplVars :: term(), Context :: term()) -> term().
+-callback find_nested_value(BaseValue :: term(), Keys :: list(), TplVars :: term(), Context :: term()) -> term().
 -callback find_value(Key :: term(), Vars :: term(), TplVars :: map(), Context :: term()) -> term().
 
 -callback set_context_vars(map()|list(), Context::term()) -> Context::term().
@@ -131,14 +133,14 @@ compile_map_nested_value(Ts, _ContextVar, _Context) ->
 %% @doc Find a list of values at once, easier and more efficient than a nested find_value/4
 %%      Add pattern matching here for nested lookups.
 find_nested_value([K|Ks], TplVars, Context) ->
-    find_nested_value_1(find_value(K, TplVars, TplVars, Context), Ks, TplVars, Context).
+    find_nested_value(find_value(K, TplVars, TplVars, Context), Ks, TplVars, Context).
 
-find_nested_value_1(undefined, _Ks, _TplVars, _Context) ->
+find_nested_value(undefined, _Ks, _TplVars, _Context) ->
     undefined;
-find_nested_value_1(V, [], _TplVars, _Context) ->
+find_nested_value(V, [], _TplVars, _Context) ->
     V;
-find_nested_value_1(V, [K|Ks], TplVars, Context) ->
-    find_nested_value_1(find_value(K, V, TplVars, Context), Ks, TplVars, Context).
+find_nested_value(V, [K|Ks], TplVars, Context) ->
+    find_nested_value(find_value(K, V, TplVars, Context), Ks, TplVars, Context).
 
 
 %% @doc Find the value of key in some structure.
