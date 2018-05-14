@@ -150,19 +150,45 @@ find_value(undefined, _, _TplVars, _Context) ->
 find_value(_, undefined, _TplVars, _Context) ->
     undefined;
 find_value(Name, Vars, _TplVars, _Context) when is_map(Vars) ->
-    maps:get(Name, Vars, undefined);
+    case maps:find(Name, Vars) of
+        {ok, V} -> V;
+        error when is_atom(Name) ->
+            % Maybe keys are binary
+            maps:get(atom_to_binary(Name, utf8), Vars, undefined);
+        error when is_binary(Name) ->
+            % Maybe keys are atoms
+            try
+                Name1 = binary_to_existing_atom(Name, utf8),
+                maps:get(Name1, Vars, undefined)
+            catch _:_ -> undefined
+            end;
+        error ->
+            undefined
+    end;
 find_value(Key, [{B,_}|_] = L, _TplVars, _Context) when is_list(B) ->
     proplists:get_value(z_convert:to_list(Key), L);
 find_value(Key, [{B,_}|_] = L, _TplVars, _Context) when is_binary(B) ->
     proplists:get_value(z_convert:to_binary(Key), L);
 find_value(Name, Vars, _TplVars, _Context) when is_atom(Name), is_list(Vars) ->
     proplists:get_value(Name, Vars);
+find_value(Name, [{A,_}|_] = L, _TplVars, _Context) when is_atom(A), is_binary(Name) ->
+    try
+        Name1 = binary_to_existing_atom(Name, utf8),
+        proplists:get_value(Name1, L)
+    catch _:_ -> undefined
+    end;
 find_value(Nr, Vars, _TplVars, _Context) when is_integer(Nr), is_list(Vars) ->
     try lists:nth(Nr, Vars)
     catch _:_ -> undefined
     end;
-find_value(IsoAtom, {trans, Tr}, _TplVars, _Context) ->
+find_value(IsoAtom, {trans, Tr}, _TplVars, _Context) when is_atom(IsoAtom) ->
     proplists:get_value(IsoAtom, Tr, <<>>);
+find_value(Iso, {trans, Tr}, _TplVars, _Context) when is_binary(Iso) ->
+    try
+        IsoAtom = binary_to_existing_atom(Iso, utf8),
+        proplists:get_value(IsoAtom, Tr, <<>>)
+    catch _:_ -> <<>>
+    end;
 find_value(Key, {obj, Props}, _TplVars, _Context) when is_list(Props) ->
     proplists:get_value(z_convert:to_list(Key), Props);
 find_value(Key, {obj, Props}, _TplVars, _Context) when is_list(Props) ->
@@ -174,13 +200,19 @@ find_value(Key, {struct, Props}, _TplVars, _Context) when is_list(Props) ->
     end;
 find_value(Key, Tuple, _TplVars, _Context) when is_tuple(Tuple) ->
     case element(1, Tuple) of
-        dict -> 
+        dict ->
             case dict:find(Key, Tuple) of
                 {ok, Val} -> Val;
                 _ -> undefined
             end;
         _ when is_integer(Key) ->
             try element(Key, Tuple)
+            catch _:_ -> undefined
+            end;
+        _ when is_binary(Key) ->
+            try
+                Key1 = binary_to_integer(Key),
+                element(Key1, Tuple)
             catch _:_ -> undefined
             end;
         _ ->
