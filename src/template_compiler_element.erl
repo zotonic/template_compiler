@@ -335,19 +335,20 @@ compile({url, {_, SrcPos, _}, Expr, Args}, #cs{runtime=Runtime} = CState, Ws) ->
                 ]),
             {Ws2, Ast}
     end;
-compile({lib, {_, SrcPos, _}, LibList, Args}, #cs{runtime=Runtime} = CState, Ws) ->
+compile({Lib, {_, SrcPos, _}, LibList, Args}, #cs{runtime=Runtime} = CState, Ws) when Lib =:= lib; Lib =:= lib_url ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
     ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList ]),
     LibFilenames = lists:map(fun({string_literal, _, Filename}) -> Filename end, LibList),
     Ast = merl:qquote(
         template_compiler_utils:pos(SrcPos),
         "_@runtime:builtin_tag("
-                "lib,"
+                "_@tag,"
                 "_@libfilenames,"
                 "_@argslist,"
                 "_@vars,"
                 "_@context)",
         [
+            {tag, erl_syntax:atom(Lib)},
             {runtime, erl_syntax:atom(Runtime)},
             {libfilenames, erl_syntax:abstract(LibFilenames)},
             {argslist, ArgsListAst},

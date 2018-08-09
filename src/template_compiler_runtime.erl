@@ -262,7 +262,7 @@ custom_tag(Tag, Args, Vars, Context) ->
     Tag:render(Args, Vars, Context).
 
 
-%% @doc Render image/image_url/media/url/lib tag. The Expr is the media item or dispatch rule.
+%% @doc Render image/image_url/media/url/lib/lib_url tag. The Expr is the media item or dispatch rule.
 -spec builtin_tag(template_compiler:builtin_tag(), Expr::term(), Args::list(), Vars::map(), Context::term()) -> 
             template_compiler:render_result().
 builtin_tag(_Tag, _Expr, _Args, _Vars, _Context) ->

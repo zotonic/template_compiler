@@ -117,6 +117,7 @@ Nonterminals
     AutoId
     
     LibTag
+    LibUrlTag
     LibList
     
     LoadTag
@@ -200,6 +201,7 @@ Terminals
     include_keyword
     inherit_keyword
     lib_keyword
+    lib_url_keyword
     load_keyword
     media_keyword
     not_keyword
@@ -285,6 +287,7 @@ Elements -> Elements IncludeTag : '$1' ++ ['$2'].
 Elements -> Elements CatIncludeTag : '$1' ++ ['$2'].
 Elements -> Elements NowTag : '$1' ++ ['$2'].
 Elements -> Elements LibTag : '$1' ++ ['$2'].
+Elements -> Elements LibUrlTag : '$1' ++ ['$2'].
 Elements -> Elements LoadTag : '$1' ++ ['$2'].
 Elements -> Elements CycleTag : '$1' ++ ['$2'].
 Elements -> Elements CustomTag : '$1' ++ ['$2'].
@@ -321,6 +324,7 @@ OptionalAll -> all_keyword : all.
 OptionalAll -> '$empty' : normal.
 
 LibTag -> open_tag lib_keyword LibList Args close_tag : {lib, '$2', '$3', '$4'}.
+LibUrlTag -> open_tag lib_url_keyword LibList Args close_tag : {lib, '$2', '$3', '$4'}.
 LibList -> string_literal : ['$1'].
 LibList -> LibList string_literal : '$1' ++ ['$2'].
 
