@@ -200,6 +200,18 @@ find_value_lookup([{_, SrcPos, _}|_] = ValueLookup, #cs{runtime=Runtime, vars_va
             {maybe_forloop_var(Ws3, hd(ValueLookup)), Ast};
         [{ast, Ast}] ->
             {maybe_forloop_var(Ws, hd(ValueLookup)), Ast};
+        [{ast, Ast} | ValueLookup1 ] ->
+            {Ws1, ValueLookupAsts} = value_lookup_asts(ValueLookup1, CState, Ws, []),
+            Ast1 = merl:qquote(
+                    erl_syntax:get_pos(hd(ValueLookupAsts)),
+                    "_@runtime:find_nested_value(_@list, _@vars, _@context)",
+                    [
+                        {runtime, erl_syntax:atom(Runtime)},
+                        {list, erl_syntax:list(ValueLookupAsts)},
+                        {vars, Ast},
+                        {context, erl_syntax:variable(CState#cs.context_var)}
+                    ]),
+            {maybe_forloop_var(Ws1, hd(ValueLookup)), Ast1};
         [{identifier, SrcPos, Var} = Idn] = ValueLookup ->
             VarName = template_compiler_utils:to_atom(Var),
             Ast = merl:qquote(
