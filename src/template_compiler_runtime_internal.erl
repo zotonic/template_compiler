@@ -237,4 +237,13 @@ print(Expr) ->
 %%      consists of the characters A-Z and 0-9 and is safe to use as HTML element id.
 -spec unique() -> string().
 unique() ->
-    <<"u", (integer_to_binary(crypto:rand_uniform(0,100000000000000000), 36))/binary>>.
+    <<"u", (integer_to_binary(rand_uniform(100000000000000000), 36))/binary>>.
+
+-spec rand_uniform( pos_integer() ) -> non_neg_integer().
+-ifdef(rand_only).
+rand_uniform(N) ->
+    rand:uniform(N) - 1.
+-else.
+rand_uniform(N) ->
+    crypto:rand_uniform(0,N).
+-endif.
