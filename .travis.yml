@@ -18,7 +18,9 @@ otp_release:
 
 install:
   - wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
-script: make test
+script:
+  - make test
+  - make dialyze
 sudo: false
 notifications:
   email:
