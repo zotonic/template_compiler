@@ -81,7 +81,7 @@ unescape_string_literal_1(<<C/utf8, Rest/binary>>, Acc) ->
 
 
 %% @doc Return the (universal) modification time of file, 0 on enoent
--spec file_mtime(filename:filename()) -> calendar:datetime() | 0.
+-spec file_mtime(file:filename_all()) -> calendar:datetime() | 0.
 file_mtime(File) ->
     case file:read_file_info(File, [{time, universal}]) of
         {ok, #file_info{mtime=MTime}} -> MTime;

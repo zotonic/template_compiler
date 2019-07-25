@@ -48,7 +48,7 @@
                   | string()
                   | {cat, binary()|string()}
                   | {cat, binary()|string(), term()}
-                  | {overrules, binary()|string(), filename:filename()}
+                  | {overrules, binary()|string(), file:filename_all()}
                   | template_file().
 -type template_key() :: {ContextName::term(), Runtime::atom(), template()}.
 -type render_result() :: binary() | string() | term() | list(render_result()).
@@ -238,7 +238,7 @@ flush() ->
     template_compiler_admin:flush().
 
 %% @doc Ping that a template has been changed
--spec flush_file(filename:filename()) -> ok.
+-spec flush_file(file:filename_all()) -> ok.
 flush_file(Filename) ->
     template_compiler_admin:flush_file(Filename).
 
@@ -250,7 +250,7 @@ flush_context_name(ContextName) ->
 
 %% @doc Compile a template to a module. The template is the path of the
 %% template to be compiled.
--spec compile_file(filename:filename(), options(), term()) -> {ok, atom()} | {error, term()}.
+-spec compile_file(file:filename_all(), options(), term()) -> {ok, atom()} | {error, term()}.
 compile_file(Filename, Options, Context) ->
     case file:read_file(Filename) of
         {ok, Tpl} ->
@@ -260,7 +260,7 @@ compile_file(Filename, Options, Context) ->
     end.
 
 %% @doc Compile a in-memory template to a module.
--spec compile_binary(binary(), filename:filename(), options(), term()) -> {ok, atom()} | {error, term()}.
+-spec compile_binary(binary(), file:filename_all(), options(), term()) -> {ok, atom()} | {error, term()}.
 compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
     Mtime = template_compiler_utils:file_mtime(Filename),
     case template_compiler_scanner:scan(Filename, Tpl) of
@@ -300,7 +300,7 @@ is_template_module(Name) -> is_template_module(z_convert:to_binary(Name)).
 
 
 %% @doc Fetch all translatable strings from a template.
--spec translations(filename:filename()) -> {ok, [translation_message()]} | {error, term()}.
+-spec translations(file:filename_all()) -> {ok, [translation_message()]} | {error, term()}.
 translations(Filename) ->
     case file:read_file(Filename) of
         {ok, Bin} ->

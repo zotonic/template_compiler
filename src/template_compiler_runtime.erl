@@ -51,7 +51,7 @@
         {ok, template_compiler:template_file()} | {error, enoent|term()}.
 -callback map_template_all(template_compiler:template(), map(), term()) -> [template_compiler:template_file()].
 
--callback is_modified(filename:filename(), calendar:datetime(), term()) -> boolean().
+-callback is_modified(file:filename_all(), calendar:datetime(), term()) -> boolean().
 
 -callback compile_map_nested_value(Tokens :: list(), ContextVar::string(), Context :: term()) -> NewTokens :: list().
 -callback find_nested_value(Keys :: list(), TplVars :: term(), Context :: term()) -> term().
@@ -121,7 +121,7 @@ map_template_all(Template, Vars, Context) ->
     end.
 
 %% @doc Check if a file has been modified
--spec is_modified(filename:filename(), calendar:datetime(), term()) -> boolean().
+-spec is_modified(file:filename_all(), calendar:datetime(), term()) -> boolean().
 is_modified(Filename, Mtime, _Context) ->
     template_compiler_utils:file_mtime(Filename) /= Mtime.
 
@@ -201,10 +201,7 @@ find_value(Key, {struct, Props}, _TplVars, _Context) when is_list(Props) ->
 find_value(Key, Tuple, _TplVars, _Context) when is_tuple(Tuple) ->
     case element(1, Tuple) of
         dict ->
-            case dict:find(Key, Tuple) of
-                {ok, Val} -> Val;
-                _ -> undefined
-            end;
+            find_value_dict(Key, Tuple);
         _ when is_integer(Key) ->
             try element(Key, Tuple)
             catch _:_ -> undefined
@@ -226,6 +223,18 @@ find_value(Key, F, TplVars, Context) when is_function(F, 3) ->
     F(Key, TplVars, Context);
 find_value(_Key, _Vars, _TplVars, _Context) ->
     undefined.
+
+
+-dialyzer({nowarn_function, find_value_dict/2}).
+-spec find_value_dict( term(), tuple() ) -> term().
+find_value_dict( Key, Dict ) ->
+    try
+        case dict:find(Key, Dict) of
+            {ok, Val} -> Val;
+            _ -> undefined
+        end
+    catch _:_ -> undefined
+    end.
 
 
 %% @doc Set any contextual arguments from the map or argument list. User for sudo/anondo and language settings

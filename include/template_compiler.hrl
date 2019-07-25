@@ -18,5 +18,5 @@
 
 -record(template_file, {
         template :: binary(),
-        filename :: filename:filename()
+        filename :: file:filename_all()
     }).

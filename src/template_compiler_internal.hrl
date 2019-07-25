@@ -20,7 +20,7 @@
 %% @doc Increment this with compiler bug fixes
 -define(COMPILER_VERSION, 1).
 
--type linecol() :: {Line::integer(), Column::integer(), filename:filename()}.
+-type linecol() :: {Line::integer(), Column::integer(), file:filename_all()}.
 
 -type token() :: {atom(), linecol(), term()}
                | identifier_token().

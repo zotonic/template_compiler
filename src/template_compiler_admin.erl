@@ -53,7 +53,7 @@
         compiled :: ets:tab(),
         compiling = [] :: list({reference(), template_compiler:template_key(), gen_server_from()}),
         waiting = [] :: list({template_compiler:template_key(), gen_server_from()}),
-        filename_keys = [] :: list({filename:filename(), template_compiler:template_key()})
+        filename_keys = [] :: list({file:filename_all(), template_compiler:template_key()})
     }).
 
 
@@ -61,7 +61,7 @@
 
 
 %% @doc Find a template, start a compilation if not found
--spec lookup(filename:filename(), template_compiler:options(), any()) -> {ok, atom()} | {error, term()}.
+-spec lookup(file:filename_all(), template_compiler:options(), any()) -> {ok, atom()} | {error, term()}.
 lookup(Filename, Options, Context) ->
     Runtime = template_compiler:get_option(runtime, Options),
     ContextName = template_compiler:get_option(context_name, Options),
@@ -106,7 +106,7 @@ flush() ->
     gen_server:cast(?MODULE, flush).
 
 %% @doc Ping that a template has been changed
--spec flush_file(filename:filename()) -> ok.
+-spec flush_file(file:filename_all()) -> ok.
 flush_file(Filename) ->
     gen_server:cast(?MODULE, {flush_file, Filename}).
 

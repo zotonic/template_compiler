@@ -714,8 +714,8 @@ expr_list(ExprList, CState, Ws) ->
         ExprList).
 
 
-is_context_vars_arg({{identifier, _, Ident}, _Val}, CState) ->
-    lists:member(Ident, CState#cs.context_vars);
+% is_context_vars_arg({{identifier, _, Ident}, _Val}, CState) ->
+%    lists:member(Ident, CState#cs.context_vars);
 is_context_vars_arg(Args, CState) when is_list(Args) ->
     lists:any(
             fun
