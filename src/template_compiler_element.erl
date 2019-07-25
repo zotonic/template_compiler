@@ -406,7 +406,7 @@ compile({'if', {'as', {_, SrcPos, _}, Expr, {identifier, _Pos, Name} = Ident}, I
                     "true -> "
                         "_@vars1 = _@vars#{ _@name => _@v },"
                         "_@context1 = _@runtime:set_context_vars(_@vars1),"
-                        "_@ifclause;",
+                        "_@ifclause;"
                     "false -> _@elseclause "
                   "end "
                 "end",
