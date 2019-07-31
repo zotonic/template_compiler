@@ -76,7 +76,7 @@
 -callback escape(iodata() | undefined, Context :: term()) -> iodata().
 
 -callback trace_compile(atom(), binary(), template_compiler:options(), term()) -> ok.
--callback trace_render(binary(), template_compiler:options(), term()) -> any().
+-callback trace_render(binary(), template_compiler:options(), term()) -> ok | {ok, iodata(), iodata()}.
 -callback trace_block({binary(),integer(),integer()}, atom(), atom(), term()) -> ok | {ok, iodata(), iodata()}.
 
 
@@ -379,18 +379,17 @@ trace_compile(_Module, Filename, Options, _Context) ->
 
 %% @block Called when a template is rendered (could be from an include) - the return is
 %%        kept in a trace for displaying template extends recursion information.
--spec trace_render(binary(), template_compiler:options(), term()) -> term().
+-spec trace_render(binary(), template_compiler:options(), term()) -> ok | {ok, iodata(), iodata()}.
 trace_render(Filename, Options, _Context) ->
     case proplists:get_value(trace_position, Options) of
         {File, Line, _Col} ->
             lager:debug("[template_compiler] Include by \"~s:~p\" of \"~s\"",
-                        [File, Line, Filename]),
-            {File, Line, Filename};
+                        [File, Line, Filename]);
         undefined ->
             lager:debug("[template_compiler] Render \"~s\"",
-                        [Filename]),
-            {undefined, undefined, Filename}
-    end.
+                        [Filename])
+    end,
+    ok.
 
 %% @block Called when a block function is called
 -spec trace_block({binary(), integer(), integer()}, atom(), atom(), term()) -> ok | {ok, iodata(), iodata()}.
