@@ -185,7 +185,7 @@ block_lookup({ok, TplFile}, BlockMap, ExtendsStack, DebugTrace, Options, Vars, R
                 true ->
                     FileTrace = [Module:filename() | [ M:filename() || M <- ExtendsStack ]],
                     lager:error("[template_compiler] Template recursion: ~p", [FileTrace]),
-                    {error, {recursion, Trace}};
+                    {error, {recursion, [Trace|DebugTrace]}};
                 false ->
                     % Check extended/overruled templates (build block map)
                     BlockMap1 = add_blocks(Module:blocks(), Module, BlockMap),
