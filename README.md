@@ -331,7 +331,9 @@ Define a variable to be used within an enclosed part of the template:
         Here v can be used as any other variable
     {% endwith %}
 
-This is useful for 
+This is useful for using the result of a complicated expression multiple times
+or if a `forloop` (see below) iterator needs to be used in overruled blocks or
+included templates.
 
 #### For tag
 
