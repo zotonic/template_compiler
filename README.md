@@ -132,8 +132,7 @@ Use `compile_file/3` and `compile_binary/4` to compile a template file or in-mem
 The `Filename` is used to reference the compiled binary.
 
 
-Force recompilation
-...................
+#### Force recompilation
 
 Sometimes (for example when template lookups or translations are changed) it is necessary to check all templates if they
 need to be recompiled.
@@ -208,8 +207,7 @@ Note: to show a `{` or `}` in a `trans` tag text then double it to `{{`.
 The `trans` tag is compiled to code so very efficient.
 
 
-List translatable strings
-.........................
+#### List translatable strings
 
 To get a list of all translatable texts in a template use:
 
@@ -227,8 +225,7 @@ Template include / extends
 
 Templates can be combined to re-use parts and keep everything manageable.
 
-Include
-.......
+#### Include
 
 First a template can be included in another template:
 
@@ -241,8 +238,7 @@ the arguments of the include tags.
 Note: in ErlyDTL the included template is compiled inline into the surrounding
 template. In template_compiler the included template is compiled as a separate module.
 
-Extends
-.......
+#### Extends
 
 You can also have a _base_ template which can be used as the basis of other templates.
 The base template should define some _blocks_ that can be changed in the template
@@ -268,8 +264,7 @@ of a lower priority. This is heavily used in Zotonic to extend templates in othe
 The `overrules` is used to make it explicit that this template overrules (or extends)
 another template with the same name.
 
-Block
-.....
+#### Block
 
 This defines a named portion of a template that can be replaced in a template that extends
 (or overrules) this template:
@@ -295,8 +290,7 @@ Blocks can be nested:
 The blocks are compiled to separate functions. The template compiler uses the template
 extends chain to figure out which block-function to render from which extending template.
 
-Inherit
-.......
+#### Inherit
 
 The `{% inherit %}` tag van be used inside a block to render the same-named block in
 the extended (or overruled) template.
@@ -315,8 +309,7 @@ Then `a.tpl` renders like:
     this is hello the base world template
 
 
-If tag
-......
+#### If tag
 
 Conditionally show or hide parts of a template:
 
@@ -330,8 +323,7 @@ Conditionally show or hide parts of a template:
 
 The `elif` can also be written as `elseif`
 
-With tag
-........
+#### With tag
 
 Define a variable to be used within an enclosed part of the template:
 
@@ -341,8 +333,7 @@ Define a variable to be used within an enclosed part of the template:
 
 This is useful for 
 
-For tag
-.......
+#### For tag
 
 Loop over a list of values, printing a comma separated list:
 
@@ -387,8 +378,7 @@ where the forloop is defined then the code for tracking the forloop iterators is
 generated.
 
 
-Comment tag
-...........
+#### Comment tag
 
 Everything surrounded by the tag is excluded:
 
@@ -399,8 +389,7 @@ Everything surrounded by the tag is excluded:
 Useful to disable parts of a template or add some explanatory texts.
 
 
-Raw tag
-........
+#### Raw tag
 
 To echo some part without rendering it:
 
@@ -409,8 +398,7 @@ To echo some part without rendering it:
     {% endraw %}
 
 
-Spaceless tag
-.............
+#### Spaceless tag
 
 Remove spaces between HTML tags:
 
@@ -421,8 +409,7 @@ Renders as:
     a-<a> x<span>xxx </span></a>-b
 
 
-Print tag
-.........
+#### Print tag
 
 Print a value in `<pre>` tags, used to inspect variables or dump some value
 when you are still writing the template:
