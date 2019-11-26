@@ -61,7 +61,8 @@
 
 -type translation_message() :: {
     Text :: binary(),
-    Args :: proplists:proplist(), {
+    Args :: proplists:proplist(),
+    {
         Filename :: file:filename(),
         Line :: pos_integer(),
         Column :: pos_integer()
