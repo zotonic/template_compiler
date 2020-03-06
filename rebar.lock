@@ -1,12 +1,12 @@
 {"1.1.0",
 [{<<"erlang_localtime">>,{pkg,<<"erlang_localtime">>,<<"1.0.0">>},0},
- {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.8">>},1},
- {<<"lager">>,{pkg,<<"lager">>,<<"3.2.1">>},0},
- {<<"zotonic_stdlib">>,{pkg,<<"zotonic_stdlib">>,<<"1.0.0">>},0}]}.
+ {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.8.0">>},0},
+ {<<"zotonic_stdlib">>,{pkg,<<"zotonic_stdlib">>,<<"1.0.2">>},0}]}.
 [
 {pkg_hash,[
  {<<"erlang_localtime">>, <<"497DFD4D13523D3E0EECDCB8D6D59857CF642A17A6BDC6133FF906FDAF2AEF21">>},
- {<<"goldrush">>, <<"2024BA375CEEA47E27EA70E14D2C483B2D8610101B4E852EF7F89163CDB6E649">>},
- {<<"lager">>, <<"EEF4E18B39E4195D37606D9088EA05BF1B745986CF8EC84F01D332456FE88D17">>},
- {<<"zotonic_stdlib">>, <<"28253FCEF01F1EFF395F6EAC77D62BB9FF4F45FF37ADD7FDCB1BD4976FCD2126">>}]}
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
+ {<<"lager">>, <<"3402B9A7E473680CA179FC2F1D827CAB88DD37DD1E6113090C6F45EF05228A1C">>},
+ {<<"zotonic_stdlib">>, <<"A9174EB6CD6CF9036A13BB4177DB425AF0522A3D9BEBD010AEABC21280DEE738">>}]}
 ].
