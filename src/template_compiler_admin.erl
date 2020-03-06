@@ -1,8 +1,8 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016 Marc Worrell
+%% @copyright 2016-2020 Marc Worrell
 %% @doc Administrate all compiled templates and compilers in flight.
 
-%% Copyright 2016 Marc Worrell
+%% Copyright 2016-2020 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@
 -spec lookup(file:filename_all(), template_compiler:options(), any()) -> {ok, atom()} | {error, term()}.
 lookup(Filename, Options, Context) ->
     Runtime = template_compiler:get_option(runtime, Options),
-    ContextName = template_compiler:get_option(context_name, Options),
+    ContextName = Runtime:get_context_name(Context),
     TplKey = {ContextName, Runtime, Filename},
     case ets:lookup(?MODULE, TplKey) of
         [#tpl{module=Module}] ->

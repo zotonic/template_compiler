@@ -1,9 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016 Marc Worrell
+%% @copyright 2016-2020 Marc Worrell
 %% @doc Simple runtime for the compiled templates. Needs to be
 %%      copied and adapted for different environments.
 
-%% Copyright 2016 Marc Worrell
+%% Copyright 2016-2020 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@
     find_nested_value/3,
     find_nested_value/4,
     find_value/4,
+    get_context_name/1,
     set_context_vars/2,
     get_translations/2,
     lookup_translation/3,
@@ -58,6 +59,7 @@
 -callback find_nested_value(BaseValue :: term(), Keys :: list(), TplVars :: term(), Context :: term()) -> term().
 -callback find_value(Key :: term(), Vars :: term(), TplVars :: map(), Context :: term()) -> term().
 
+-callback get_context_name(Context::term()) -> atom().
 -callback set_context_vars(map()|list(), Context::term()) -> Context::term().
 
 -callback get_translations(Text :: binary(), Context :: term()) -> binary() | {trans, [{atom(), binary()}]}.
@@ -235,6 +237,19 @@ find_value_dict( Key, Dict ) ->
         end
     catch _:_ -> undefined
     end.
+
+
+%% @doc Set the context name for this context, used for flush or recompile all templates
+%%      beloging to a certain context (like a single site).
+-spec get_context_name( term() ) -> atom().
+get_context_name(Context) when is_map(Context) ->
+    maps:get(context_name, Context, undefined);
+get_context_name(Context) when is_list(Context) ->
+    proplists:get_value(context_name, Context, undefined);
+get_context_name(Context) when is_atom(Context) ->
+    Context;
+get_context_name(_) ->
+    undefined.
 
 
 %% @doc Set any contextual arguments from the map or argument list. User for sudo/anondo and language settings
