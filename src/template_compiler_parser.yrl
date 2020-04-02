@@ -140,6 +140,7 @@ Nonterminals
     PrintTag
     ImageTag
     ImageUrlTag
+    ImageDataUrlTag
     MediaTag
     TransTag
     TransExtTag
@@ -197,6 +198,7 @@ Terminals
     ifnotequal_keyword
     image_keyword
     image_url_keyword
+    image_data_url_keyword
     in_keyword
     include_keyword
     inherit_keyword
@@ -297,6 +299,7 @@ Elements -> Elements UrlTag : '$1' ++ ['$2'].
 Elements -> Elements PrintTag : '$1' ++ ['$2'].
 Elements -> Elements ImageTag : '$1' ++ ['$2'].
 Elements -> Elements ImageUrlTag : '$1' ++ ['$2'].
+Elements -> Elements ImageDataUrlTag : '$1' ++ ['$2'].
 Elements -> Elements MediaTag : '$1' ++ ['$2'].
 
 
@@ -431,6 +434,7 @@ CallWithTag -> open_tag call_keyword identifier with_keyword E close_tag : {call
 
 ImageTag -> open_tag image_keyword E Args close_tag : {image, '$2', '$3', '$4' }.
 ImageUrlTag -> open_tag image_url_keyword E Args close_tag : {image_url, '$2', '$3', '$4' }.
+ImageDataUrlTag -> open_tag image_data_url_keyword E Args close_tag : {image_data_url, '$2', '$3', '$4' }.
 MediaTag -> open_tag media_keyword E Args close_tag : {media, '$2', '$3', '$4' }.
 
 UrlTag -> open_tag url_keyword E Args close_tag : {url, '$2', '$3', '$4'}.

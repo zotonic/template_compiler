@@ -55,6 +55,7 @@
 
 -type builtin_tag() :: image
                      | image_url
+                     | image_data_url
                      | media
                      | url
                      | lib.
