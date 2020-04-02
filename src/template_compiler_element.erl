@@ -232,7 +232,11 @@ compile({custom_tag, {identifier, SrcPos, Name}, Args}, #cs{runtime=Runtime} = C
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]),
     {Ws1, Ast};
-compile({Tag, {_, SrcPos, _}, Expr, Args}, #cs{runtime=Runtime} = CState, Ws) when Tag =:= image; Tag =:= image_url; Tag =:= media ->
+compile({Tag, {_, SrcPos, _}, Expr, Args}, #cs{runtime=Runtime} = CState, Ws)
+    when Tag =:= image;
+         Tag =:= image_url;
+         Tag =:= image_data_url;
+         Tag =:= media ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
     {Ws2, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws1),
     ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList ]),

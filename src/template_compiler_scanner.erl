@@ -1,7 +1,8 @@
 %%%-------------------------------------------------------------------
 %%% @author    Roberto Saccon <rsaccon@gmail.com> [http://rsaccon.com]
 %%% @author    Evan Miller <emmiller@gmail.com>
-%%% @copyright 2008 Roberto Saccon, Evan Miller
+%%% @author    Marc Worrell <marc@worrell.nl>
+%%% @copyright 2008 Roberto Saccon, Evan Miller; 2009-2020 Marc Worrell
 %%% @doc 
 %%% Template language scanner
 %%% @end  
@@ -9,6 +10,7 @@
 %%% The MIT License
 %%%
 %%% Copyright (c) 2007 Roberto Saccon, Evan Miller
+%%% Copyright (c) 2009-2020 Marc Worrell
 %%%
 %%% Permission is hereby granted, free of charge, to any person obtaining a copy
 %%% of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +31,7 @@
 %%% THE SOFTWARE.
 %%%
 %%% @since 2007-11-11 by Roberto Saccon, Evan Miller
+%%% @since 2008 by Marc Worrell
 %%%-------------------------------------------------------------------
 %%%
 %%%-------------------------------------------------------------------
@@ -79,8 +82,10 @@ identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc})
         <<"comment">>, <<"endcomment">>, <<"cycle">>, <<"firstof">>, <<"ifchanged">>,
         <<"ifequal">>, <<"endifequal">>, <<"ifnotequal">>, <<"endifnotequal">>, <<"now">>,
         <<"regroup">>, <<"rsc">>, <<"spaceless">>, <<"endspaceless">>, <<"ssi">>,
-        <<"templatetag">>, <<"load">>, <<"call">>, <<"url">>, <<"print">>, <<"image">>,
-        <<"image_url">>, <<"media">>, <<"with">>, <<"endwith">>, <<"all">>, <<"lib">>, <<"lib_url">>,
+        <<"templatetag">>, <<"load">>, <<"call">>, <<"url">>, <<"print">>,
+        <<"image">>, <<"image_url">>, <<"image_data_url">>, <<"media">>,
+        <<"with">>, <<"endwith">>, <<"all">>,
+        <<"lib">>, <<"lib_url">>,
         <<"cache">>, <<"endcache">>, <<"filter">>, <<"endfilter">>, <<"javascript">>,
         <<"endjavascript">>, <<"optional">>, <<"trans">>
     ],
