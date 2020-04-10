@@ -1,8 +1,8 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016 Marc Worrell
+%% @copyright 2016-2020 Marc Worrell
 %% @doc Compile expressions to erl_syntax trees.
 
-%% Copyright 2016 Marc Worrell
+%% Copyright 2016-2020 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -149,6 +149,25 @@ find_value_lookup([{identifier, SrcPos, <<"false">>}], _CState, Ws) ->
     {Ws, template_compiler_utils:set_pos(SrcPos, erl_syntax:atom(false))};
 find_value_lookup([{identifier, SrcPos, <<"undefined">>}], _CState, Ws) ->
     {Ws, template_compiler_utils:set_pos(SrcPos, erl_syntax:atom(undefined))};
+find_value_lookup([
+            {identifier, SrcPos, <<"forloop">>},
+            {identifier, _, Key}
+        ], #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
+    Ws1 = Ws#ws{is_forloop_var=true},
+    ValueLookupAsts = [
+        erl_syntax:atom(forloop),
+        erl_syntax:atom(binary_to_atom(Key, utf8))
+    ],
+    Ast = merl:qquote(
+            erl_syntax:get_pos(SrcPos),
+            "_@runtime:find_nested_value(_@list, _@vars, _@context)",
+            [
+                {runtime, erl_syntax:atom(Runtime)},
+                {list, erl_syntax:list(ValueLookupAsts)},
+                {vars, erl_syntax:variable(Vars)},
+                {context, erl_syntax:variable(CState#cs.context_var)}
+            ]),
+    {Ws1, Ast};
 find_value_lookup([{_, SrcPos, _}|_] = ValueLookup, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
     case Runtime:compile_map_nested_value(ValueLookup, CState#cs.context_var, CState#cs.context) of
         [{mfa, M, F, As}] ->
@@ -246,8 +265,7 @@ maybe_forloop_var(Ws, _) ->
 value_lookup_asts([], _CState, Ws, Acc) ->
     {Ws, lists:reverse(Acc)};
 value_lookup_asts([{identifier, _, Var}|Vs], CState, Ws, Acc) ->
-    VarName = template_compiler_utils:to_atom(Var),
-    value_lookup_asts(Vs, CState, Ws, [erl_syntax:atom(VarName)|Acc]);
+    value_lookup_asts(Vs, CState, Ws, [erl_syntax:abstract(Var)|Acc]);
 value_lookup_asts([{ast, Ast}|Vs], CState, Ws, Acc) ->
     value_lookup_asts(Vs, CState, Ws, [Ast|Acc]);
 value_lookup_asts([{expr, Expr}|Vs], CState, Ws, Acc) ->
