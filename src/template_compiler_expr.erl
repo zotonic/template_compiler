@@ -192,7 +192,7 @@ find_value_lookup([{_, SrcPos, _}|_] = ValueLookup, #cs{runtime=Runtime, vars_va
                         {vars, erl_syntax:variable(Vars)},
                         {context, erl_syntax:variable(CState#cs.context_var)}
                     ]),
-            {maybe_forloop_var(Ws3, hd(ValueLookup)), Ast};
+            {Ws3, Ast};
         [{mfa2, M, F, As, ExtraArg}] ->
             {Ws1, ValueLookupAsts} = value_lookup_asts(As, CState, Ws, []),
             {Ws2, V1} = template_compiler_utils:var(Ws1),
@@ -216,9 +216,9 @@ find_value_lookup([{_, SrcPos, _}|_] = ValueLookup, #cs{runtime=Runtime, vars_va
                         {vars, erl_syntax:variable(Vars)},
                         {context, erl_syntax:variable(CState#cs.context_var)}
                     ]),
-            {maybe_forloop_var(Ws3, hd(ValueLookup)), Ast};
+            {Ws3, Ast};
         [{ast, Ast}] ->
-            {maybe_forloop_var(Ws, hd(ValueLookup)), Ast};
+            {Ws, Ast};
         [{ast, Ast} | ValueLookup1 ] ->
             {Ws1, ValueLookupAsts} = value_lookup_asts(ValueLookup1, CState, Ws, []),
             Ast1 = merl:qquote(
@@ -230,8 +230,8 @@ find_value_lookup([{_, SrcPos, _}|_] = ValueLookup, #cs{runtime=Runtime, vars_va
                         {vars, Ast},
                         {context, erl_syntax:variable(CState#cs.context_var)}
                     ]),
-            {maybe_forloop_var(Ws1, hd(ValueLookup)), Ast1};
-        [{identifier, SrcPos, Var} = Idn] = ValueLookup ->
+            {Ws1, Ast1};
+        [{identifier, SrcPos, Var}] = ValueLookup ->
             VarName = template_compiler_utils:to_atom(Var),
             Ast = merl:qquote(
                     template_compiler_utils:pos(SrcPos),
@@ -242,7 +242,7 @@ find_value_lookup([{_, SrcPos, _}|_] = ValueLookup, #cs{runtime=Runtime, vars_va
                         {vars, erl_syntax:variable(Vars)},
                         {context, erl_syntax:variable(CState#cs.context_var)}
                     ]),
-            {maybe_forloop_var(Ws, Idn), Ast};
+            {Ws, Ast};
         ValueLookup1 ->
             {Ws1, ValueLookupAsts} = value_lookup_asts(ValueLookup1, CState, Ws, []),
             Ast = merl:qquote(
@@ -254,13 +254,8 @@ find_value_lookup([{_, SrcPos, _}|_] = ValueLookup, #cs{runtime=Runtime, vars_va
                         {vars, erl_syntax:variable(Vars)},
                         {context, erl_syntax:variable(CState#cs.context_var)}
                     ]),
-            {maybe_forloop_var(Ws1, hd(ValueLookup)), Ast}
+            {Ws1, Ast}
     end.
-
-maybe_forloop_var(Ws, {identifier, _, <<"forloop">>}) ->
-    Ws#ws{is_forloop_var=true};
-maybe_forloop_var(Ws, _) ->
-    Ws.
 
 value_lookup_asts([], _CState, Ws, Acc) ->
     {Ws, lists:reverse(Acc)};
