@@ -86,7 +86,7 @@ compile_file(Filename, TplKey, Options, Context) ->
                         ?WITH_STACKTRACE(What, Error, Stack)
                             % io:format("Error compiling template ~p: ~p:~n~p at~n ~p~n",
                             %           [Filename, What, Error, Stack]),
-                            io:format("Error compiling template ~p: ~p:~n~p at~n ~p~n",
+                            lager:error("Error compiling template ~p: ~p:~n~p at~n ~p~n",
                                         [Filename, What, Error,
                                          lager:pr_stacktrace(Stack, {What, Error})
                                         ]),
