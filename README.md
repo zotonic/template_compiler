@@ -116,7 +116,7 @@ How to use
 
 Render a template to an iolist:
 
-    Vars = #{ a => 1 },                 % Template variables, use a map
+    Vars = #{ <<"a">> => 1 },                 % Template variables, use a map
     Options = [],                       % Render and compilation options
     Context = your_request_context,     % Context passed to the runtime module and filters
     {ok, IOList} = template_compiler:render("hello.tpl", Vars, Options, Context).
@@ -175,11 +175,11 @@ Instead of strings, variables can also be objects that contain attributes. To ac
 The `article` could have been passed as a proplist or map in the _Vars_ for the template render function:
 
     #{
-        article => #{
-            title => <<"My title"/utf8>>,
-            author => #{
-                id => 1234,
-                last_name => <<"Janssen">>
+        <<"article">> => #{
+            <<"title">> => <<"My title"/utf8>>,
+            <<"author">> => #{
+                <<"id">> => 1234,
+                <<"last_name">> => <<"Janssen">>
             }
         }
     }.
