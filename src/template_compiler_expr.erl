@@ -340,7 +340,6 @@ mapfields_ast(Args, Cs, Ws) ->
 mapfields_1([], _Cs, Ws, Acc) ->
     {Ws, lists:reverse(Acc)};
 mapfields_1([{{identifier, _, Arg}, Expr}|Args], Cs, Ws, Acc) ->
-    ArgName = template_compiler_utils:to_atom(Arg),
     {Ws1, ExprAst} = compile(Expr, Cs, Ws),
-    Ast = erl_syntax:map_field_assoc(erl_syntax:atom(ArgName), ExprAst),
+    Ast = erl_syntax:map_field_assoc(erl_syntax:abstract(Arg), ExprAst),
     mapfields_1(Args, Cs, Ws1, [Ast|Acc]).
