@@ -193,11 +193,12 @@ Expressions can use different values types:
  * Variables (see above)
  * Number: `123`
  * String: `"hello"` or `'hello'`
- * Translatable string: `_"Hello"`
+ * Translatable string: `_"Hello"` (see below)
  * List:  `[ 1, 2, 3 ]`
  * Map, using Elixir syntax:  `%{ a: 1, b: 2 }`
- * Erlang atom:  ` ``a`` `  (quoted using backticks)
+ * Erlang atom: <tt>&grave;a&grave;</tt> (quoted using backticks)
  * Tagged value list: `{mytag a=1 b=2}`, this translates to Erlang `{mytag, [{a,1}, {b,2}]}`
+ * Unique generated id: `#foo` - an unique prefix is used for each template
 
 
 Translatable texts
