@@ -22,6 +22,7 @@ groups() ->
         ,expr_filter
         ,expr_nested
         ,expr_autoid
+        ,expr_map
         ]}].
 
 init_per_suite(Config) ->
@@ -94,6 +95,14 @@ expr_autoid(_Config) ->
     {ok, Bin2} = template_compiler:render("expr_autoid_2.tpl", #{ foo => 20 }, [], undefined),
     {match, _} = re:run(iolist_to_binary(Bin2), "x:[a-zA-Z0-9]+-id-20:y").
 
+
+expr_map(_Config) ->
+    {ok, Bin1} = template_compiler:render("expr_map.tpl", #{}, [], undefined),
+    <<"X<pre>#{}</pre>Y">> = iolist_to_binary(Bin1),
+    {ok, Bin2} = template_compiler:render("expr_map_2.tpl", #{}, [], undefined),
+    <<"X<pre>#{a =&gt; 1}</pre>Y">> = iolist_to_binary(Bin2),
+    {ok, Bin3} = template_compiler:render("expr_map_3.tpl", #{ <<"c">> => 2 }, [], undefined),
+    <<"X<pre>#{a =&gt; 1,b =&gt; 4}</pre>Y">> = iolist_to_binary(Bin3).
 
 test_data_dir(Config) ->
     filename:join([

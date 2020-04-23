@@ -82,6 +82,10 @@ compile({auto_id, {identifier, SrcPos, Name}}, #cs{vars_var=Vars}, Ws) ->
                     {vars, erl_syntax:variable(Vars)}
                 ]),
     {Ws#ws{is_autoid_var=true}, Ast};
+compile({map_value, Args}, Cs, Ws) ->
+    {WsProps, PropsAst} = mapfields_ast(Args, Cs, Ws),
+    Ast = erl_syntax:map_expr(PropsAst),
+    {WsProps, Ast};
 compile({tuple_value, {identifier, _, Name}, Args}, Cs, Ws) ->
     TupleName = erl_syntax:atom(template_compiler_utils:to_atom(Name)),
     {WsProps, PropsAst} = proplist_ast(Args, Cs, Ws),
@@ -328,3 +332,15 @@ proplist_1([{{identifier, _, Arg}, Expr}|Args], Cs, Ws, Acc) ->
     {Ws1, ExprAst} = compile(Expr, Cs, Ws),
     Ast = erl_syntax:tuple([erl_syntax:atom(ArgName), ExprAst]),
     proplist_1(Args, Cs, Ws1, [Ast|Acc]).
+
+
+mapfields_ast(Args, Cs, Ws) ->
+    mapfields_1(Args, Cs, Ws, []).
+
+mapfields_1([], _Cs, Ws, Acc) ->
+    {Ws, lists:reverse(Acc)};
+mapfields_1([{{identifier, _, Arg}, Expr}|Args], Cs, Ws, Acc) ->
+    ArgName = template_compiler_utils:to_atom(Arg),
+    {Ws1, ExprAst} = compile(Expr, Cs, Ws),
+    Ast = erl_syntax:map_field_assoc(erl_syntax:atom(ArgName), ExprAst),
+    mapfields_1(Args, Cs, Ws1, [Ast|Acc]).

@@ -105,6 +105,8 @@ render(Template0, Vars, Options, Context) when is_map(Vars) ->
                             Vars
                     end,
             {ok, maybe_wrap(BaseModule:render(Vars1, BlockMap, Context), OptDebugWrap)};
+        {error, {Loc, template_compiler_parser, S}} ->
+            {error, {Loc, template_compiler_parser, iolist_to_binary(S)}};
         {error, _} = Error ->
             Error
     end.
@@ -133,6 +135,8 @@ render_block(Block, Template0, Vars, Options, Context) when is_map(Vars) ->
                     end,
             % Render the specific block
             {ok, template_compiler_runtime_internal:block_call({<<>>,1,1}, Block, Vars1, BlockMap, Runtime, Context)};
+        {error, {Loc, template_compiler_parser, S}} ->
+            {error, {Loc, template_compiler_parser, iolist_to_binary(S)}};
         {error, _} = Error ->
             Error
     end.

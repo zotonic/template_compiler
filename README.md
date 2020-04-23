@@ -185,6 +185,21 @@ The `article` could have been passed as a proplist or map in the _Vars_ for the 
     }.
 
 
+Values and expressions
+----------------------
+
+Expressions can use different values types:
+
+ * Variables (see above)
+ * Number: `123`
+ * String: `"hello"` or `'hello'`
+ * Translatable string: `_"Hello"`
+ * List:  `[ 1, 2, 3 ]`
+ * Map, using Elixir syntax:  `%{ a: 1, b: 2 }`
+ * Erlang atom:  `\`a\``  (quoted using backticks)
+ * Tagged value list: `{mytag a=1 b=2}`, this translates to Erlang `{mytag, [{a,1}, {b,2}]}`
+
+
 Translatable texts
 ------------------
 
