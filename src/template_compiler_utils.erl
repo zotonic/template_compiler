@@ -89,11 +89,11 @@ file_mtime(File) ->
         {error, _} -> 0
     end.
 
--spec set_pos({filename:filename_all(), pos_integer(), pos_integer()}, term()) -> term().
+-spec set_pos({file:filename_all(), pos_integer(), pos_integer()}, term()) -> term().
 set_pos(SrcPos, Tree) ->
     erl_syntax:set_pos(Tree, pos(SrcPos)).
 
--spec pos({filename:filename_all(), pos_integer(), pos_integer()}) -> {pos_integer(), pos_integer()}.
+-spec pos({file:filename_all(), pos_integer(), pos_integer()}) -> {pos_integer(), pos_integer()}.
 pos({_File, Line, Column}) ->
     {Line, Column}.
 

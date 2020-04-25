@@ -147,7 +147,11 @@ Nonterminals
     ValueList
     OptArrayList
     ArrayList
-    
+
+    MapFieldList
+    MapFields
+    MapField
+
     OptionalPrefix
     OptionalAll
 
@@ -452,10 +456,18 @@ Args -> Args identifier equal E : '$1' ++ [{'$2', '$4'}].
 Value -> Value pipe Filter : {apply_filter, '$1', '$3'}.
 Value -> TermValue : '$1'.
 
+MapFields -> '$empty' : [].
+MapFields -> MapFieldList : '$1'.
+MapFieldList -> MapField : [ '$1' ].
+MapFieldList -> MapFieldList comma MapField : ['$3' | '$1'].
+MapField -> identifier colon E : {'$1', '$3'}.
+
+
 TermValue -> '(' E ')' : '$2'.
 TermValue -> Variable : {find_value, '$1'}.
 TermValue -> Literal : '$1'.
 TermValue -> hash AutoId : {auto_id, '$2'}.
+TermValue -> '%' open_curly MapFields close_curly : {map_value, '$3'}.
 TermValue -> open_curly identifier Args close_curly : {tuple_value, '$2', '$3'}.
 TermValue -> open_bracket OptArrayList close_bracket : {value_list, '$2'}.
 
