@@ -167,6 +167,12 @@ find_value(Name, Vars, _TplVars, _Context) when is_map(Vars) ->
         error ->
             undefined
     end;
+find_value(Name, [ V | _ ] = Vars, _TplVars, _Context) when is_binary(Name), is_atom(V) ->
+    try
+        Atom = binary_to_existing_atom(Name, utf8),
+        proplists:get_value(Atom, Vars)
+    catch _:_ -> undefined
+    end;
 find_value(Key, [{B,_}|_] = L, _TplVars, _Context) when is_list(B) ->
     proplists:get_value(z_convert:to_list(Key), L);
 find_value(Key, [{B,_}|_] = L, _TplVars, _Context) when is_binary(B) ->
