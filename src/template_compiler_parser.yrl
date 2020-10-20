@@ -331,7 +331,7 @@ OptionalAll -> all_keyword : all.
 OptionalAll -> '$empty' : normal.
 
 LibTag -> open_tag lib_keyword LibList Args close_tag : {lib, '$2', '$3', '$4'}.
-LibUrlTag -> open_tag lib_url_keyword LibList Args close_tag : {lib, '$2', '$3', '$4'}.
+LibUrlTag -> open_tag lib_url_keyword LibList Args close_tag : {lib_url, '$2', '$3', '$4'}.
 LibList -> string_literal : ['$1'].
 LibList -> LibList string_literal : '$1' ++ ['$2'].
 
