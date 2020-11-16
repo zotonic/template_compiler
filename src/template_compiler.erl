@@ -273,7 +273,7 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
             ContextVars = get_option(context_vars, Options),
             Tokens1 = maybe_drop_text(Tokens, Tokens),
             Tokens2 = expand_translations(Tokens1, Runtime, Context),
-            Module = module_name(Runtime, ContextVars, Tokens2),
+            Module = module_name(Runtime, Filename, ContextVars, Tokens2),
             case erlang:module_loaded(Module) of
                 true ->
                     {ok, Module};
@@ -321,9 +321,15 @@ translations(Filename) ->
 
 %%%% --------------------------------- Internal ----------------------------------
 
-module_name(Runtime, SpecialContextArgs, Tokens) ->
-    Tokens1 = remove_srcpos(Tokens),
-    TokenChecksum = crypto:hash(sha, term_to_binary({?COMPILER_VERSION, Runtime, SpecialContextArgs, Tokens1})),
+module_name(Runtime, Filename, SpecialContextArgs, Tokens) ->
+    Term = {
+        ?COMPILER_VERSION,
+        unicode:characters_to_binary(Filename),
+        Runtime,
+        SpecialContextArgs,
+        remove_srcpos(Tokens)
+    },
+    TokenChecksum = crypto:hash(sha, term_to_binary(Term)),
     Hex = z_string:to_lower(z_url:hex_encode(TokenChecksum)),
     binary_to_atom(iolist_to_binary(["tpl_",Hex]), 'utf8').
 
