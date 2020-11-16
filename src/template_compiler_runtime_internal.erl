@@ -175,8 +175,16 @@ block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
         template_compiler:render_result().
 include(SrcPos, Method, Template, Args, Runtime, ContextVars, IsContextVars, Vars, Context) ->
     Vars1 = lists:foldl(
-                fun({V,E}, Acc) ->
-                    Acc#{V => E}
+                fun
+                    ({'$cat', [Cat|_] = E}, Acc) when is_atom(Cat); is_binary(Cat); is_list(Cat) ->
+                        Acc#{'$id' => E};
+                    ({'$cat', E}, Acc) ->
+                        Acc#{
+                            'id' => E,
+                            '$cat' => E
+                        };
+                    ({V,E}, Acc) ->
+                        Acc#{V => E}
                 end,
                 Vars,
                 Args),
