@@ -685,7 +685,7 @@ include({_, SrcPos, _}, Method, Template, ArgsList, IsContextVars, #cs{runtime=R
 
 catinclude({_, SrcPos, _}, Method, Template, IdAst, ArgsList, IsContextVars, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
     {Ws1, TemplateAst} = template_compiler_expr:compile(Template, CState, Ws),
-    ArgsList1 = [ {erl_syntax:atom(id),IdAst} | ArgsList ],
+    ArgsList1 = [ {erl_syntax:atom('$cat'),IdAst} | ArgsList ],
     ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList1 ]),
     Ast = ?Q([
             "template_compiler_runtime_internal:include(",
