@@ -334,6 +334,8 @@ to_bool(Value, _Context) ->
 -spec to_list(Value :: term(), Context :: term()) -> list().
 to_list(undefined, _Context) ->
     [];
+to_list(<<>>, _Context) ->
+    [];
 to_list(Map, _Context) when is_map(Map) ->
     maps:to_list(Map);
 to_list({trans, Tr}, _Context) when is_list(Tr) ->
