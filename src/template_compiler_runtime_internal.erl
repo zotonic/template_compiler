@@ -177,14 +177,14 @@ include(SrcPos, Method, Template, Args, Runtime, ContextVars, IsContextVars, Var
     Vars1 = lists:foldl(
                 fun
                     ({'$cat', [Cat|_] = E}, Acc) when is_atom(Cat); is_binary(Cat); is_list(Cat) ->
-                        Acc#{'$id' => E};
+                        Acc#{ '$cat' => E };
                     ({'$cat', E}, Acc) ->
                         Acc#{
                             'id' => E,
                             '$cat' => E
                         };
                     ({V,E}, Acc) ->
-                        Acc#{V => E}
+                        Acc#{ V => E }
                 end,
                 Vars,
                 Args),
