@@ -189,6 +189,8 @@ find_value(Nr, Vars, _TplVars, _Context) when is_integer(Nr), is_list(Vars) ->
     try lists:nth(Nr, Vars)
     catch _:_ -> undefined
     end;
+find_value(SomeKey, [ {_, _} | _ ] = List, _TplVars, _Context) ->
+    proplists:get_value(SomeKey, List);
 find_value(IsoAtom, {trans, Tr}, _TplVars, _Context) when is_atom(IsoAtom) ->
     proplists:get_value(IsoAtom, Tr, <<>>);
 find_value(Iso, {trans, Tr}, _TplVars, _Context) when is_binary(Iso) ->
