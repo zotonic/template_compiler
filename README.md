@@ -1,7 +1,7 @@
 Template Compiler for Erlang / Elixir
 =====================================
 
-[![Build Status](https://travis-ci.org/zotonic/template_compiler.svg?branch=master)](https://travis-ci.org/zotonic/template_compiler)
+![Test](https://github.com/zotonic/template_compiler/workflows/Test/badge.svg)
 [![Join the chat at https://gitter.im/zotonic/zotonic](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/zotonic/zotonic?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 This is the template compiler used by [The Erlang Content Management Framework and CMS Zotonic](http://zotonic.com/).
