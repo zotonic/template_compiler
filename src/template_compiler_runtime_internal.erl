@@ -1,8 +1,8 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016 Marc Worrell
+%% @copyright 2016-2021 Marc Worrell
 %% @doc Callback routines for compiled templates.
 
-%% Copyright 2016 Marc Worrell
+%% Copyright 2016-2021 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -215,8 +215,16 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
             <<>>;
         {error, enoent} ->
             <<>>;
-        {error, _} =Error ->
-            lager:error("Error ~p", [Error]),
+        {error, Reason} when is_list(Reason); is_binary(Reason) ->
+            R1 = try
+                iolist_to_binary(Reason)
+            catch _:_ ->
+                Reason
+            end,
+            lager:error("Template render error: '~s' for template ~p", [R1, Template]),
+            <<>>;
+        {error, Reason} ->
+            lager:error("Template render error: ~p for template ~p", [Reason, Template]),
             <<>>
     end.
 
