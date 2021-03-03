@@ -163,7 +163,7 @@ handle_call({compile_done, Result, TplKey}, _From, State) ->
     end,
     {Waiters, State2} = split_waiters(TplKey, State1),
     lists:foreach(
-            fun(Waiter) ->
+            fun({_TplKey, Waiter}) ->
                 gen_server:reply(Waiter, Result)
             end,
             Waiters),
