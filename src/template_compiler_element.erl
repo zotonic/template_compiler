@@ -650,7 +650,6 @@ compile({cycle, {_, SrcPos, _} = TagSrc, Exprs}, CState, Ws) ->
                 {vars, erl_syntax:variable(CState#cs.vars_var)},
                 {caseast, erl_syntax:case_expr(ValueAst, ClauseAsts)}
             ]),
-    io:format("~n~n~p~n~n", [Ast]),
     compile({value, TagSrc, {ast, Ast}, []}, CState, Ws2#ws{is_forloop_var=true}).
 
 
