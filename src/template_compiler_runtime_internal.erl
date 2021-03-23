@@ -238,7 +238,7 @@ call(Module, Args, Vars, Context) ->
     end.
 
 
-%% @doc Echo the HTML escape value within <pre> tags.
+%% @doc Echo the HTML escape value within &lt;pre&gt; tags.
 -spec print(term()) -> iolist().
 print(Expr) ->
     V = io_lib:format("~p", [Expr]),
