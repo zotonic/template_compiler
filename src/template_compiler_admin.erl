@@ -83,7 +83,7 @@ compile_file(Filename, TplKey, Options, Context) ->
             Result = try
                         template_compiler:compile_file(Filename, Options, Context)
                      catch
-                        ?WITH_STACKTRACE(What, Error, Stack)
+                        What:Error:Stack ->
                             % io:format("Error compiling template ~p: ~p:~n~p at~n ~p~n",
                             %           [Filename, What, Error, Stack]),
                             lager:error("Error compiling template ~p: ~p:~n~p at~n ~p~n",

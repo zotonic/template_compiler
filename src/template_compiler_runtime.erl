@@ -403,8 +403,8 @@ trace_compile(_Module, Filename, Options, _Context) ->
     end,
     ok.
 
-%% @block Called when a template is rendered (could be from an include) - the return is
-%%        kept in a trace for displaying template extends recursion information.
+%% @doc Called when a template is rendered (could be from an include) - the return is
+%%      kept in a trace for displaying template extends recursion information.
 -spec trace_render(binary(), template_compiler:options(), term()) -> ok | {ok, iodata(), iodata()}.
 trace_render(Filename, Options, _Context) ->
     case proplists:get_value(trace_position, Options) of
@@ -417,7 +417,7 @@ trace_render(Filename, Options, _Context) ->
     end,
     ok.
 
-%% @block Called when a block function is called
+%% @doc Called when a block function is called
 -spec trace_block({binary(), integer(), integer()}, atom(), atom(), term()) -> ok | {ok, iodata(), iodata()}.
 trace_block(_SrcPos, _Name, _Module, _Context) ->
     ok.
