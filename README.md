@@ -197,6 +197,7 @@ Expressions can use different values types:
  * List:  `[ 1, 2, 3 ]`
  * Map, using Elixir syntax: `%{ a: 1, b: 2 }` where the keys will become binary strings
    equivalent to the Erlang map: `#{ <<"a">> => 1, <<"b">> => 2 }`
+ * Map, using strings as keys: `%{ "foaf:name":"Hello" }`
  * Erlang atom: <tt>&grave;a&grave;</tt> (quoted using backticks)
  * Tagged value list: `{mytag a=1 b=2}`, this translates to Erlang `{mytag, [{a,1}, {b,2}]}`
  * Unique generated id: `#foo` - an unique prefix is used for each template

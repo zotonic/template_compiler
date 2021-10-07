@@ -24,7 +24,6 @@
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
--include("template_compiler.hrl").
 -include("template_compiler_internal.hrl").
 
 -spec compile(element()|elements(), #cs{}, #ws{}) -> {#ws{}, erl_syntax:syntaxTree()}.

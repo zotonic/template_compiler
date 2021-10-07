@@ -24,7 +24,6 @@
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
--include("template_compiler.hrl").
 -include("template_compiler_internal.hrl").
 
 
@@ -342,4 +341,8 @@ mapfields_1([], _Cs, Ws, Acc) ->
 mapfields_1([{{identifier, _, Arg}, Expr}|Args], Cs, Ws, Acc) ->
     {Ws1, ExprAst} = compile(Expr, Cs, Ws),
     Ast = erl_syntax:map_field_assoc(erl_syntax:abstract(Arg), ExprAst),
+    mapfields_1(Args, Cs, Ws1, [Ast|Acc]);
+mapfields_1([{{string_literal, _, Text}, Expr}|Args], Cs, Ws, Acc) ->
+    {Ws1, ExprAst} = compile(Expr, Cs, Ws),
+    Ast = erl_syntax:map_field_assoc(erl_syntax:abstract(Text), ExprAst),
     mapfields_1(Args, Cs, Ws1, [Ast|Acc]).
