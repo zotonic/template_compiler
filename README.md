@@ -47,59 +47,63 @@ Templates are compiled to functions containinge entry point to all blocks.
 
 A template like:
 
-    Hello
-    {% block a %}this is block a{% endblock %}
-    World
-    {% block b %}this is block b{% endblock %}
+```dtl
+Hello
+{% block a %}this is block a{% endblock %}
+World
+{% block b %}this is block b{% endblock %}
+```
 
 Will be compiled to an Erlang module with the following structure:
 
-    -module(tpl_7bae8076a5771865123be7112468b79e9d78a640).
-    -export([
-        render/3,
-        render_block/4,
-        timestamp/0,
-        blocks/0,
-        module/0,
-        extends/0,
-        filename/0,
-        mtime/0,
-        is_autoid/0,
-        runtime/0
-    ]).
 
-    %% The main render function.
-    render(Args, Vars, Context) -> [ ... ].
+```erlang
+-module(tpl_7bae8076a5771865123be7112468b79e9d78a640).
+-export([
+    render/3,
+    render_block/4,
+    timestamp/0,
+    blocks/0,
+    module/0,
+    extends/0,
+    filename/0,
+    mtime/0,
+    is_autoid/0,
+    runtime/0
+]).
 
-    %% Render functions per block, the 'Blocks' is a block trace used internally.
-    render_block(a, Vars, Blocks, Context) -> [ ... ];
-    render_block(b, Vars, Blocks, Context) -> [ ... ];
-    render_block(_, _Vars, _Blocks, _Context) -> <<>>.
+%% The main render function.
+render(Args, BlockMap, Context) -> [ ... ].
 
-    %% Timestamp on module compilation (os:timestamp/0)
-    timestamp() -> {1574,685843,340548}.
+%% Render functions per block, the 'Blocks' is a block trace used internally.
+render_block(a, Vars, Blocks, Context) -> [ ... ];
+render_block(b, Vars, Blocks, Context) -> [ ... ];
+render_block(_, _Vars, _Blocks, _Context) -> <<>>.
 
-    %% Block defined in this template.
-    blocks() -> [ a, b ].
+%% Timestamp on module compilation (os:timestamp/0)
+timestamp() -> {1574,685843,340548}.
 
-    %% The module name
-    module() -> tpl_7bae8076a5771865123be7112468b79e9d78a640.
+%% Block defined in this template.
+blocks() -> [ a, b ].
 
-    %% The template that this template extends on.
-    extends() -> undefined.
+%% The module name
+module() -> tpl_7bae8076a5771865123be7112468b79e9d78a640.
 
-    %% The filename of this template
-    filename -> <<"foor/bar/a.tpl">>.
+%% The template that this template extends on.
+extends() -> undefined.
 
-    %% The modification time of the template file on compilation
-    mtime() - {{2019,1,31},{11,51,49}}.
+%% The filename of this template
+filename -> <<"foor/bar/a.tpl">>.
 
-    %% Flag if the autoid ("#id") construct is used in this template.
-    is_autoid() -> false.
+%% The modification time of the template file on compilation
+mtime() - {{2019,1,31},{11,51,49}}.
 
-    %% Runtime module this template is linked against.
-    runtime() -> template_compiler_runtime.
+%% Flag if the autoid ("#id") construct is used in this template.
+is_autoid() -> false.
 
+%% Runtime module this template is linked against.
+runtime() -> template_compiler_runtime.
+```
 
 The module includes debug information so that stack traces show the correct template file and line number.
 
@@ -116,10 +120,12 @@ How to use
 
 Render a template to an iolist:
 
-    Vars = #{ <<"a">> => 1 },                 % Template variables, use a map
-    Options = [],                       % Render and compilation options
-    Context = your_request_context,     % Context passed to the runtime module and filters
-    {ok, IOList} = template_compiler:render("hello.tpl", Vars, Options, Context).
+```erlang
+Vars = #{ <<"a">> => 1 },                 % Template variables, use a map
+Options = [],                       % Render and compilation options
+Context = your_request_context,     % Context passed to the runtime module and filters
+{ok, IOList} = template_compiler:render("hello.tpl", Vars, Options, Context).
+```
 
 The `render/4` function looks up the template, ensures it is compiled, and then calls the compiled render
 function of the template or the templates it extends (which are also compiled etc.).
@@ -127,7 +133,9 @@ function of the template or the templates it extends (which are also compiled et
 
 Use `compile_file/3` and `compile_binary/4` to compile a template file or in-memory binary to a module:
 
-    {ok, Module} = template_compiler:compile_binary(<<"...">>, Filename, Options, Context).
+```erlang
+{ok, Module} = template_compiler:compile_binary(<<"...">>, Filename, Options, Context).
+```
 
 The `Filename` is used to reference the compiled binary.
 
@@ -161,29 +169,36 @@ Variables
 
 Variables are surrounded by `{{` and `}}` (double braces):
 
-    Hello, I’m `{{ first_name }} {{ last_name }}`.
+```dtl
+Hello, I’m `{{ first_name }} {{ last_name }}`.
+```
 
 When rendering this template, you need to pass the variables to it. If you pass “James” for
 `first_name` and “Bond” for `last_name`, the template renders to:
 
-    Hello, I’m James Bond.
+```
+Hello, I’m James Bond.
+```
 
 Instead of strings, variables can also be objects that contain attributes. To access the attributes, use dot notation:
 
-    {{ article.title }} was created by {{ article.author.last_name }}
+```dtl
+{{ article.title }} was created by {{ article.author.last_name }}
+```
 
 The `article` could have been passed as a proplist or map in the _Vars_ for the template render function:
 
-    #{
-        <<"article">> => #{
-            <<"title">> => <<"My title"/utf8>>,
-            <<"author">> => #{
-                <<"id">> => 1234,
-                <<"last_name">> => <<"Janssen">>
-            }
+```erlang
+#{
+    <<"article">> => #{
+        <<"title">> => <<"My title"/utf8>>,
+        <<"author">> => #{
+            <<"id">> => 1234,
+            <<"last_name">> => <<"Janssen">>
         }
-    }.
-
+    }
+}.
+```
 
 Values and expressions
 ----------------------
@@ -210,15 +225,21 @@ There are three ways translatable texts can be used.
 
 As a tag embedded in the text of the template:
 
-    {_ This text is translatable _}
+```dtl
+{_ This text is translatable _}
+```
 
 As double quoted string prefixed with a '_', where you could also use a string:
 
-    {% include "_a.tpl" title=_"Translatable text" %}
+```dtl
+{% include "_a.tpl" title=_"Translatable text" %}
+```
 
 As a text with arguments:
 
-    {% trans "Hello {foo}, Bye" foo=author.name_full %}
+```dtl
+{% trans "Hello {foo}, Bye" foo=author.name_full %}
+```
 
 Note: to show a `{` or `}` in a `trans` tag text then double it to `{{`.
 
@@ -229,14 +250,17 @@ The `trans` tag is compiled to code so very efficient.
 
 To get a list of all translatable texts in a template use:
 
-    template_compiler:translations(TemplateFilename).
+```erlang
+template_compiler:translations(TemplateFilename).
+```
 
 This returns a list of all strings, which could be used to generate a .po file:
 
-    [
-        {<<"Hello {foo}, Bye">>, [], {<<"foo/bar.tpl">>, 1234, 5}}
-    ].
-
+```erlang
+[
+    {<<"Hello {foo}, Bye">>, [], {<<"foo/bar.tpl">>, 1234, 5}}
+].
+```
 
 Template include / extends
 --------------------------
@@ -247,7 +271,9 @@ Templates can be combined to re-use parts and keep everything manageable.
 
 First a template can be included in another template:
 
-    Hello {% include "_name.tpl" id=foobar %}
+```dtl
+Hello {% include "_name.tpl" id=foobar %}
+```
 
 The template (`_name.tpl` in this case) will be included at the called spot.
 All variables known at the spot of the include will be passed, with the addition of
@@ -262,12 +288,16 @@ You can also have a _base_ template which can be used as the basis of other temp
 The base template should define some _blocks_ that can be changed in the template
 that extends the base template:
 
-    {% extends "base.tpl" %}
-    {% block name %}Piet!{% endblock %}
+```dtl
+{% extends "base.tpl" %}
+{% block name %}Piet!{% endblock %}
+```
 
 Where the `base.tpl` could be:
 
-    Hello {% block name %}...{% endblock %} world.
+```dtl
+Hello {% block name %}...{% endblock %} world.
+```
 
 The `{% extends "..." %}` tag _must_ be the first tag in the template. Also any text
 outside the block tags will be dropped. So be sure to surround replacable parts in your
@@ -276,8 +306,10 @@ base templates with block tags.
 There is a variation on `extends` where the template extends on a same-named template
 of a lower priority. This is heavily used in Zotonic to extend templates in other modules.
 
-    {% overrules %}
-    {% block name %}...{% endblock %}
+```dtl
+{% overrules %}
+{% block name %}...{% endblock %}
+```
 
 The `overrules` is used to make it explicit that this template overrules (or extends)
 another template with the same name.
@@ -287,23 +319,27 @@ another template with the same name.
 This defines a named portion of a template that can be replaced in a template that extends
 (or overrules) this template:
 
-    Some text
-    {% block myname %}
-        Some text in the block that might be replaced
-    {% endblock %}
-    And text after the block
+```dtl
+Some text
+{% block myname %}
+    Some text in the block that might be replaced
+{% endblock %}
+And text after the block
+```
 
 Blocks can be nested:
 
-    Some text
-    {% block myname %}
-        Some text in the block that might be replaced
-        {% block nestedblock %}
-            Text in the nested block
-        {% endblock %}
-        And more text in the outer block
+```dtl
+Some text
+{% block myname %}
+    Some text in the block that might be replaced
+    {% block nestedblock %}
+        Text in the nested block
     {% endblock %}
-    And text after the block
+    And more text in the outer block
+{% endblock %}
+And text after the block
+```
 
 The blocks are compiled to separate functions. The template compiler uses the template
 extends chain to figure out which block-function to render from which extending template.
@@ -315,29 +351,36 @@ the extended (or overruled) template.
 
 If base.tpl is like:
 
-    this is {% block a %}the base{% endblock %} template
+```dtl
+this is {% block a %}the base{% endblock %} template
+```
 
 And a.tpl is like:
 
-    {% extends "base.tpl" %}
-    {% block a %}hello {% inherit %} world{% endblock %}
+```dtl
+{% extends "base.tpl" %}
+{% block a %}hello {% inherit %} world{% endblock %}
+```
 
 Then `a.tpl` renders like:
 
-    this is hello the base world template
-
+```
+this is hello the base world template
+```
 
 #### If tag
 
 Conditionally show or hide parts of a template:
 
-    {% if somevar %}
-        True
-    {% elif othervar %}
-        Other var
-    {% else %}
-        False
-    {% endif %}
+```dtl
+{% if somevar %}
+    True
+{% elif othervar %}
+    Other var
+{% else %}
+    False
+{% endif %}
+```
 
 The `elif` can also be written as `elseif`
 
@@ -345,9 +388,11 @@ The `elif` can also be written as `elseif`
 
 Define a variable to be used within an enclosed part of the template:
 
-    {% with someexpr as v %}
-        Here v can be used as any other variable
-    {% endwith %}
+```dtl
+{% with someexpr as v %}
+    Here v can be used as any other variable
+{% endwith %}
+```
 
 This is useful for using the result of a complicated expression multiple times
 or if a `forloop` (see below) iterator needs to be used in overruled blocks or
@@ -357,25 +402,28 @@ included templates.
 
 Loop over a list of values, printing a comma separated list:
 
-    {% for k in [ 1, 2, 3, 4 ] %}
-        {{ k }}{% if nor forloop.last %},{% endif %}
-    {% endfor %}
-
+```dtl
+{% for k in [ 1, 2, 3, 4 ] %}
+    {{ k }}{% if nor forloop.last %},{% endif %}
+{% endfor %}
+```
 
 Loop over a list of tuples (eg. `[ {a, 1}, {b, 2} ]`):
 
-    <table>
-    {% for key, value in someproplist %}
-        <tr>
-            <th>{{ key|escape }}</th>
-            <td>{{ value|escape }}</td>
-        </tr>
-    {% empty %}
-        <tr>
-            <td>{_ Sorry, no values _}</td>
-        </tr>
-    {% endfor %}
-    </table>
+```dtl
+<table>
+{% for key, value in someproplist %}
+    <tr>
+        <th>{{ key|escape }}</th>
+        <td>{{ value|escape }}</td>
+    </tr>
+{% empty %}
+    <tr>
+        <td>{_ Sorry, no values _}</td>
+    </tr>
+{% endfor %}
+</table>
+```
 
 Within a forloop there is an iterator called `forloop` with the following
 properties:
@@ -402,9 +450,11 @@ generated.
 
 Everything surrounded by the tag is excluded:
 
-    {% comment %}
-        Some explanation that will not be part of the compiled template
-    {% endcomment %}
+```dtl
+{% comment %}
+    Some explanation that will not be part of the compiled template
+{% endcomment %}
+```
 
 Useful to disable parts of a template or add some explanatory texts.
 
@@ -413,28 +463,34 @@ Useful to disable parts of a template or add some explanatory texts.
 
 To echo some part without rendering it:
 
-    {% raw %}
-        {{ hello }} {% this is }} %} echo'd as-is
-    {% endraw %}
-
+```dtl
+{% raw %}
+    {{ hello }} {% this is }} %} echo'd as-is
+{% endraw %}
+```
 
 #### Spaceless tag
 
 Remove spaces between HTML tags:
 
-    a-{% spaceless %} <a> x<span>xxx </span> </a> {% endspaceless %}-b
+```dtl
+a-{% spaceless %} <a> x<span>xxx </span> </a> {% endspaceless %}-b
+```
 
 Renders as:
 
-    a-<a> x<span>xxx </span></a>-b
-
+```
+a-<a> x<span>xxx </span></a>-b
+```
 
 #### Print tag
 
 Print a value in `<pre>` tags, used to inspect variables or dump some value
 when you are still writing the template:
 
-    {% print somexpr %}
+```dtl
+{% print somexpr %}
+```
 
 The expression value will be printed using `io_lib:format("~p", [ SomExpr ])`, then
 escaped and surrounded with `<pre>...</pre>`.
