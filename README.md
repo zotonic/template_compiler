@@ -173,7 +173,7 @@ Variables
 Variables are surrounded by `{{` and `}}` (double braces):
 
 ```django
-Hello, I’m `{{ first_name }} {{ last_name }}`.
+Hello, I’m {{ first_name }} {{ last_name }}.
 ```
 
 When rendering this template, you need to pass the variables to it. If you pass “James” for
