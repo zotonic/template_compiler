@@ -16,16 +16,19 @@ To test, run: `make test`
 
 To use in your project with rebar3, use the [Hex package](https://hex.pm/packages/template_compiler):
 
-    {deps, [
-        template_compiler
-    ]}.
+```erlang
+{deps, [
+    template_compiler
+]}.
+```
 
 Or directly from git:
 
-    {deps, [
-        {template_compiler, {git, "https://github.com/zotonic/template_compiler", {branch, "master"}}}.
-    ]}.
-
+```erlang
+{deps, [
+    {template_compiler, {git, "https://github.com/zotonic/template_compiler", {branch, "master"}}}.
+]}.
+```
 
 Template Language
 -----------------
@@ -47,7 +50,7 @@ Templates are compiled to functions containinge entry point to all blocks.
 
 A template like:
 
-```dtl
+```django
 Hello
 {% block a %}this is block a{% endblock %}
 World
@@ -169,7 +172,7 @@ Variables
 
 Variables are surrounded by `{{` and `}}` (double braces):
 
-```dtl
+```django
 Hello, I’m `{{ first_name }} {{ last_name }}`.
 ```
 
@@ -182,7 +185,7 @@ Hello, I’m James Bond.
 
 Instead of strings, variables can also be objects that contain attributes. To access the attributes, use dot notation:
 
-```dtl
+```django
 {{ article.title }} was created by {{ article.author.last_name }}
 ```
 
@@ -225,19 +228,19 @@ There are three ways translatable texts can be used.
 
 As a tag embedded in the text of the template:
 
-```dtl
+```django
 {_ This text is translatable _}
 ```
 
 As double quoted string prefixed with a '_', where you could also use a string:
 
-```dtl
+```django
 {% include "_a.tpl" title=_"Translatable text" %}
 ```
 
 As a text with arguments:
 
-```dtl
+```django
 {% trans "Hello {foo}, Bye" foo=author.name_full %}
 ```
 
@@ -271,7 +274,7 @@ Templates can be combined to re-use parts and keep everything manageable.
 
 First a template can be included in another template:
 
-```dtl
+```django
 Hello {% include "_name.tpl" id=foobar %}
 ```
 
@@ -288,14 +291,14 @@ You can also have a _base_ template which can be used as the basis of other temp
 The base template should define some _blocks_ that can be changed in the template
 that extends the base template:
 
-```dtl
+```django
 {% extends "base.tpl" %}
 {% block name %}Piet!{% endblock %}
 ```
 
 Where the `base.tpl` could be:
 
-```dtl
+```django
 Hello {% block name %}...{% endblock %} world.
 ```
 
@@ -306,7 +309,7 @@ base templates with block tags.
 There is a variation on `extends` where the template extends on a same-named template
 of a lower priority. This is heavily used in Zotonic to extend templates in other modules.
 
-```dtl
+```django
 {% overrules %}
 {% block name %}...{% endblock %}
 ```
@@ -319,7 +322,7 @@ another template with the same name.
 This defines a named portion of a template that can be replaced in a template that extends
 (or overrules) this template:
 
-```dtl
+```django
 Some text
 {% block myname %}
     Some text in the block that might be replaced
@@ -329,7 +332,7 @@ And text after the block
 
 Blocks can be nested:
 
-```dtl
+```django
 Some text
 {% block myname %}
     Some text in the block that might be replaced
@@ -351,13 +354,13 @@ the extended (or overruled) template.
 
 If base.tpl is like:
 
-```dtl
+```django
 this is {% block a %}the base{% endblock %} template
 ```
 
 And a.tpl is like:
 
-```dtl
+```django
 {% extends "base.tpl" %}
 {% block a %}hello {% inherit %} world{% endblock %}
 ```
@@ -372,7 +375,7 @@ this is hello the base world template
 
 Conditionally show or hide parts of a template:
 
-```dtl
+```django
 {% if somevar %}
     True
 {% elif othervar %}
@@ -388,7 +391,7 @@ The `elif` can also be written as `elseif`
 
 Define a variable to be used within an enclosed part of the template:
 
-```dtl
+```django
 {% with someexpr as v %}
     Here v can be used as any other variable
 {% endwith %}
@@ -402,7 +405,7 @@ included templates.
 
 Loop over a list of values, printing a comma separated list:
 
-```dtl
+```django
 {% for k in [ 1, 2, 3, 4 ] %}
     {{ k }}{% if nor forloop.last %},{% endif %}
 {% endfor %}
@@ -410,7 +413,7 @@ Loop over a list of values, printing a comma separated list:
 
 Loop over a list of tuples (eg. `[ {a, 1}, {b, 2} ]`):
 
-```dtl
+```django
 <table>
 {% for key, value in someproplist %}
     <tr>
@@ -450,7 +453,7 @@ generated.
 
 Everything surrounded by the tag is excluded:
 
-```dtl
+```django
 {% comment %}
     Some explanation that will not be part of the compiled template
 {% endcomment %}
@@ -463,7 +466,7 @@ Useful to disable parts of a template or add some explanatory texts.
 
 To echo some part without rendering it:
 
-```dtl
+```django
 {% raw %}
     {{ hello }} {% this is }} %} echo'd as-is
 {% endraw %}
@@ -473,13 +476,13 @@ To echo some part without rendering it:
 
 Remove spaces between HTML tags:
 
-```dtl
+```django
 a-{% spaceless %} <a> x<span>xxx </span> </a> {% endspaceless %}-b
 ```
 
 Renders as:
 
-```
+```html
 a-<a> x<span>xxx </span></a>-b
 ```
 
@@ -488,7 +491,7 @@ a-<a> x<span>xxx </span></a>-b
 Print a value in `<pre>` tags, used to inspect variables or dump some value
 when you are still writing the template:
 
-```dtl
+```django
 {% print somexpr %}
 ```
 
