@@ -12,7 +12,13 @@
       {template_dir, {template_compiler, "templates"}}
   ]},
   {modules, []},
-  {maintainers, ["Zotonic Team"]},
-  {licenses, ["Apache 2.0"]},
-  {links, [{"GitHub", "https://github.com/zotonic/template_compiler"}]}
+  {excluded_files, [
+      "src/template_compiler_parser.erl"
+  ]},
+  {doc, "doc"},
+  {licenses, ["Apache-2.0"]},
+  {links, [
+    {"GitHub", "https://github.com/zotonic/template_compiler"},
+    {"Zotonic", "http://zotonic.com"}
+  ]}
  ]}.
