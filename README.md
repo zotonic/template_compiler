@@ -219,7 +219,8 @@ Expressions can use different values types:
  * Erlang atom: <tt>&grave;a&grave;</tt> (quoted using backticks)
  * Tagged value list: `{mytag a=1 b=2}`, this translates to Erlang `{mytag, [{a,1}, {b,2}]}`
  * Unique generated id: `#foo` - an unique prefix is used for each template
-
+ * Model calls `m.rsc.foo`
+ * Model calls with an optional argument `m.rsc.foo!bar`
 
 Translatable texts
 ------------------
