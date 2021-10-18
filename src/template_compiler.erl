@@ -1,8 +1,8 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016 Marc Worrell
+%% @copyright 2016-2021 Marc Worrell
 %% @doc Main template compiler entry points.
 
-%% Copyright 2016 Marc Worrell
+%% Copyright 2016-2021 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -53,6 +53,9 @@
 -type template_key() :: {ContextName::term(), Runtime::atom(), template()}.
 -type render_result() :: binary() | string() | term() | list(render_result()).
 
+-type model_return() :: {ok, {term(), list()}}
+                      | {error, term()}.
+
 -type builtin_tag() :: image
                      | image_url
                      | image_data_url
@@ -77,7 +80,9 @@
     template_file/0,
     template_key/0,
     builtin_tag/0,
-    translation_message/0
+    translation_message/0,
+    render_result/0,
+    model_return/0
 ]).
 
 

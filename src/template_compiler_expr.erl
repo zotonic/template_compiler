@@ -137,23 +137,33 @@ compile({apply_filter, Expr, {filter, {identifier, SrcPos, Filter}, FilterArgs}}
                          erl_syntax:atom(FilterName),
                          Args)),
     {Ws2, Ast};
-compile({model, [{identifier, SrcPos, Model} | Path ], OptPayload}, #cs{runtime=Runtime} = CState, Ws) ->
+compile({model, [{identifier, SrcPos, Model} | Path ], OptPayload}, #cs{runtime=Runtime, vars_var=Vars} = CState, Ws) ->
     {Ws1, PathAsts} = value_lookup_asts(Path, CState, Ws, []),
     {Ws2, PayloadAst} = case OptPayload of
         none -> {Ws1, erl_syntax:abstract(undefined)};
         Expr -> compile(Expr, CState, Ws1)
     end,
+    {Ws3, V1} = template_compiler_utils:var(Ws2),
+    {Ws4, V2} = template_compiler_utils:var(Ws3),
     Ast = merl:qquote(
             template_compiler_utils:pos(SrcPos),
-            "_@runtime:model_call(_@model, _@path, _@payload, _@context)",
+            "case _@runtime:model_call(_@model, _@path, _@payload, _@context) of "
+            "  {ok, {_@v1, []}} -> _@v1;"
+            "  {ok, {_@v1, _@v2}} when is_list(_@v2) -> "
+            "       _@runtime:find_nested_value(_@v1, _@v2, _@vars, _@context); "
+            "  {error, _} -> undefined "
+            "end",
             [
                 {model, erl_syntax:atom(binary_to_atom(Model, 'utf8'))},
                 {path, erl_syntax:list(PathAsts)},
                 {payload, PayloadAst},
+                {v1, erl_syntax:variable(V1)},
+                {v2, erl_syntax:variable(V2)},
+                {vars, erl_syntax:variable(Vars)},
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {runtime, erl_syntax:atom(Runtime)}
             ]),
-    {Ws2, Ast}.
+    {Ws4, Ast}.
 
 
 find_value_lookup([{identifier, SrcPos, <<"now">>}], _CState, Ws) ->

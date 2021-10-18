@@ -66,6 +66,7 @@
 -callback get_translations(Text :: binary(), Context :: term()) -> binary() | {trans, [{atom(), binary()}]}.
 -callback lookup_translation({trans, list({atom(), binary()})}, TplVars :: map(), Context :: term()) -> binary().
 
+-callback model_call(Model::atom(), Path::list(), Payload::term(), Context::term()) -> template_compiler:model_return().
 -callback custom_tag(Module::atom(), Args::list(), TplVars::map(), Context::term()) -> template_compiler:render_result().
 -callback builtin_tag(template_compiler:builtin_tag(), term(), Args::list(), TplVars::map(), Context::term()) -> template_compiler:render_result().
 -callback cache_tag(Seconds::integer(), Name::binary(), Args::list(), function(), TplVars::map(), Context::term()) -> template_compiler:render_result().
@@ -289,9 +290,9 @@ lookup_translation({trans, Tr}, TplVars, _Context) when is_map(TplVars) ->
     end.
 
 %% @doc A model call with optional payload. Compiled from m.model.path!payload
--spec model_call(Model::atom(), Path::list(), Payload::term(), Context::term()) -> template_compiler:render_result().
+-spec model_call(Model::atom(), Path::list(), Payload::term(), Context::term()) -> template_compiler:model_return().
 model_call(Model, Path, Payload, _Context) ->
-    io_lib:format("model:~p ~p :: ~p", [ Model, Path, Payload ]).
+    {ok, {io_lib:format("model:~p ~p :: ~p", [ Model, Path, Payload ]), []}}.
 
 %% @doc Render a custom tag (Zotonic scomp) - this can be changed to more complex runtime lookups.
 -spec custom_tag(Tag::atom(), Args::list(), Vars::map(), Context::term()) -> template_compiler:render_result().
