@@ -111,7 +111,7 @@ expr_map(_Config) ->
 
 expr_model_call(_Config) ->
     {ok, Bin1} = template_compiler:render("expr_model_call.tpl", #{}, [], undefined),
-    <<"model:foo [<<\"bar\">>,<<\"baz\">>,3] ! 4">> = iolist_to_binary(Bin1).
+    <<"model:foo [<<\"bar\">>,<<\"baz\">>,3] :: 4">> = iolist_to_binary(Bin1).
 
 
 test_data_dir(Config) ->
