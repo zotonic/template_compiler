@@ -460,6 +460,7 @@ MapFields -> '$empty' : [].
 MapFields -> MapFieldList : '$1'.
 MapFieldList -> MapField : [ '$1' ].
 MapFieldList -> MapFieldList comma MapField : ['$3' | '$1'].
+MapFieldList -> MapFieldList MapField : ['$2' | '$1'].
 MapField -> identifier colon E : {'$1', '$3'}.
 MapField -> string_literal colon E : {'$1', '$3'}.
 

@@ -104,7 +104,9 @@ expr_map(_Config) ->
     {ok, Bin3} = template_compiler:render("expr_map_3.tpl", #{ <<"c">> => 2 }, [], undefined),
     <<"X<pre>#{&lt;&lt;&quot;a&quot;&gt;&gt; =&gt; 1,&lt;&lt;&quot;b&quot;&gt;&gt; =&gt; 4}</pre>Y">> = iolist_to_binary(Bin3),
     {ok, Bin4} = template_compiler:render("expr_map_4.tpl", #{}, [], undefined),
-    <<"1">> = iolist_to_binary(Bin4).
+    <<"1">> = iolist_to_binary(Bin4),
+    {ok, Bin5} = template_compiler:render("expr_map_5.tpl", #{}, [], undefined),
+    <<"1">> = iolist_to_binary(Bin5).
 
 test_data_dir(Config) ->
     filename:join([
