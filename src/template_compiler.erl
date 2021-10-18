@@ -346,7 +346,7 @@ compile_forms(Filename, Forms) ->
             [ok, Module, Bin | _Info] = tuple_to_list(Compiled),
             code:purge(Module),
             case code:load_binary(Module, atom_to_list(Module) ++ ".erl", Bin) of
-                {module, Module} ->
+                {module, _Module} ->
                     {ok, Module};
                 Error ->
                     lager:error("Error loading compiling forms for ~p: ~p",

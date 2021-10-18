@@ -67,9 +67,9 @@ scan(SourceRef, Template) when is_binary(Template) ->
 
 
 identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc}) 
-  when PrevToken == open_tag; 
-       PrevToken == all_keyword;
-       PrevToken == optional_keyword ->
+  when PrevToken =:= open_tag; 
+       PrevToken =:= all_keyword;
+       PrevToken =:= optional_keyword ->
     %% the last two guards really ought to be for it's own fun, 
     %% since they only apply for [cat]include (the last one only for include)
 
@@ -87,7 +87,8 @@ identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc})
         <<"with">>, <<"endwith">>, <<"all">>,
         <<"lib">>, <<"lib_url">>,
         <<"cache">>, <<"endcache">>, <<"filter">>, <<"endfilter">>, <<"javascript">>,
-        <<"endjavascript">>, <<"optional">>, <<"trans">>
+        <<"endjavascript">>, <<"optional">>, <<"trans">>,
+        <<"m">>
     ],
     Type = case lists:member(String, Keywords) of
         true -> 
@@ -99,7 +100,7 @@ identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc})
             identifier
     end,
     {Type, [{Type, Pos, String}|Acc]};
-identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc}) when PrevToken == pipe ->
+identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc}) when PrevToken =:= pipe ->
     %% Accept any filter function, though translate 'not', 'and' and 'or' as they are special keywords
     ReservedErlang = [
         <<"not">>, <<"and">>, <<"or">>
@@ -109,11 +110,24 @@ identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc}) when PrevToke
         _ ->    String
     end,
     {identifier, [{identifier, Pos, NewFilter}|Acc]};
-identifier_to_keyword({identifier, Pos, String}, {_PrevToken, Acc}) ->
+identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc}) when PrevToken =:= dot ->
     %% After the first keyword of a tag we accept a limited set of keywords
     Keywords = [
         <<"in">>, <<"not">>, <<"or">>, <<"and">>, <<"xor">>, <<"firstof">>,
         <<"regroup">>, <<"templatetag">>, <<"with">>, <<"as">>
+    ], 
+    Type = case lists:member(String, Keywords) of
+        true -> list_to_atom(binary_to_list(String) ++ "_keyword");
+        _ ->    identifier
+    end,
+    {Type, [{Type, Pos, String}|Acc]};
+identifier_to_keyword({identifier, Pos, String}, {_PrevToken, Acc}) ->
+    %% After the first keyword of a tag we accept a limited set of keywords
+    %% At the start of an expression the 'm' is a special keyword
+    Keywords = [
+        <<"in">>, <<"not">>, <<"or">>, <<"and">>, <<"xor">>, <<"firstof">>,
+        <<"regroup">>, <<"templatetag">>, <<"with">>, <<"as">>,
+        <<"m">>
     ], 
     Type = case lists:member(String, Keywords) of
         true -> list_to_atom(binary_to_list(String) ++ "_keyword");
@@ -331,6 +345,9 @@ scan(<<"}}-->", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, <<"}}-->">>})
 scan(<<"}}", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, <<"}}">>}) ->
     scan(T, [{close_var, {SourceRef, Row, Column}, <<"}}">>} | Scanned], {SourceRef, Row, Column + 2}, in_text);
 
+scan(<<"%{", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
+    scan(T, [{open_map, {SourceRef, Row, Column}, <<"{">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
+
 % Expression operators
 scan(<<"==", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
     scan(T, [{'==', {SourceRef, Row, Column}, <<"==">>} | Scanned], {SourceRef, Row, Column + 2}, {in_code, Closer});
@@ -384,6 +401,9 @@ scan(<<")", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
     scan(T, [{')', {SourceRef, Row, Column}, <<")">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
 
 % Other
+scan(<<"::", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
+    scan(T, [{colons, {SourceRef, Row, Column}, <<",">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
+
 scan(<<",", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
     scan(T, [{comma, {SourceRef, Row, Column}, <<",">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
 
@@ -436,7 +456,7 @@ scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_code, Closer})
         digit ->
             scan(T, [{number_literal, {SourceRef, Row, Column}, <<H/utf8>>} | Scanned], {SourceRef, Row, Column + 1}, {in_number, Closer});
         _ ->
-            {error, io_lib:format("Illegal character ~s:~p column ~p", [SourceRef, Row, Column])}
+            {error, iolist_to_binary(io_lib:format("Illegal character ~s:~p column ~p", [SourceRef, Row, Column]))}
     end;
 
 scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_number, Closer}) ->
@@ -444,7 +464,7 @@ scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_number, Closer
         digit ->
             scan(T, append_char(Scanned, H), {SourceRef, Row, Column + 1}, {in_number, Closer});
         _ ->
-            {error, io_lib:format("Illegal character ~s:~p column ~p", [SourceRef, Row, Column])}
+            {error, iolist_to_binary(io_lib:format("Illegal character ~s:~p column ~p", [SourceRef, Row, Column]))}
     end;
 
 scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_identifier, Closer}) ->
@@ -454,7 +474,7 @@ scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_identifier, Cl
         digit ->
             scan(T, append_char(Scanned, H), {SourceRef, Row, Column + 1}, {in_identifier, Closer});
         _ ->
-            {error, io_lib:format("Illegal character ~s:~p column ~p", [SourceRef, Row, Column])}
+            {error, iolist_to_binary(io_lib:format("Illegal character ~s:~p column ~p", [SourceRef, Row, Column]))}
     end.
 
 % scan(_X, Scanned, SRC, In) ->

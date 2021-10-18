@@ -23,6 +23,7 @@ groups() ->
         ,expr_nested
         ,expr_autoid
         ,expr_map
+        ,expr_model_call
         ]}].
 
 init_per_suite(Config) ->
@@ -107,6 +108,11 @@ expr_map(_Config) ->
     <<"1">> = iolist_to_binary(Bin4),
     {ok, Bin5} = template_compiler:render("expr_map_5.tpl", #{}, [], undefined),
     <<"1">> = iolist_to_binary(Bin5).
+
+expr_model_call(_Config) ->
+    {ok, Bin1} = template_compiler:render("expr_model_call.tpl", #{}, [], undefined),
+    <<"model:foo [<<\"bar\">>,<<\"baz\">>,3] :: 4">> = iolist_to_binary(Bin1).
+
 
 test_data_dir(Config) ->
     filename:join([
