@@ -233,6 +233,7 @@ Terminals
     with_keyword
     open_curly
     close_curly
+    open_map
     open_bracket
     close_bracket
     open_trans
@@ -475,7 +476,7 @@ TermValue -> Variable : {find_value, '$1'}.
 TermValue -> Literal : '$1'.
 TermValue -> ModelCall : '$1'.
 TermValue -> hash AutoId : {auto_id, '$2'}.
-TermValue -> '%' open_curly MapFields close_curly : {map_value, '$3'}.
+TermValue -> open_map MapFields close_curly : {map_value, '$2'}.
 TermValue -> open_curly identifier Args close_curly : {tuple_value, '$2', '$3'}.
 TermValue -> open_bracket OptArrayList close_bracket : {value_list, '$2'}.
 
