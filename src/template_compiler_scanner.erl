@@ -398,8 +398,8 @@ scan(<<")", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
     scan(T, [{')', {SourceRef, Row, Column}, <<")">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
 
 % Other
-scan(<<"!", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
-    scan(T, [{'!', {SourceRef, Row, Column}, <<",">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
+scan(<<"::", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
+    scan(T, [{colons, {SourceRef, Row, Column}, <<",">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
 
 scan(<<",", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
     scan(T, [{comma, {SourceRef, Row, Column}, <<",">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});

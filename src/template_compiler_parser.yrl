@@ -177,6 +177,7 @@ Terminals
     close_var
     comment_keyword
     colon
+    colons
     comma
     cycle_keyword
     dot
@@ -246,8 +247,7 @@ Terminals
     '++' '--'
     '+' '-'
     '*' '/' '%'
-    '(' ')'
-    '!'.
+    '(' ')'.
 
 Rootsymbol
     Template.
@@ -484,7 +484,7 @@ AutoId -> identifier : '$1'.
 
 ModelCall -> m_keyword dot Variable OptModelArg : {model, '$3', '$4'}.
 OptModelArg -> '$empty' : none.
-OptModelArg -> '!' TermValue : '$2'.
+OptModelArg -> colons TermValue : '$2'.
 
 Variable -> identifier : ['$1'].
 Variable -> Variable open_bracket E close_bracket : '$1' ++ [{expr, '$3'}].

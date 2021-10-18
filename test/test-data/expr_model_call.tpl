@@ -1,1 +1,1 @@
-{{ m.foo.bar.baz[3]!4 }}
+{{ m.foo.bar.baz[3]::4 }}
