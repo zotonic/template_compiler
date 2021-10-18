@@ -136,7 +136,25 @@ compile({apply_filter, Expr, {filter, {identifier, SrcPos, Filter}, FilterArgs}}
                          erl_syntax:atom(FilterModule),
                          erl_syntax:atom(FilterName),
                          Args)),
+    {Ws2, Ast};
+compile({model, [{identifier, SrcPos, Model} | Path ], OptPayload}, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, PathAsts} = value_lookup_asts(Path, CState, Ws, []),
+    {Ws2, PayloadAst} = case OptPayload of
+        none -> {Ws1, erl_syntax:abstract(undefined)};
+        Expr -> compile(Expr, CState, Ws1)
+    end,
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "_@runtime:model_call(_@model, _@path, _@payload, _@context)",
+            [
+                {model, erl_syntax:atom(binary_to_atom(Model, 'utf8'))},
+                {path, erl_syntax:list(PathAsts)},
+                {payload, PayloadAst},
+                {context, erl_syntax:variable(CState#cs.context_var)},
+                {runtime, erl_syntax:atom(Runtime)}
+            ]),
     {Ws2, Ast}.
+
 
 find_value_lookup([{identifier, SrcPos, <<"now">>}], _CState, Ws) ->
     Ast = template_compiler_utils:set_pos(
@@ -234,10 +252,10 @@ find_value_lookup([{_, SrcPos, _}|_] = ValueLookup, #cs{runtime=Runtime, vars_va
                         {context, erl_syntax:variable(CState#cs.context_var)}
                     ]),
             {Ws1, Ast1};
-        [{identifier, SrcPos, Var}] = ValueLookup ->
+        [{identifier, SrcPosIdn, Var}] ->
             VarName = template_compiler_utils:to_atom(Var),
             Ast = merl:qquote(
-                    template_compiler_utils:pos(SrcPos),
+                    template_compiler_utils:pos(SrcPosIdn),
                     "_@runtime:find_value(_@varname, _@vars, _@vars, _@context)",
                     [
                         {runtime, erl_syntax:atom(Runtime)},

@@ -115,6 +115,9 @@ Nonterminals
     Filter
     FilterArgs
     AutoId
+
+    ModelCall
+    OptModelArg
     
     LibTag
     LibUrlTag
@@ -209,6 +212,7 @@ Terminals
     lib_keyword
     lib_url_keyword
     load_keyword
+    m_keyword
     media_keyword
     not_keyword
     now_keyword
@@ -242,7 +246,8 @@ Terminals
     '++' '--'
     '+' '-'
     '*' '/' '%'
-    '(' ')'.
+    '(' ')'
+    '!'.
 
 Rootsymbol
     Template.
@@ -258,7 +263,7 @@ Left 500 '*' '/' '%'.
 Unary 600 Uminus Unot.
 
 %% Expected shift/reduce conflicts
-Expect 4.
+Expect 5.
 
 Template -> ExtendsTag BlockElements : {extends, '$1', '$2'}.
 Template -> OverrulesTag BlockElements : {overrules, '$2'}.
@@ -468,6 +473,7 @@ MapField -> string_literal colon E : {'$1', '$3'}.
 TermValue -> '(' E ')' : '$2'.
 TermValue -> Variable : {find_value, '$1'}.
 TermValue -> Literal : '$1'.
+TermValue -> ModelCall : '$1'.
 TermValue -> hash AutoId : {auto_id, '$2'}.
 TermValue -> '%' open_curly MapFields close_curly : {map_value, '$3'}.
 TermValue -> open_curly identifier Args close_curly : {tuple_value, '$2', '$3'}.
@@ -475,6 +481,10 @@ TermValue -> open_bracket OptArrayList close_bracket : {value_list, '$2'}.
 
 AutoId -> identifier dot identifier : {'$1', '$3'}.
 AutoId -> identifier : '$1'.
+
+ModelCall -> m_keyword dot Variable OptModelArg : {model, '$3', '$4'}.
+OptModelArg -> '$empty' : none.
+OptModelArg -> '!' TermValue : '$2'.
 
 Variable -> identifier : ['$1'].
 Variable -> Variable open_bracket E close_bracket : '$1' ++ [{expr, '$3'}].

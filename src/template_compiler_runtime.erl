@@ -32,6 +32,7 @@
     set_context_vars/2,
     get_translations/2,
     lookup_translation/3,
+    model_call/4,
     custom_tag/4,
     builtin_tag/5,
     cache_tag/6,
@@ -287,6 +288,10 @@ lookup_translation({trans, Tr}, TplVars, _Context) when is_map(TplVars) ->
             <<>>
     end.
 
+%% @doc A model call with optional payload. Compiled from m.model.path!payload
+-spec model_call(Model::atom(), Path::list(), Payload::term(), Context::term()) -> template_compiler:render_result().
+model_call(Model, Path, Payload, _Context) ->
+    io_lib:format("model:~p ~p ! ~p", [ Model, Path, Payload ]).
 
 %% @doc Render a custom tag (Zotonic scomp) - this can be changed to more complex runtime lookups.
 -spec custom_tag(Tag::atom(), Args::list(), Vars::map(), Context::term()) -> template_compiler:render_result().
