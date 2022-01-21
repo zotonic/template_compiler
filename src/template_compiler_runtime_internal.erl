@@ -46,8 +46,12 @@ forloop(IsLoopVar, ListExpr, Idents, BodyFun, EmptyFun, Runtime, IsContextVars, 
             forloop_map(List, Idents, BodyFun, Runtime, IsContextVars, Vars, Context)
     end.
 
-forloop_to_list(Map, 1, _Runtime, _Context) when is_map(Map) ->
-    [ Map ];
+forloop_to_list(V, 1, _Runtime, _Context)
+    when is_map(V);
+         is_number(V);
+         is_atom(V);
+         is_binary(V) ->
+    [ V ];
 forloop_to_list(ListExpr, _NVars, Runtime, Context) ->
     Runtime:to_list(ListExpr, Context).
 
