@@ -26,6 +26,7 @@ groups() ->
         ,for_test
         ,for_forloop_test
         ,for_multivar_test
+        ,for_map_test
         ]}].
 
 init_per_suite(Config) ->
@@ -103,6 +104,18 @@ for_multivar_test(_Config) ->
     {ok, Bin1} = template_compiler:render("for_multivar.tpl", #{ v => [{a,1},{b,2},{c,3}] }, [], undefined),
     <<"a:1,b:2,c:3,">> = z_string:trim(iolist_to_binary(Bin1)),
     ok.
+
+for_map_test(_Config) ->
+    % for v in map - a single map becomes a list
+    {ok, Bin1} = template_compiler:render("for_map_1.tpl", #{ v => #{ foo => 1 } }, [], undefined),
+    <<"1">> = z_string:trim(iolist_to_binary(Bin1)),
+    {ok, Bin2} = template_compiler:render("for_map_1.tpl", #{ v => [ #{ foo => 1 } ] }, [], undefined),
+    <<"1">> = z_string:trim(iolist_to_binary(Bin2)),
+    % for k,v in map - access the map as key/value list
+    {ok, Bin3} = template_compiler:render("for_map_2.tpl", #{ v => #{ foo => 1 } }, [], undefined),
+    <<"foo,1">> = z_string:trim(iolist_to_binary(Bin3)),
+    ok.
+
 
 test_data_dir(Config) ->
     filename:join([

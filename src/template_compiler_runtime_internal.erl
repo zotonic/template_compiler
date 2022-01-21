@@ -1,8 +1,8 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016-2021 Marc Worrell
+%% @copyright 2016-2022 Marc Worrell
 %% @doc Callback routines for compiled templates.
 
-%% Copyright 2016-2021 Marc Worrell
+%% Copyright 2016-2022 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@
     unique/0
     ]).
 
--include("template_compiler.hrl").
 
 %% @doc Runtime implementation of a forloop. Two variations: one with 
 -spec forloop(IsForloopVar :: boolean(), ListExpr :: term(), LoopVars :: [atom()],
@@ -38,7 +37,7 @@
               Runtime :: atom(), IsContextVars :: boolean(),
               Vars :: map(), Context :: term()) -> term().
 forloop(IsLoopVar, ListExpr, Idents, BodyFun, EmptyFun, Runtime, IsContextVars, Vars, Context) ->
-    case Runtime:to_list(ListExpr, Context) of
+    case forloop_to_list(ListExpr, length(Idents), Runtime, Context) of
         [] ->
             EmptyFun();
         List when IsLoopVar ->
@@ -46,6 +45,12 @@ forloop(IsLoopVar, ListExpr, Idents, BodyFun, EmptyFun, Runtime, IsContextVars, 
         List when not IsLoopVar ->
             forloop_map(List, Idents, BodyFun, Runtime, IsContextVars, Vars, Context)
     end.
+
+forloop_to_list(Map, 1, _Runtime, _Context) when is_map(Map) ->
+    [ Map ];
+forloop_to_list(ListExpr, _NVars, Runtime, Context) ->
+    Runtime:to_list(ListExpr, Context).
+
 
 % For loop with a forloop variable in the body, use a fold with a forloop state
 % variable.
