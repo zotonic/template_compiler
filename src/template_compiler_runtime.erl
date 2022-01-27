@@ -84,6 +84,7 @@
 -callback trace_block({binary(),integer(),integer()}, atom(), atom(), term()) -> ok | {ok, iodata(), iodata()}.
 
 
+-include_lib("kernel/include/logger.hrl").
 -include("template_compiler.hrl").
 
 %% @doc Dynamic mapping of a template to a template name, context sensitive on the template vars.
@@ -401,10 +402,10 @@ escape(Value, _Context) ->
 trace_compile(_Module, Filename, Options, _Context) ->
     case proplists:get_value(trace_position, Options) of
         {File, Line, _Col} ->
-            lager:debug("[template_compiler] Compiling \"~s\" (called from \"~s:~p\")",
+            ?LOG_DEBUG("[template_compiler] Compiling \"~s\" (called from \"~s:~p\")",
                         [Filename, File, Line]);
         undefined ->
-            lager:debug("[template_compiler] Compiling \"~s\"",
+            ?LOG_DEBUG("[template_compiler] Compiling \"~s\"",
                         [Filename])
     end,
     ok.
@@ -415,10 +416,10 @@ trace_compile(_Module, Filename, Options, _Context) ->
 trace_render(Filename, Options, _Context) ->
     case proplists:get_value(trace_position, Options) of
         {File, Line, _Col} ->
-            lager:debug("[template_compiler] Include by \"~s:~p\" of \"~s\"",
+            ?LOG_DEBUG("[template_compiler] Include by \"~s:~p\" of \"~s\"",
                         [File, Line, Filename]);
         undefined ->
-            lager:debug("[template_compiler] Render \"~s\"",
+            ?LOG_DEBUG("[template_compiler] Render \"~s\"",
                         [Filename])
     end,
     ok.

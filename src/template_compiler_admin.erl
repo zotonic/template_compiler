@@ -38,7 +38,7 @@
     terminate/2
     ]).
 
-
+-include_lib("kernel/include/logger.hrl").
 -include("template_compiler.hrl").
 -include("template_compiler_internal.hrl").
 
@@ -86,10 +86,8 @@ compile_file(Filename, TplKey, Options, Context) ->
                         What:Error:Stack ->
                             % io:format("Error compiling template ~p: ~p:~n~p at~n ~p~n",
                             %           [Filename, What, Error, Stack]),
-                            lager:error("Error compiling template ~p: ~p:~n~p at~n ~p~n",
-                                        [Filename, What, Error,
-                                         lager:pr_stacktrace(Stack, {What, Error})
-                                        ]),
+                            ?LOG_ERROR("Error compiling template ~p: ~p:~n~p at~n ~p~n",
+                                        [Filename, What, Error, Stack]),
                             {error, Error}
                      end,
             ok = gen_server:call(?MODULE, {compile_done, Result, TplKey}, infinity),
@@ -217,7 +215,7 @@ handle_cast(Msg, State) ->
 handle_info({'DOWN', MRef, process, _Pid, Reason}, State) ->
     case lists:keytake(MRef, 1, State#state.compiling) of
         {value, {_MRef, TplKey, _From}, Compiling1} ->
-            lager:error("[template_compiler] Process compiling ~p down (reason ~p), restarting other waiter",
+            ?LOG_ERROR("[template_compiler] Process compiling ~p down (reason ~p), restarting other waiter",
                         [TplKey, Reason]),
             {noreply, restart_compile(TplKey, State#state{compiling=Compiling1})};
         false ->
