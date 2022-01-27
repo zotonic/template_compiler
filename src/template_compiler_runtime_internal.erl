@@ -30,6 +30,8 @@
     unique/0
     ]).
 
+-include_lib("kernel/include/logger.hrl").
+
 
 %% @doc Runtime implementation of a forloop. Two variations: one with 
 -spec forloop(IsForloopVar :: boolean(), ListExpr :: term(), LoopVars :: [atom()],
@@ -222,7 +224,7 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
         {ok, Result} ->
             Result;
         {error, enoent} when Method =:= normal ->
-            lager:error("Missing included template ~p", [Template]),
+            ?LOG_ERROR("Missing included template ~p", [Template]),
             <<>>;
         {error, enoent} ->
             <<>>;
@@ -232,10 +234,10 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
             catch _:_ ->
                 Reason
             end,
-            lager:error("Template render error: '~s' for template ~p", [R1, Template]),
+            ?LOG_ERROR("Template render error: '~s' for template ~p", [R1, Template]),
             <<>>;
         {error, Reason} ->
-            lager:error("Template render error: ~p for template ~p", [Reason, Template]),
+            ?LOG_ERROR("Template render error: ~p for template ~p", [Reason, Template]),
             <<>>
     end.
 

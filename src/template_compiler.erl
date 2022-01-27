@@ -34,6 +34,7 @@
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
+-include_lib("kernel/include/logger.hrl").
 -include("template_compiler_internal.hrl").
 -include("template_compiler.hrl").
 
@@ -195,7 +196,7 @@ block_lookup({ok, TplFile}, BlockMap, ExtendsStack, DebugTrace, Options, Vars, R
             case lists:member(Module, ExtendsStack) of
                 true ->
                     FileTrace = [Module:filename() | [ M:filename() || M <- ExtendsStack ]],
-                    lager:error("[template_compiler] Template recursion: ~p", [FileTrace]),
+                    ?LOG_ERROR("[template_compiler] Template recursion: ~p", [FileTrace]),
                     {error, {recursion, [Trace|DebugTrace]}};
                 false ->
                     % Check extended/overruled templates (build block map)
@@ -354,15 +355,15 @@ compile_forms(Filename, Forms) ->
                 {module, _Module} ->
                     {ok, Module};
                 Error ->
-                    lager:error("Error loading compiling forms for ~p: ~p",
+                    ?LOG_ERROR("Error loading compiling forms for ~p: ~p",
                                 [Filename, Error]),
                     Error
             end;
         error ->
-            lager:error("Error compiling forms for ~p", [Filename]),
+            ?LOG_ERROR("Error compiling forms for ~p", [Filename]),
             {error, {compile, []}};
         {error, Es, Ws} ->
-            lager:error("Errors compiling ~p: ~p  (warnings ~p)",
+            ?LOG_ERROR("Errors compiling ~p: ~p  (warnings ~p)",
                         [Filename, Es, Ws]),
             {error, {compile, Es, Ws}}
     end.
