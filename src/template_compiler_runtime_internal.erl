@@ -33,7 +33,7 @@
 -include_lib("kernel/include/logger.hrl").
 
 
-%% @doc Runtime implementation of a forloop. Two variations: one with 
+%% @doc Runtime implementation of a forloop.
 -spec forloop(IsForloopVar :: boolean(), ListExpr :: term(), LoopVars :: [atom()],
               LoopBody :: fun(), EmptyPart :: fun(),
               Runtime :: atom(), IsContextVars :: boolean(),
@@ -54,8 +54,6 @@ forloop_to_list(V, 1, _Runtime, _Context)
          is_atom(V);
          is_binary(V) ->
     [ V ];
-forloop_to_list(Map, 1, _Runtime, _Context) when is_map(Map) ->
-    [ Map ];
 forloop_to_list(ListExpr, _NVars, Runtime, Context) ->
     Runtime:to_list(ListExpr, Context).
 
