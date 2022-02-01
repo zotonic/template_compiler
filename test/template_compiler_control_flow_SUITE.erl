@@ -24,6 +24,7 @@ groups() ->
         ,if_equal
         ,if_notequal
         ,for_test
+        ,for_undefined_test
         ,for_forloop_test
         ,for_multivar_test
         ,for_map_test
@@ -91,6 +92,11 @@ for_test(_Config) ->
     <<"1,2,3,4,">> = z_string:trim(iolist_to_binary(Bin1)),
     {ok, Bin2} = template_compiler:render("for_empty.tpl", #{ v => [] }, [], undefined),
     <<"empty">> = z_string:trim(iolist_to_binary(Bin2)),
+    ok.
+
+for_undefined_test(_Config) ->
+    {ok, Bin1} = template_compiler:render("for.tpl", #{ v => undefined }, [], undefined),
+    <<>> = z_string:trim(iolist_to_binary(Bin1)),
     ok.
 
 for_forloop_test(_Config) ->

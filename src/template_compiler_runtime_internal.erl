@@ -48,6 +48,8 @@ forloop(IsLoopVar, ListExpr, Idents, BodyFun, EmptyFun, Runtime, IsContextVars, 
             forloop_map(List, Idents, BodyFun, Runtime, IsContextVars, Vars, Context)
     end.
 
+forloop_to_list(undefined, _, _Runtime, _Context) ->
+    [];
 forloop_to_list(V, 1, _Runtime, _Context)
     when is_map(V);
          is_number(V);
