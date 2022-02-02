@@ -86,8 +86,13 @@ compile_file(Filename, TplKey, Options, Context) ->
                         What:Error:Stack ->
                             % io:format("Error compiling template ~p: ~p:~n~p at~n ~p~n",
                             %           [Filename, What, Error, Stack]),
-                            ?LOG_ERROR("Error compiling template ~p: ~p:~n~p at~n ~p~n",
-                                        [Filename, What, Error, Stack]),
+                            ?LOG_ERROR(
+                                "Error compiling template ~p: ~p: ~p",
+                                [Filename, What, Error],
+                                #{
+                                    template => Filename,
+                                    stack => Stack
+                                }),
                             {error, Error}
                      end,
             ok = gen_server:call(?MODULE, {compile_done, Result, TplKey}, infinity),
