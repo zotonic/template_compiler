@@ -196,7 +196,7 @@ block_lookup({ok, TplFile}, BlockMap, ExtendsStack, DebugTrace, Options, Vars, R
             case lists:member(Module, ExtendsStack) of
                 true ->
                     FileTrace = [Module:filename() | [ M:filename() || M <- ExtendsStack ]],
-                    ?LOG_ERROR("[template_compiler] Template recursion: ~p", [FileTrace]),
+                    ?LOG_ERROR(#{ text => "Template recursion.", trace => FileTrace}),
                     {error, {recursion, [Trace|DebugTrace]}};
                 false ->
                     % Check extended/overruled templates (build block map)
@@ -355,16 +355,14 @@ compile_forms(Filename, Forms) ->
                 {module, _Module} ->
                     {ok, Module};
                 Error ->
-                    ?LOG_ERROR("Error loading compiling forms for ~p: ~p",
-                                [Filename, Error]),
+                    ?LOG_ERROR(#{ text => "Error loading compiling forms.", filename => Filename, error => Error}),
                     Error
             end;
         error ->
-            ?LOG_ERROR("Error compiling forms for ~p", [Filename]),
+            ?LOG_ERROR(#{ text => "Error compiling forms.", filename => Filename}),
             {error, {compile, []}};
         {error, Es, Ws} ->
-            ?LOG_ERROR("Errors compiling ~p: ~p  (warnings ~p)",
-                        [Filename, Es, Ws]),
+            ?LOG_ERROR(#{ text => "Errors compiling.", filename => Filename, errors => Es, warnings => Ws}),
             {error, {compile, Es, Ws}}
     end.
 

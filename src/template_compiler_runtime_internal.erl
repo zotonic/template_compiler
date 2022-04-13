@@ -224,7 +224,7 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
         {ok, Result} ->
             Result;
         {error, enoent} when Method =:= normal ->
-            ?LOG_ERROR("Missing included template ~p", [Template]),
+            ?LOG_ERROR(#{ text => "Missing included template.", template => Template}),
             <<>>;
         {error, enoent} ->
             <<>>;
@@ -234,10 +234,10 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
             catch _:_ ->
                 Reason
             end,
-            ?LOG_ERROR("Template render error: '~s' for template ~p", [R1, Template]),
+            ?LOG_ERROR(#{ text => "Template render error.", template => Template, reason => R1}),
             <<>>;
         {error, Reason} ->
-            ?LOG_ERROR("Template render error: ~p for template ~p", [Reason, Template]),
+            ?LOG_ERROR(#{ text => "Template render error.", template => Template, reason => Reason}),
             <<>>
     end.
 
