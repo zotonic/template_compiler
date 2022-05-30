@@ -362,7 +362,7 @@ compile_forms(Filename, Forms) ->
             ?LOG_ERROR(#{ text => "Error compiling forms.", filename => Filename }),
             {error, {compile, []}};
         {error, Es, Ws} ->
-            ?LOG_ERROR(#{ text => "Errors compiling.", filename => Filename, errors => Es, warnings => Ws}),
+            ?LOG_ERROR(#{ text => "Errors compiling.", filename => Filename, errors => Es, warnings => Ws }),
             {error, {compile, Es, Ws}}
     end.
 
