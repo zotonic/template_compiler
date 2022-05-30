@@ -355,7 +355,7 @@ compile_forms(Filename, Forms) ->
                 {module, _Module} ->
                     {ok, Module};
                 Error ->
-                    ?LOG_ERROR(#{ text => "Error loading compiling forms.", filename => Filename, error => Error}),
+                    ?LOG_ERROR(#{ text => "Error loading compiling forms.", filename => Filename, error => Error }),
                     Error
             end;
         error ->
