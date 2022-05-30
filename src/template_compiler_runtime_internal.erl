@@ -237,20 +237,8 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
             <<>>;
         {error, enoent} ->
             <<>>;
-        {error, Reason} when is_list(Reason); is_binary(Reason) ->
-            R1 = try
-                iolist_to_binary(Reason)
-            catch _:_ ->
-                Reason
-            end,
-            ?LOG_ERROR(#{
-                text => <<"Template render error">>,
-                template => Template,
-                result => error,
-                reason => R1,
-                at => SrcFile,
-                line => SrcLine
-            }),
+        {error, Err} when is_map(Err) ->
+            ?LOG_ERROR(Err),
             <<>>;
         {error, Reason} ->
             ?LOG_ERROR(#{

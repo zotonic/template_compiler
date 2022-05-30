@@ -290,7 +290,11 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
                     {ok, Module};
                 false ->
                     Runtime:trace_compile(Module, Filename, Options, Context),
-                    case compile_tokens(template_compiler_parser:parse(Tokens2), cs(Module, Filename, Options, Context)) of
+                    case compile_tokens(
+                            template_compiler_parser:parse(Tokens2),
+                            cs(Module, Filename, Options, Context),
+                            Options)
+                    of
                         {ok, {Extends, BlockAsts, TemplateAst, IsAutoid}} ->
                             Forms = template_compiler_module:compile(
                                                 Module, Filename, Mtime, IsAutoid, Runtime,
@@ -398,22 +402,61 @@ cs(Module, Filename, Options, Context) ->
         context=Context
     }.
 
-compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState) ->
+compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
     {ok, {Extend, BlockAsts, undefined, Ws#ws.is_autoid_var}};
-compile_tokens({ok, {overrules, Elements}}, CState) ->
+compile_tokens({ok, {overrules, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
     {ok, {overrules, BlockAsts, undefined, Ws#ws.is_autoid_var}};
-compile_tokens({ok, {base, Elements}}, CState) ->
+compile_tokens({ok, {base, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
     CStateElts = CState#cs{blocks = BlockAsts},
     {Ws1, TemplateAsts} = template_compiler_element:compile(Elements, CStateElts, Ws),
     {ok, {undefined, BlockAsts, TemplateAsts, Ws1#ws.is_autoid_var}};
-compile_tokens({error, _} = Error, _CState) ->
+compile_tokens({error, {Loc, template_compiler_parser, Msg}}, #cs{ filename = Filename }, Options) ->
+    % Try format the Yecc error
+    Err = split_loc(Loc),
+    Stack = [
+        {filename:basename(Filename), render, 1, [
+            {file, maps:get(at, Err)},
+            {line, {maps:get(line, Err), maps:get(column, Err)}}
+        ]}
+        | case proplists:get_value(trace_position, Options) of
+            {SrcFile, SrcLine, _SrcCol} ->
+                [
+                    {filename:basename(SrcFile), render, 1, [
+                        {file, SrcFile},
+                        {line, SrcLine}
+                    ]}
+                ];
+            undefined ->
+                []
+        end
+    ],
+    Err1 = Err#{
+        result => error,
+        reason => syntax,
+        text => iolist_to_binary(Msg),
+        stack => Stack
+    },
+    {error, Err1};
+compile_tokens({error, _} = Error, _CState, _Options) ->
     Error.
+
+split_loc({Filename, Line, Col}) ->
+    #{
+        at => Filename,
+        line => Line,
+        column => Col
+    };
+split_loc({Filename, Line}) ->
+    #{
+        at => Filename,
+        line => Line
+    }.
 
 -spec compile_blocks([block_element()], #cs{}) -> {#ws{}, [{atom(), erl_syntax:syntaxTree()}]}.
 compile_blocks(Blocks, CState) ->
