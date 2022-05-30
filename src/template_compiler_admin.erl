@@ -88,7 +88,7 @@ compile_file(Filename, TplKey, Options, Context) ->
                             %           [Filename, What, Error, Stack]),
                             ?LOG_ERROR(
                                 #{
-                                  text =>"Error compiling template.", 
+                                  text => "Error compiling template.", 
                                   template => Filename,
                                   what => What,
                                   error => Error,
