@@ -196,7 +196,7 @@ block_lookup({ok, TplFile}, BlockMap, ExtendsStack, DebugTrace, Options, Vars, R
             case lists:member(Module, ExtendsStack) of
                 true ->
                     FileTrace = [Module:filename() | [ M:filename() || M <- ExtendsStack ]],
-                    ?LOG_ERROR(#{ text => "Template recursion.", trace => FileTrace}),
+                    ?LOG_ERROR(#{ text => "Template recursion.", trace => FileTrace }),
                     {error, {recursion, [Trace|DebugTrace]}};
                 false ->
                     % Check extended/overruled templates (build block map)
