@@ -224,7 +224,7 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
         {ok, Result} ->
             Result;
         {error, enoent} when Method =:= normal ->
-            ?LOG_ERROR(#{ text => "Missing included template.", template => Template}),
+            ?LOG_ERROR(#{ text => "Missing included template.", template => Template }),
             <<>>;
         {error, enoent} ->
             <<>>;
