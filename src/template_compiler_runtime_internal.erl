@@ -234,7 +234,7 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
             catch _:_ ->
                 Reason
             end,
-            ?LOG_ERROR(#{ text => "Template render error.", template => Template, reason => R1}),
+            ?LOG_ERROR(#{ text => "Template render error.", template => Template, reason => R1 }),
             <<>>;
         {error, Reason} ->
             ?LOG_ERROR(#{ text => "Template render error.", template => Template, reason => Reason}),
