@@ -221,7 +221,7 @@ handle_cast(Msg, State) ->
 handle_info({'DOWN', MRef, process, _Pid, Reason}, State) ->
     case lists:keytake(MRef, 1, State#state.compiling) of
         {value, {_MRef, TplKey, _From}, Compiling1} ->
-            ?LOG_ERROR(#{ text => "Process compiling down. Restarting other waiter.", tpl_key => TplKey, reason => Reason}),
+            ?LOG_ERROR(#{ text => "Process compiling down. Restarting other waiter.", tpl_key => TplKey, reason => Reason }),
             {noreply, restart_compile(TplKey, State#state{compiling=Compiling1})};
         false ->
             {noreply, State}
