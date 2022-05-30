@@ -1,8 +1,8 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2010-2016 Marc Worrell
+%% @copyright 2010-2022 Marc Worrell
 %% @doc Operators for expression evaluation in templates
 
-%% Copyright 2010-2016 Marc Worrell
+%% Copyright 2010-2022 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -20,9 +20,7 @@
 -author("Marc Worrell <marc@worrell.nl>").
 
 -export([
-    'and'/4,
     'not'/3,
-    'or'/4,
     'xor'/4,
 
     concat/4,
@@ -44,27 +42,11 @@
     ne/4
 ]).
 
-
-'and'(true, true, _Runtime, _Context) -> true;
-'and'(undefined, _, _Runtime, _Context) -> false;
-'and'(_, undefined, _Runtime, _Context) -> false;
-'and'(false, _, _Runtime, _Context) -> false;
-'and'(_, false, _Runtime, _Context) -> false;
-'and'(A, B, Runtime, Context) ->
-    Runtime:to_bool(Runtime:to_simple_value(A, Context), Context)
-    andalso Runtime:to_bool(Runtime:to_simple_value(B, Context), Context).
-
 'not'(false, _Runtime, _Context) -> true;
 'not'(true, _Runtime, _Context) -> false;
 'not'(undefined, _Runtime, _Context) -> true;
 'not'(A, Runtime, Context) ->
     not Runtime:to_bool(A, Context).
-
-'or'(true, _, _Runtime, _Context) -> true;
-'or'(_, true, _Runtime, _Context) -> true;
-'or'(A, B, Runtime, Context) ->
-    Runtime:to_bool(Runtime:to_simple_value(A, Context), Context) 
-    orelse Runtime:to_bool(Runtime:to_simple_value(B, Context), Context).
 
 'xor'(A, A, _Runtime, _Context) -> false;
 'xor'(A, B, Runtime, Context) ->

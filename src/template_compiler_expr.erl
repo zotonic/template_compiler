@@ -104,6 +104,38 @@ compile({expr, {Op, {_, SrcPos, _}}, Arg}, #cs{runtime=Runtime} = CState, Ws) wh
                 {runtime, erl_syntax:atom(Runtime)}
             ]),
     {Ws1, Ast};
+compile({expr, {'or', {_, SrcPos, _}}, Arg1, Arg2}, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, Arg1Ast} = compile(Arg1, CState, Ws),
+    {Ws2, Arg2Ast} = compile(Arg2, CState, Ws1),
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "case _@runtime:to_bool(_@runtime:to_simple_value(_@arg1, _@context), _@context) of "
+            "  true -> true; "
+            "  false -> _@runtime:to_bool(_@runtime:to_simple_value(_@arg2, _@context), _@context) "
+            "end",
+            [
+                {arg1, Arg1Ast},
+                {arg2, Arg2Ast},
+                {context, erl_syntax:variable(CState#cs.context_var)},
+                {runtime, erl_syntax:atom(Runtime)}
+            ]),
+    {Ws2, Ast};
+compile({expr, {'and', {_, SrcPos, _}}, Arg1, Arg2}, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, Arg1Ast} = compile(Arg1, CState, Ws),
+    {Ws2, Arg2Ast} = compile(Arg2, CState, Ws1),
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "case _@runtime:to_bool(_@runtime:to_simple_value(_@arg1, _@context), _@context) of "
+            "  true -> _@runtime:to_bool(_@runtime:to_simple_value(_@arg2, _@context), _@context); "
+            "  false -> false "
+            "end",
+            [
+                {arg1, Arg1Ast},
+                {arg2, Arg2Ast},
+                {context, erl_syntax:variable(CState#cs.context_var)},
+                {runtime, erl_syntax:atom(Runtime)}
+            ]),
+    {Ws2, Ast};
 compile({expr, {Op, {_, SrcPos, _}}, Arg1, Arg2}, #cs{runtime=Runtime} = CState, Ws) when is_atom(Op) ->
     {Ws1, Arg1Ast} = compile(Arg1, CState, Ws),
     {Ws2, Arg2Ast} = compile(Arg2, CState, Ws1),
