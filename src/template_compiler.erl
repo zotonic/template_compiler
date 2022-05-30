@@ -196,7 +196,12 @@ block_lookup({ok, TplFile}, BlockMap, ExtendsStack, DebugTrace, Options, Vars, R
             case lists:member(Module, ExtendsStack) of
                 true ->
                     FileTrace = [Module:filename() | [ M:filename() || M <- ExtendsStack ]],
-                    ?LOG_ERROR(#{ text => "Template recursion.", trace => FileTrace }),
+                    ?LOG_ERROR(#{
+                        text => <<"Template recursion">>,
+                        result => error,
+                        reason => recursion,
+                        trace => FileTrace
+                    }),
                     {error, {recursion, [Trace|DebugTrace]}};
                 false ->
                     % Check extended/overruled templates (build block map)
@@ -354,15 +359,33 @@ compile_forms(Filename, Forms) ->
             case code:load_binary(Module, atom_to_list(Module) ++ ".erl", Bin) of
                 {module, _Module} ->
                     {ok, Module};
-                Error ->
-                    ?LOG_ERROR(#{ text => "Error loading compiling forms.", filename => Filename, error => Error }),
+                {error, Reason} = Error ->
+                    ?LOG_ERROR(#{
+                        text => <<"Error loading compiling forms">>,
+                        module => Module,
+                        filename => Filename,
+                        result => error,
+                        reason => Reason
+                    }),
                     Error
             end;
         error ->
-            ?LOG_ERROR(#{ text => "Error compiling forms.", filename => Filename }),
+            ?LOG_ERROR(#{
+                text => <<"Error compiling forms">>,
+                result => error,
+                reason => compile,
+                filename => Filename
+            }),
             {error, {compile, []}};
         {error, Es, Ws} ->
-            ?LOG_ERROR(#{ text => "Errors compiling.", filename => Filename, errors => Es, warnings => Ws }),
+            ?LOG_ERROR(#{
+                text => <<"Errors compiling">>,
+                filename => Filename,
+                result => error,
+                reason => compile,
+                errors => Es,
+                warnings => Ws
+            }),
             {error, {compile, Es, Ws}}
     end.
 

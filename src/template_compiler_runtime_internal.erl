@@ -215,6 +215,7 @@ include_1(SrcPos, all, Template, Runtime, ContextVars, Vars1, Context) ->
             end,
             Templates);
 include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
+    {SrcFile, SrcLine, _SrcCol} = SrcPos,
     Options = [
         {runtime, Runtime},
         {trace_position, SrcPos},
@@ -224,7 +225,15 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
         {ok, Result} ->
             Result;
         {error, enoent} when Method =:= normal ->
-            ?LOG_ERROR(#{ text => "Missing included template.", template => Template }),
+            ?LOG_ERROR(#{
+                text => <<"Included template not found">>,
+                template => Template,
+                srcpos => SrcPos,
+                result => error,
+                reason => enoent,
+                at => SrcFile,
+                line => SrcLine
+            }),
             <<>>;
         {error, enoent} ->
             <<>>;
@@ -234,10 +243,25 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
             catch _:_ ->
                 Reason
             end,
-            ?LOG_ERROR(#{ text => "Template render error.", template => Template, reason => R1 }),
+            ?LOG_ERROR(#{
+                text => <<"Template render error">>,
+                template => Template,
+                result => error,
+                reason => R1,
+                at => SrcFile,
+                line => SrcLine
+            }),
             <<>>;
         {error, Reason} ->
-            ?LOG_ERROR(#{ text => "Template render error.", template => Template, reason => Reason }),
+            ?LOG_ERROR(#{
+                text => <<"Template render error">>,
+                template => Template,
+                srcpos => SrcPos,
+                result => error,
+                reason => Reason,
+                at => SrcFile,
+                line => SrcLine
+            }),
             <<>>
     end.
 

@@ -86,14 +86,13 @@ compile_file(Filename, TplKey, Options, Context) ->
                         What:Error:Stack ->
                             % io:format("Error compiling template ~p: ~p:~n~p at~n ~p~n",
                             %           [Filename, What, Error, Stack]),
-                            ?LOG_ERROR(
-                                #{
-                                  text => "Error compiling template.", 
-                                  template => Filename,
-                                  what => What,
-                                  error => Error,
-                                  stack => Stack
-                                }),
+                            ?LOG_ERROR(#{
+                                text => <<"Error compiling template">>,
+                                template => Filename,
+                                result => What,
+                                reason => Error,
+                                stack => Stack
+                            }),
                             {error, Error}
                      end,
             ok = gen_server:call(?MODULE, {compile_done, Result, TplKey}, infinity),
@@ -221,7 +220,12 @@ handle_cast(Msg, State) ->
 handle_info({'DOWN', MRef, process, _Pid, Reason}, State) ->
     case lists:keytake(MRef, 1, State#state.compiling) of
         {value, {_MRef, TplKey, _From}, Compiling1} ->
-            ?LOG_ERROR(#{ text => "Process compiling down. Restarting other waiter.", tpl_key => TplKey, reason => Reason }),
+            ?LOG_ERROR(#{
+                text => <<"Compiler process down; restarting with other waiter">>,
+                tpl_key => TplKey,
+                result => error,
+                reason => Reason
+            }),
             {noreply, restart_compile(TplKey, State#state{compiling=Compiling1})};
         false ->
             {noreply, State}
