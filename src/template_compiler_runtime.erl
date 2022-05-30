@@ -402,11 +402,17 @@ escape(Value, _Context) ->
 trace_compile(_Module, Filename, Options, _Context) ->
     case proplists:get_value(trace_position, Options) of
         {File, Line, _Col} ->
-            ?LOG_DEBUG("[template_compiler] Compiling \"~s\" (called from \"~s:~p\")",
-                        [Filename, File, Line]);
+            ?LOG_DEBUG(#{
+                text => <<"Compiling template">>,
+                filename => Filename,
+                at => File,
+                line => Line
+            });
         undefined ->
-            ?LOG_DEBUG("[template_compiler] Compiling \"~s\"",
-                        [Filename])
+            ?LOG_DEBUG(#{
+                text => <<"Compiling template">>,
+                filename => Filename
+            })
     end,
     ok.
 
@@ -416,11 +422,17 @@ trace_compile(_Module, Filename, Options, _Context) ->
 trace_render(Filename, Options, _Context) ->
     case proplists:get_value(trace_position, Options) of
         {File, Line, _Col} ->
-            ?LOG_DEBUG("[template_compiler] Include by \"~s:~p\" of \"~s\"",
-                        [File, Line, Filename]);
+            ?LOG_DEBUG(#{
+                text => <<"Template include">>,
+                filename => Filename,
+                at => File,
+                line => Line
+            });
         undefined ->
-            ?LOG_DEBUG("[template_compiler] Render \"~s\"",
-                        [Filename])
+            ?LOG_DEBUG(#{
+                text => <<"Template render">>,
+                filename => Filename
+            })
     end,
     ok.
 

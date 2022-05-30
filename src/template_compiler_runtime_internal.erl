@@ -215,6 +215,7 @@ include_1(SrcPos, all, Template, Runtime, ContextVars, Vars1, Context) ->
             end,
             Templates);
 include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
+    {SrcFile, SrcLine, _SrcCol} = SrcPos,
     Options = [
         {runtime, Runtime},
         {trace_position, SrcPos},
@@ -224,20 +225,31 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
         {ok, Result} ->
             Result;
         {error, enoent} when Method =:= normal ->
-            ?LOG_ERROR("Missing included template ~p", [Template]),
+            ?LOG_ERROR(#{
+                text => <<"Included template not found">>,
+                template => Template,
+                srcpos => SrcPos,
+                result => error,
+                reason => enoent,
+                at => SrcFile,
+                line => SrcLine
+            }),
             <<>>;
         {error, enoent} ->
             <<>>;
-        {error, Reason} when is_list(Reason); is_binary(Reason) ->
-            R1 = try
-                iolist_to_binary(Reason)
-            catch _:_ ->
-                Reason
-            end,
-            ?LOG_ERROR("Template render error: '~s' for template ~p", [R1, Template]),
+        {error, Err} when is_map(Err) ->
+            ?LOG_ERROR(Err),
             <<>>;
         {error, Reason} ->
-            ?LOG_ERROR("Template render error: ~p for template ~p", [Reason, Template]),
+            ?LOG_ERROR(#{
+                text => <<"Template render error">>,
+                template => Template,
+                srcpos => SrcPos,
+                result => error,
+                reason => Reason,
+                at => SrcFile,
+                line => SrcLine
+            }),
             <<>>
     end.
 
