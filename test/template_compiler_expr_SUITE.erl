@@ -24,6 +24,8 @@ groups() ->
         ,expr_autoid
         ,expr_map
         ,expr_model_call
+        ,expr_orelse
+        ,expr_andalso
         ]}].
 
 init_per_suite(Config) ->
@@ -112,6 +114,36 @@ expr_map(_Config) ->
 expr_model_call(_Config) ->
     {ok, Bin1} = template_compiler:render("expr_model_call.tpl", #{}, [], undefined),
     <<"model:foo [<<\"bar\">>,<<\"baz\">>,3] :: 4">> = iolist_to_binary(Bin1).
+
+expr_orelse(_Config) ->
+    erlang:erase(x),
+    {ok, Bin1} = template_compiler:render("expr_orelse.tpl", #{ <<"a">> => 0, <<"b">> => 0 }, [], undefined),
+    <<"false">> = iolist_to_binary(Bin1),
+    1 = erlang:get(x),
+    erlang:erase(x),
+    {ok, Bin2} = template_compiler:render("expr_orelse.tpl", #{ <<"a">> => 1, <<"b">> => 0 }, [], undefined),
+    <<"true">> = iolist_to_binary(Bin2),
+    undefined = erlang:get(x),
+    erlang:erase(x),
+    {ok, Bin3} = template_compiler:render("expr_orelse.tpl", #{ <<"a">> => 0, <<"b">> => 1 }, [], undefined),
+    <<"true">> = iolist_to_binary(Bin3),
+    1 = erlang:get(x),
+    erlang:erase(x).
+
+expr_andalso(_Config) ->
+    erlang:erase(x),
+    {ok, Bin1} = template_compiler:render("expr_andalso.tpl", #{ <<"a">> => 0, <<"b">> => 0 }, [], undefined),
+    <<"false">> = iolist_to_binary(Bin1),
+    undefined = erlang:get(x),
+    erlang:erase(x),
+    {ok, Bin2} = template_compiler:render("expr_andalso.tpl", #{ <<"a">> => 1, <<"b">> => 1 }, [], undefined),
+    <<"true">> = iolist_to_binary(Bin2),
+    1 = erlang:get(x),
+    erlang:erase(x),
+    {ok, Bin3} = template_compiler:render("expr_andalso.tpl", #{ <<"a">> => 1, <<"b">> => 0 }, [], undefined),
+    <<"false">> = iolist_to_binary(Bin3),
+    1 = erlang:get(x),
+    erlang:erase(x).
 
 
 test_data_dir(Config) ->
