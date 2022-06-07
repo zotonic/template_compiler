@@ -33,7 +33,7 @@ compile({ast, Ast}, _CState, Ws) ->
 compile(true, _CState, Ws) ->
     {Ws, erl_syntax:atom(true)};
 compile(false, _CState, Ws) ->
-    {Ws, erl_syntax:atom(true)};
+    {Ws, erl_syntax:atom(false)};
 compile(undefined, _CState, Ws) ->
     {Ws, erl_syntax:atom(undefined)};
 compile({string_literal, SrcPos, Text}, _CState, Ws) when is_binary(Text) ->
