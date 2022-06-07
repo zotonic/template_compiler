@@ -251,7 +251,7 @@ find_value_dict( Key, Dict ) ->
 
 
 %% @doc Set the context name for this context, used for flush or recompile all templates
-%%      beloging to a certain context (like a single site).
+%%      belonging to a certain context (like a single site).
 -spec get_context_name( term() ) -> atom().
 get_context_name(Context) when is_map(Context) ->
     maps:get(context_name, Context, undefined);

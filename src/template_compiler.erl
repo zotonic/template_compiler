@@ -233,7 +233,7 @@ add_blocks([Block|Blocks], Module, BlockMap) ->
     add_blocks(Blocks, Module, BlockMap1).
 
 
-%% @doc Extract compiler options and handle possible defauts.
+%% @doc Extract compiler options and handle possible defaults.
 -spec get_option(Option :: atom(), Options :: options()) -> term().
 get_option(runtime, Options) ->
     proplists:get_value(runtime, Options, template_compiler_runtime);
