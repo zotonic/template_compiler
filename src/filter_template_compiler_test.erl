@@ -30,6 +30,8 @@ template_compiler_test(Value, _Context) when is_integer(Value) ->
 template_compiler_test(Value, _Context) ->
     2*z_convert:to_integer(iolist_to_binary(Value)).
 
+template_compiler_test(A, <<"w">>, _Context) ->
+    io_lib:format("~w", [A]);
 template_compiler_test(A, B, _Context) ->
     [
         z_convert:to_binary(A),

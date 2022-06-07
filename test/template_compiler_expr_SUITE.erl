@@ -20,6 +20,7 @@ groups() ->
         [expr_test
         ,expr_op_test
         ,expr_filter
+        ,expr_literals
         ,expr_nested
         ,expr_autoid
         ,expr_map
@@ -68,6 +69,18 @@ expr_filter(_Config) ->
     <<"a20b">> = iolist_to_binary(Bin1),
     {ok, Bin2} = template_compiler:render("expr_filter_2.tpl", #{ a => 1, b => 2, c => 3 }, [], undefined),
     <<"*1:2*1:3:2*">> = iolist_to_binary(Bin2),
+    ok.
+
+expr_literals(_Config) ->
+    {ok, Bin1} = template_compiler:render("literals.tpl", #{}, [], undefined),
+    <<"true
+false
+undefined
+42
+<<104,101,108,108,111,32,119,111,114,108,100>>
+atom
+[a,b,c]
+#{<<97>> => 1,<<98>> => 2}\n">>, iolist_to_binary(Bin1),
     ok.
 
 expr_nested(_Config) ->
