@@ -161,7 +161,7 @@ is not changed from the previous compilation then the _Form_ is not compiled, sp
 Template language and Tags
 ==========================
 
-**For more complete documentaion see Zotonic: http://docs.zotonic.com/en/latest/developer-guide/templates.html**
+**For more complete documentation see Zotonic: http://docs.zotonic.com/en/latest/developer-guide/templates.html**
 
 Below is a short list of tags and explanation of template include / extend.
 
@@ -304,7 +304,7 @@ Hello {% block name %}...{% endblock %} world.
 ```
 
 The `{% extends "..." %}` tag _must_ be the first tag in the template. Also any text
-outside the block tags will be dropped. So be sure to surround replacable parts in your
+outside the block tags will be dropped. So be sure to surround replaceable parts in your
 base templates with block tags.
 
 There is a variation on `extends` where the template extends on a same-named template
@@ -438,7 +438,7 @@ properties:
  * `forloop.counter0` iteratiomn counter, starts at `0`
  * `forloop.revcounter` iteration counter, starts at `N`, ends at `1`
  * `forloop.revcounter0` iteration counter, starts at `N-1`, ends at `0`
- * `forloop.parentloop` the `forloop` paramater of the enclosing _for_ loop (if any)
+ * `forloop.parentloop` the `forloop` parameter of the enclosing _for_ loop (if any)
 
 **NOTE** the `forloop` iterator is only available in the template that contains
 the `for` loop, it is not passed to any included or extending templates.
