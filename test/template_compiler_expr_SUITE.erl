@@ -80,7 +80,7 @@ undefined
 <<104,101,108,108,111,32,119,111,114,108,100>>
 atom
 [a,b,c]
-#{<<97>> => 1,<<98>> => 2}\n">>, iolist_to_binary(Bin1),
+#{<<97>> => 1,<<98>> => 2}\n">> = iolist_to_binary(Bin1),
     ok.
 
 expr_nested(_Config) ->
