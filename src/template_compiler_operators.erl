@@ -22,6 +22,8 @@
 -export([
     'not'/3,
     'xor'/4,
+    'and'/4,
+    'or'/4,
 
     concat/4,
     subtract/4,
@@ -33,7 +35,7 @@
     modulo/4,
 
     negate/3,
-    
+
     ge/4,
     le/4,
     gt/4,
@@ -53,6 +55,17 @@
     A1 = Runtime:to_simple_value(A, Context),
     B1 = Runtime:to_simple_value(B, Context),
     Runtime:to_bool(A1, Context) xor Runtime:to_bool(B1, Context).
+
+% 'and' and 'or' are used by the expression compiler.
+'and'(A, B, Runtime, Context) ->
+    A1 = Runtime:to_simple_value(A, Context),
+    B1 = Runtime:to_simple_value(B, Context),
+    Runtime:to_bool(A1, Context) andalso Runtime:to_bool(B1, Context).
+
+'or'(A, B, Runtime, Context) ->
+    A1 = Runtime:to_simple_value(A, Context),
+    B1 = Runtime:to_simple_value(B, Context),
+    Runtime:to_bool(A1, Context) orelse Runtime:to_bool(B1, Context).
 
 
 concat(A, undefined, _Runtime, _Context) when is_binary(A) -> A;
