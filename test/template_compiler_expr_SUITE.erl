@@ -66,7 +66,7 @@ expr_op_test(_Config) ->
     ok.
 
 expr_op_eq_neq_test(_Config) ->
-    % {{ a == b }}|{{ a === b }}|{{ a /= b }}|{{ a /== b }}|{{ a != b }}|{{ a !== b }}
+    % {{ a == b }}|{{ a === b }}|{{ a /= b }}|{{ a =/= b }}|{{ a != b }}|{{ a !== b }}
     {ok, Bin1} = template_compiler:render("expr_op_eq_neq.tpl", #{ a => 10, b => 5 }, [], undefined),
     <<"false|false|true|true|true|true">> = iolist_to_binary(Bin1),
     {ok, Bin2} = template_compiler:render("expr_op_eq_neq.tpl", #{ a => 5, b => 5 }, [], undefined),
