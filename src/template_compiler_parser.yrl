@@ -244,7 +244,7 @@ Terminals
     xor_keyword
     and_keyword
     hash
-    '==' '/=' '<' '>' '=<' '>='
+    '===' '/==' '==' '/=' '<' '>' '=<' '>='
     '++' '--'
     '+' '-'
     '*' '/' '%'
@@ -257,7 +257,7 @@ Rootsymbol
 Left 100 or_keyword.
 Left 105 xor_keyword.
 Left 110 and_keyword.
-Nonassoc 300 '==' '/=' '<' '>' '=<' '>='.
+Nonassoc 300 '===' '/==' '==' '/=' '<' '>' '=<' '>='.
 Left 350 '++' '--'.
 Left 400 '+' '-'.
 Left 500 '*' '/' '%'.
@@ -511,6 +511,8 @@ OptE -> E : '$1'.
 E -> E or_keyword E  : {expr, {'or', '$2'}, '$1', '$3'}.
 E -> E xor_keyword E  : {expr, {'xor', '$2'}, '$1', '$3'}.
 E -> E and_keyword E  : {expr, {'and', '$2'}, '$1', '$3'}.
+E -> E '===' E  : {expr, {'seq', '$2'}, '$1', '$3'}.
+E -> E '/==' E  : {expr, {'sne', '$2'}, '$1', '$3'}.
 E -> E '==' E  : {expr, {'eq', '$2'}, '$1', '$3'}.
 E -> E '/=' E  : {expr, {'ne', '$2'}, '$1', '$3'}.
 E -> E '<' E  : {expr, {'lt', '$2'}, '$1', '$3'}.
