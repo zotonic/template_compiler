@@ -349,6 +349,18 @@ scan(<<"%{", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
     scan(T, [{open_map, {SourceRef, Row, Column}, <<"{">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
 
 % Expression operators
+scan(<<"===", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
+    scan(T, [{'=:=', {SourceRef, Row, Column}, <<"===">>} | Scanned], {SourceRef, Row, Column + 3}, {in_code, Closer});
+
+scan(<<"=:=", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
+    scan(T, [{'=:=', {SourceRef, Row, Column}, <<"=:=">>} | Scanned], {SourceRef, Row, Column + 3}, {in_code, Closer});
+
+scan(<<"!==", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
+    scan(T, [{'=/=', {SourceRef, Row, Column}, <<"!==">>} | Scanned], {SourceRef, Row, Column + 3}, {in_code, Closer});
+
+scan(<<"=/=", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
+    scan(T, [{'=/=', {SourceRef, Row, Column}, <<"=/=">>} | Scanned], {SourceRef, Row, Column + 3}, {in_code, Closer});
+
 scan(<<"==", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
     scan(T, [{'==', {SourceRef, Row, Column}, <<"==">>} | Scanned], {SourceRef, Row, Column + 2}, {in_code, Closer});
 

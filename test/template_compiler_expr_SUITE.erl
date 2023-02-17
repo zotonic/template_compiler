@@ -16,9 +16,10 @@ all() ->
     ].
 
 groups() ->
-    [{basic, [], 
+    [{basic, [],
         [expr_test
         ,expr_op_test
+        ,expr_op_eq_neq_test
         ,expr_filter
         ,expr_literals
         ,expr_nested
@@ -62,6 +63,18 @@ expr_test(_Config) ->
 expr_op_test(_Config) ->
     {ok, Bin1} = template_compiler:render("expr_op.tpl", #{ a => 10, b => 5 }, [], undefined),
     <<"15|5|50|5|2.0">> = iolist_to_binary(Bin1),
+    ok.
+
+expr_op_eq_neq_test(_Config) ->
+    % {{ a == b }}|{{ a === b }}|{{ a /= b }}|{{ a =/= b }}|{{ a != b }}|{{ a !== b }}
+    {ok, Bin1} = template_compiler:render("expr_op_eq_neq.tpl", #{ a => 10, b => 5 }, [], undefined),
+    <<"false|false|true|true|true|true">> = iolist_to_binary(Bin1),
+    {ok, Bin2} = template_compiler:render("expr_op_eq_neq.tpl", #{ a => 5, b => 5 }, [], undefined),
+    <<"true|true|false|false|false|false">> = iolist_to_binary(Bin2),
+    {ok, Bin3} = template_compiler:render("expr_op_eq_neq.tpl", #{ a => 5, b => <<"5">> }, [], undefined),
+    <<"true|false|false|true|false|true">> = iolist_to_binary(Bin3),
+    {ok, Bin4} = template_compiler:render("expr_op_eq_neq.tpl", #{ a => 30, b => true }, [], undefined),
+    <<"true|false|false|true|false|true">> = iolist_to_binary(Bin4),
     ok.
 
 expr_filter(_Config) ->

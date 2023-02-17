@@ -41,7 +41,9 @@
     gt/4,
     lt/4,
     eq/4,
-    ne/4
+    ne/4,
+    seq/4,
+    sne/4
 ]).
 
 'not'(false, _Runtime, _Context) -> true;
@@ -190,6 +192,18 @@ ne(A, A, _Runtime, _Context) -> false;
 ne(Input, Value, Runtime, Context) ->
     {A, B} = to_values(Input, Value, Runtime, Context),
     A /= B.
+
+seq(A, A, _Runtime, _Context) -> true;
+seq(Input, Value, Runtime, Context) ->
+    A1 = Runtime:to_simple_value(Input, Context),
+    B1 = Runtime:to_simple_value(Value, Context),
+    A1 == B1.
+
+sne(A, A, _Runtime, _Context) -> false;
+sne(Input, Value, Runtime, Context) ->
+    A1 = Runtime:to_simple_value(Input, Context),
+    B1 = Runtime:to_simple_value(Value, Context),
+    A1 /= B1.
 
 
 %% @doc Convert the two parameters to compatible values
