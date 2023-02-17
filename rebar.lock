@@ -1,22 +1,22 @@
 {"1.2.0",
 [{<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.11.0">>},1},
- {<<"qdate_localtime">>,{pkg,<<"qdate_localtime">>,<<"1.2.0">>},0},
+ {<<"qdate_localtime">>,{pkg,<<"qdate_localtime">>,<<"1.2.1">>},0},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.6">>},2},
  {<<"tls_certificate_check">>,
-  {pkg,<<"tls_certificate_check">>,<<"1.16.0">>},
+  {pkg,<<"tls_certificate_check">>,<<"1.17.3">>},
   1},
- {<<"zotonic_stdlib">>,{pkg,<<"zotonic_stdlib">>,<<"1.11.2">>},0}]}.
+ {<<"zotonic_stdlib">>,{pkg,<<"zotonic_stdlib">>,<<"1.13.0">>},0}]}.
 [
 {pkg_hash,[
  {<<"cowlib">>, <<"0B9FF9C346629256C42EBE1EEB769A83C6CB771A6EE5960BD110AB0B9B872063">>},
- {<<"qdate_localtime">>, <<"644ADE4C7F7EAC765E2048DFA714D78EA86BAF5255FE46279B2EAC5729760A07">>},
+ {<<"qdate_localtime">>, <<"72E1034DC6B7FEE8F588281EDDD0BD0DC5260005D758052F50634D265D382C18">>},
  {<<"ssl_verify_fun">>, <<"CF344F5692C82D2CD7554F5EC8FD961548D4FD09E7D22F5B62482E5AEAEBD4B0">>},
- {<<"tls_certificate_check">>, <<"45B05E3B993DBACE2E4EBCCB666EADBD038F1DA8F4DB9691F4F34A274DFB0BD7">>},
- {<<"zotonic_stdlib">>, <<"CAC0BA50B041C38DD7925B990DAC084616CCA1E042FE82E458A94E52A89F3E26">>}]},
+ {<<"tls_certificate_check">>, <<"B84B68C5A607A37C98C88D26101028F9667DF520FF6557ACBABCAFB6799EB317">>},
+ {<<"zotonic_stdlib">>, <<"D0EFD279C005B82CA54C015ECB95F1AF11FC5088546999FFDED986895D2F2F5A">>}]},
 {pkg_hash_ext,[
  {<<"cowlib">>, <<"2B3E9DA0B21C4565751A6D4901C20D1B4CC25CBB7FD50D91D2AB6DD287BC86A9">>},
- {<<"qdate_localtime">>, <<"98A538A5B6046B8652DFC5630B030D0414A1B31D0130C81FA6B88B5C1E625109">>},
+ {<<"qdate_localtime">>, <<"1109958D205C65C595C8C5694CB83EBAF2DBE770CF902E4DCE8AFB2C4123764D">>},
  {<<"ssl_verify_fun">>, <<"BDB0D2471F453C88FF3908E7686F86F9BE327D065CC1EC16FA4540197EA04680">>},
- {<<"tls_certificate_check">>, <<"3DC0508C749619B8D6A5E21ACA4D719C184F065541795B0556398C8E574A3064">>},
- {<<"zotonic_stdlib">>, <<"AEBF9DD330207A9FB73FC1744EE4037BAC4B62A21EB13D6DA5BD951A5D658C89">>}]}
+ {<<"tls_certificate_check">>, <<"EEC5BA4298DEE0B4E1EF612D90B2A35F6AF064D477BD9531EAC19CABA9F84A0A">>},
+ {<<"zotonic_stdlib">>, <<"C2CFB9F9DB6C9EFC58EAC6C311ADA85C27CFFA4BE99C49786BD9A950CB054519">>}]}
 ].
