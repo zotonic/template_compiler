@@ -96,7 +96,7 @@ module() -> tpl_7bae8076a5771865123be7112468b79e9d78a640.
 extends() -> undefined.
 
 %% The filename of this template
-filename -> <<"foor/bar/a.tpl">>.
+filename() -> <<"foo/bar/a.tpl">>.
 
 %% The modification time of the template file on compilation
 mtime() - {{2019,1,31},{11,51,49}}.
