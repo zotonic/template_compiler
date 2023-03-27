@@ -6,7 +6,7 @@
 %%% @copyright 2009-2016 Marc Worrell
 %%% @doc Template language grammar
 %%% @changes Marc Worrell - added print/image/scomp, more args options etc.
-%%% @end  
+%%% @end
 %%%
 %%% The MIT License
 %%%
@@ -50,7 +50,7 @@ Nonterminals
     ExtendsTag
     OverrulesTag
     InheritTag
-    
+
     IncludeTag
     CatIncludeTag
     NowTag
@@ -71,7 +71,7 @@ Nonterminals
     FilterBraced
     EndFilterBraced
     Filters
-    
+
     ScriptBlock
     ScriptBraced
     EndScriptBraced
@@ -94,12 +94,12 @@ Nonterminals
     IfEqualBlock
     IfEqualBraced
     IfEqualExpression
-    EndIfEqualBraced  
-    
+    EndIfEqualBraced
+
     IfNotEqualBlock
     IfNotEqualBraced
     IfNotEqualExpression
-    EndIfNotEqualBraced      
+    EndIfNotEqualBraced
 
     AutoEscapeBlock
     AutoEscapeBraced
@@ -108,7 +108,7 @@ Nonterminals
     WithBlock
     WithBraced
     EndWithBraced
-    
+
     Value
     TermValue
     Variable
@@ -118,14 +118,14 @@ Nonterminals
 
     ModelCall
     OptModelArg
-    
+
     LibTag
     LibUrlTag
     LibList
-    
+
     LoadTag
     LoadNames
-    
+
     CustomTag
     WithArgs
     Args
@@ -319,6 +319,7 @@ OptWith -> '$empty' : [].
 OptWith -> with_keyword Args : '$2'.
 
 ExtendsTag -> open_tag extends_keyword string_literal close_tag : '$3'.
+ExtendsTag -> open_tag extends_keyword ModelCall close_tag : '$3'.
 OverrulesTag -> open_tag overrules_keyword close_tag : overrules.
 InheritTag -> open_tag inherit_keyword close_tag : {inherit, '$1'}.
 

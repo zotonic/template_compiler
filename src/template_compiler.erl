@@ -215,6 +215,10 @@ block_lookup({ok, TplFile}, BlockMap, ExtendsStack, DebugTrace, Options, Vars, R
                             block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options, Vars, Runtime, Context);
                         Extends when is_binary(Extends) ->
                             Next = Runtime:map_template(Extends, Vars, Context),
+                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options, Vars, Runtime, Context);
+                        {model, {Model, Path, Payload}} ->
+                            {ok, {Extends, _}} = Runtime:model_call(Model, Path, Payload, Context),
+                            Next = Runtime:map_template(z_convert:to_binary(Extends), Vars, Context),
                             block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options, Vars, Runtime, Context)
                     end
             end;
@@ -406,6 +410,16 @@ compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState, _
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
     {ok, {Extend, BlockAsts, undefined, Ws#ws.is_autoid_var}};
+compile_tokens({ok, {extends, {model, [{identifier, _, Model0} | Path0], Payload0}, Elements}}, CState, _Options) ->
+    Blocks = find_blocks(Elements),
+    {Ws, BlockAsts} = compile_blocks(Blocks, CState),
+    Model = template_compiler_utils:to_atom(Model0),
+    Path = lists:map(fun({identifier, _, P}) -> P end, Path0),
+    Payload = case Payload0 =:= none of
+                  true -> undefined;
+                  false -> Payload0
+              end,
+    {ok, {{model, {Model, Path, Payload}}, BlockAsts, undefined, Ws#ws.is_autoid_var}};
 compile_tokens({ok, {overrules, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
