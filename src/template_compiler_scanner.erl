@@ -3,9 +3,9 @@
 %%% @author    Evan Miller <emmiller@gmail.com>
 %%% @author    Marc Worrell <marc@worrell.nl>
 %%% @copyright 2008 Roberto Saccon, Evan Miller; 2009-2020 Marc Worrell
-%%% @doc 
+%%% @doc
 %%% Template language scanner
-%%% @end  
+%%% @end
 %%%
 %%% The MIT License
 %%%
@@ -43,7 +43,7 @@
 -author('emmiller@gmail.com').
 -author('marc@worrell.nl').
 
--export([scan/1, scan/2]). 
+-export([scan/1, scan/2]).
 
 
 %%====================================================================
@@ -66,11 +66,11 @@ scan(SourceRef, Template) when is_binary(Template) ->
     scan(Template, [], {SourceRef, 1, 1}, in_text).
 
 
-identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc}) 
-  when PrevToken =:= open_tag; 
+identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc})
+  when PrevToken =:= open_tag;
        PrevToken =:= all_keyword;
        PrevToken =:= optional_keyword ->
-    %% the last two guards really ought to be for it's own fun, 
+    %% the last two guards really ought to be for it's own fun,
     %% since they only apply for [cat]include (the last one only for include)
 
     %% At the start of a {% .... %} tag we accept all keywords
@@ -91,12 +91,12 @@ identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc})
         <<"m">>
     ],
     Type = case lists:member(String, Keywords) of
-        true -> 
-            case list_to_atom(binary_to_list(String) ++ "_keyword") of
+        true ->
+            case template_compiler_utils:to_atom(binary_to_list(String) ++ "_keyword") of
                 elseif_keyword -> elif_keyword;
                 KWA -> KWA
             end;
-        _ -> 
+        _ ->
             identifier
     end,
     {Type, [{Type, Pos, String}|Acc]};
@@ -115,9 +115,9 @@ identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc}) when PrevToke
     Keywords = [
         <<"in">>, <<"not">>, <<"or">>, <<"and">>, <<"xor">>, <<"firstof">>,
         <<"regroup">>, <<"templatetag">>, <<"with">>, <<"as">>
-    ], 
+    ],
     Type = case lists:member(String, Keywords) of
-        true -> list_to_atom(binary_to_list(String) ++ "_keyword");
+        true -> template_compiler_utils:to_atom(binary_to_list(String) ++ "_keyword");
         _ ->    identifier
     end,
     {Type, [{Type, Pos, String}|Acc]};
@@ -128,15 +128,15 @@ identifier_to_keyword({identifier, Pos, String}, {_PrevToken, Acc}) ->
         <<"in">>, <<"not">>, <<"or">>, <<"and">>, <<"xor">>, <<"firstof">>,
         <<"regroup">>, <<"templatetag">>, <<"with">>, <<"as">>,
         <<"m">>
-    ], 
+    ],
     Type = case lists:member(String, Keywords) of
-        true -> list_to_atom(binary_to_list(String) ++ "_keyword");
+        true -> template_compiler_utils:to_atom(binary_to_list(String) ++ "_keyword");
         _ ->    identifier
     end,
     {Type, [{Type, Pos, String}|Acc]};
 identifier_to_keyword({Type, Pos, String}, {_PrevToken, Acc}) ->
     {Type, [{Type, Pos, String}|Acc]}.
-    
+
 
 scan(<<>>, Scanned, _, in_text) ->
     {_Token, ScannedKeyword} = lists:foldr(fun identifier_to_keyword/2, {'$eof', []}, Scanned),
@@ -198,13 +198,13 @@ scan(<<"{{", T/binary>>, Scanned, {SourceRef, Row, Column}, in_text) ->
 scan(<<"<!--{_", T/binary>>, Scanned, {SourceRef, Row, Column}, in_text) ->
     scan(T, [
             {trans_text, {SourceRef, Row, Column + 6}, <<"">>},
-            {open_trans, {SourceRef, Row, Column}, <<"<!--{_">>} | Scanned], 
+            {open_trans, {SourceRef, Row, Column}, <<"<!--{_">>} | Scanned],
     {SourceRef, Row, Column + 6}, {in_trans, <<"_}-->">>});
 
 scan(<<"{_", T/binary>>, Scanned, {SourceRef, Row, Column}, in_text) ->
     scan(T, [
             {trans_text, {SourceRef, Row, Column + 2}, <<>>},
-            {open_trans, {SourceRef, Row, Column}, <<"{_">>} | Scanned], 
+            {open_trans, {SourceRef, Row, Column}, <<"{_">>} | Scanned],
         {SourceRef, Row, Column + 2}, {in_trans, <<"_}">>});
 
 scan(<<"_}-->", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_trans, <<"_}-->">>}) ->
@@ -235,11 +235,11 @@ scan(<<_/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_comment, Close
     scan(T, Scanned, {SourceRef, Row, Column + 1}, {in_comment, Closer});
 
 scan(<<"<!--{%", T/binary>>, Scanned, {SourceRef, Row, Column}, in_text) ->
-    scan(T, [{open_tag, {SourceRef, Row, Column}, <<"<!--{%">>} | Scanned], 
+    scan(T, [{open_tag, {SourceRef, Row, Column}, <<"<!--{%">>} | Scanned],
         {SourceRef, Row, Column + 6}, {in_code, <<"%}-->">>});
 
 scan(<<"{%", T/binary>>, Scanned, {SourceRef, Row, Column}, in_text) ->
-    scan(T, [{open_tag, {SourceRef, Row, Column}, <<"{%">>} | Scanned], 
+    scan(T, [{open_tag, {SourceRef, Row, Column}, <<"{%">>} | Scanned],
         {SourceRef, Row, Column + 2}, {in_code, <<"%}">>});
 
 scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_trans, Closer}) ->

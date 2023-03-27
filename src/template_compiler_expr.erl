@@ -7,9 +7,9 @@
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
-%% 
+%%
 %%     http://www.apache.org/licenses/LICENSE-2.0
-%% 
+%%
 %% Unless required by applicable law or agreed to in writing, software
 %% distributed under the License is distributed on an "AS IS" BASIS,
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -186,7 +186,7 @@ compile({model, [{identifier, SrcPos, Model} | Path ], OptPayload}, #cs{runtime=
             "  {error, _} -> undefined "
             "end",
             [
-                {model, erl_syntax:atom(binary_to_atom(Model, 'utf8'))},
+                {model, erl_syntax:atom(template_compiler_utils:to_atom(Model))},
                 {path, erl_syntax:list(PathAsts)},
                 {payload, PayloadAst},
                 {v1, erl_syntax:variable(V1)},
@@ -219,7 +219,7 @@ find_value_lookup([
     Ws1 = Ws#ws{is_forloop_var=true},
     ValueLookupAsts = [
         erl_syntax:atom(forloop),
-        erl_syntax:atom(binary_to_atom(Key, utf8))
+        erl_syntax:atom(template_compiler_utils:to_atom(Key))
     ],
     Ast = merl:qquote(
             erl_syntax:get_pos(SrcPos),

@@ -346,7 +346,7 @@ module_name(Runtime, Filename, SpecialContextArgs, Tokens) ->
     },
     TokenChecksum = crypto:hash(sha, term_to_binary(Term)),
     Hex = z_string:to_lower(z_url:hex_encode(TokenChecksum)),
-    binary_to_atom(iolist_to_binary(["tpl_",Hex]), 'utf8').
+    template_compiler_utils:to_atom(iolist_to_binary(["tpl_",Hex])).
 
 % Ensure that duplicate files have the same checksum by removing the filename.
 remove_srcpos(Tokens) ->
