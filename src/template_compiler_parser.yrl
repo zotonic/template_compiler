@@ -318,8 +318,7 @@ ValueBraced -> open_var E OptWith close_var : {value, '$1', '$2', '$3'}.
 OptWith -> '$empty' : [].
 OptWith -> with_keyword Args : '$2'.
 
-ExtendsTag -> open_tag extends_keyword string_literal close_tag : '$3'.
-ExtendsTag -> open_tag extends_keyword ModelCall close_tag : '$3'.
+ExtendsTag -> open_tag extends_keyword E WithArgs close_tag : {'$3', '$4'}.
 OverrulesTag -> open_tag overrules_keyword close_tag : overrules.
 InheritTag -> open_tag inherit_keyword close_tag : {inherit, '$1'}.
 
