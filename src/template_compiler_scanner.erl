@@ -45,6 +45,8 @@
 
 -export([scan/1, scan/2]). 
 
+-define(IS_EOF(S),
+        (S =:= <<>> orelse S =:= <<"\n">> orelse S =:= <<"\r\n">>)).
 
 %%====================================================================
 %% API
@@ -138,20 +140,20 @@ identifier_to_keyword({Type, Pos, String}, {_PrevToken, Acc}) ->
     {Type, [{Type, Pos, String}|Acc]}.
     
 
-scan(<<>>, Scanned, _, in_text) ->
+scan(Eof, Scanned, _, in_text) when ?IS_EOF(Eof) ->
     {_Token, ScannedKeyword} = lists:foldr(fun identifier_to_keyword/2, {'$eof', []}, Scanned),
     {ok, lists:reverse(ScannedKeyword)};
 
-scan(<<>>, _Scanned, {SourceRef, _, _}, {in_comment, _}) ->
+scan(Eof, _Scanned, {SourceRef, _, _}, {in_comment, _}) when ?IS_EOF(Eof) ->
     {error, io_lib:format("Reached end of ~p inside a comment.", [SourceRef])};
 
-scan(<<>>, _Scanned, {SourceRef, _, _}, {in_trans, _}) ->
+scan(Eof, _Scanned, {SourceRef, _, _}, {in_trans, _}) when ?IS_EOF(Eof) ->
     {error, io_lib:format("Reached end of ~p inside a trans block.", [SourceRef])};
 
-scan(<<>>, _Scanned, {SourceRef, _, _}, {in_raw, _}) ->
+scan(Eof, _Scanned, {SourceRef, _, _}, {in_raw, _}) when ?IS_EOF(Eof) ->
     {error, io_lib:format("Reached end of ~p inside a raw block.", [SourceRef])};
 
-scan(<<>>, _Scanned, {SourceRef, _, _}, _) ->
+scan(Eof, _Scanned, {SourceRef, _, _}, _) when ?IS_EOF(Eof) ->
     {error, io_lib:format("Reached end of ~p inside a code block.", [SourceRef])};
 
 %%we just capture the {% raw %} {% endraw %} tags and pass on string between the tags as is
