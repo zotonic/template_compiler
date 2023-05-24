@@ -6,7 +6,10 @@
   {applications, [
       kernel,
       stdlib,
-      crypto
+      crypto,
+      compiler,
+      syntax_tools,
+      zotonic_stdlib
   ]},
   {env,[
       {template_dir, {template_compiler, "templates"}}
