@@ -45,6 +45,13 @@ include_test(_Config) ->
 include_dynamic_test(_Config) ->
     {ok, Bin1} = template_compiler:render("include_dynamic.tpl", #{ t => "include_b.tpl" }, [], undefined),
     <<"abc">> = iolist_to_binary(Bin1),
+
+    {ok, Bin2} = template_compiler:render("include_dynamic.tpl", #{ t => "include_b_no_trailing_newline.tpl" }, [], undefined),
+    <<"abc">> = iolist_to_binary(Bin2),
+
+    {ok, Bin3} = template_compiler:render("include_dynamic.tpl", #{ t => "include_b_trailing_dos_newline.tpl" }, [], undefined),
+    <<"abc">> = iolist_to_binary(Bin3),
+
     ok.
 
 include_args_test(_Config) ->

@@ -499,6 +499,11 @@ when you are still writing the template:
 The expression value will be printed using `io_lib:format("~p", [ SomExpr ])`, then
 escaped and surrounded with `<pre>...</pre>`.
 
+Whitespace Handling
+-------------------
+ 
+- A single trailing newline is stripped, from the template, if present.
+- Other whitespace, like tabs, newlines and spaces are returned unchanged.
 
 License
 =======
