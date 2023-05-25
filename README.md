@@ -130,17 +130,17 @@ Context = your_request_context,     % Context passed to the runtime module and f
 {ok, IOList} = template_compiler:render("hello.tpl", Vars, Options, Context).
 ```
 
-The `render/4` function looks up the template, ensures it is compiled, and then calls the compiled render
-function of the template or the templates it extends (which are also compiled etc.).
+The `template_compiler:render/4` function looks up the template, ensures it is compiled, and then
+calls the compiled render function of the template or the templates it extends (which are also compiled etc.).
 
 
-Use `compile_file/3` and `compile_binary/4` to compile a template file or in-memory binary to a module:
+Use `template_compiler:compile_file/3` and `template_compiler:compile_binary/4` to compile a template file or in-memory binary to a module:
 
 ```erlang
 {ok, Module} = template_compiler:compile_binary(<<"...">>, Filename, Options, Context).
 ```
 
-The `Filename` is used to reference the compiled binary.
+The Filename is used to reference the compiled binary.
 
 
 #### Force recompilation
