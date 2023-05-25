@@ -213,9 +213,13 @@ block_lookup({ok, TplFile}, BlockMap, ExtendsStack, DebugTrace, Options, Vars, R
                             Template = TplFile#template_file.template,
                             Next = Runtime:map_template({overrules, Template, Module:filename()}, Vars, Context),
                             block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options, Vars, Runtime, Context);
-                        Extends when is_binary(Extends) ->
-                            Next = Runtime:map_template(Extends, Vars, Context),
-                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options, Vars, Runtime, Context)
+                        {ExtendsBlockAst, ArgsListAst} ->
+                            {value, ArgsList, []} = erl_eval:expr(ArgsListAst, []),
+                            Vars1 = merge_vars(ArgsList, Vars),
+                            Context1 = Runtime:set_context_vars(Vars1, Context),
+                            {value, Extends, _} = erl_eval:expr(ExtendsBlockAst, [{'Vars', Vars1}, {'Context', Context1}]),
+                            Next = Runtime:map_template(z_convert:to_binary(Extends), Vars1, Context1),
+                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options, Vars1, Runtime, Context1)
                     end
             end;
         {error, _} = Error ->
@@ -402,10 +406,13 @@ cs(Module, Filename, Options, Context) ->
         context=Context
     }.
 
-compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState, _Options) ->
+compile_tokens({ok, {extends, {ExtendsBlock, Args}, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
-    {ok, {Extend, BlockAsts, undefined, Ws#ws.is_autoid_var}};
+    {Ws1, ExtendsBlockAst} = template_compiler_expr:compile(ExtendsBlock, CState, Ws),
+    {Ws2, ArgsList} = template_compiler_element:with_args(Args, CState, Ws1, false),
+    ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList ]),
+    {ok, {{erl_syntax:revert(ExtendsBlockAst), erl_syntax:revert(ArgsListAst)}, BlockAsts, undefined, Ws2#ws.is_autoid_var}};
 compile_tokens({ok, {overrules, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
@@ -573,3 +580,12 @@ extract_translations(Tokens) ->
         end,
         [],
         Tokens).
+
+merge_vars(Args1, Args2) when is_list(Args1), is_list(Args2) ->
+    lists:merge(Args1, Args2);
+merge_vars(Args1, Args2) when is_map(Args1), is_map(Args2) ->
+    maps:merge(Args1, Args2);
+merge_vars(Args1, Args2) when is_list(Args1), is_map(Args2) ->
+    maps:merge(proplists:to_map(Args1), Args2);
+merge_vars(Args1, Args2) when is_map(Args1), is_list(Args2) ->
+    lists:merge(proplists:from_map(Args1), Args2).
