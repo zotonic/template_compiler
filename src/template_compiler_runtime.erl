@@ -1,9 +1,10 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016-2020 Marc Worrell
+%% @copyright 2016-2023 Marc Worrell
 %% @doc Simple runtime for the compiled templates. Needs to be
 %%      copied and adapted for different environments.
+%% @end
 
-%% Copyright 2016-2020 Marc Worrell
+%% Copyright 2016-2023 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.

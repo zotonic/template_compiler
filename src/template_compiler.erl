@@ -1,8 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016-2021 Marc Worrell
+%% @copyright 2016-2023 Marc Worrell
 %% @doc Main template compiler entry points.
+%% @end
 
-%% Copyright 2016-2021 Marc Worrell
+%% Copyright 2016-2023 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -295,10 +296,10 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
                             cs(Module, Filename, Options, Context),
                             Options)
                     of
-                        {ok, {Extends, BlockAsts, TemplateAst, IsAutoid}} ->
+                        {ok, {Extends, Includes, BlockAsts, TemplateAst, IsAutoid}} ->
                             Forms = template_compiler_module:compile(
                                                 Module, Filename, Mtime, IsAutoid, Runtime,
-                                                Extends, BlockAsts, TemplateAst),
+                                                Extends, Includes, BlockAsts, TemplateAst),
                             compile_forms(Filename, Forms);
                         {error, _} = Error ->
                             Error
@@ -405,17 +406,17 @@ cs(Module, Filename, Options, Context) ->
 compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
-    {ok, {Extend, BlockAsts, undefined, Ws#ws.is_autoid_var}};
+    {ok, {Extend, Ws#ws.includes, BlockAsts, undefined, Ws#ws.is_autoid_var}};
 compile_tokens({ok, {overrules, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
-    {ok, {overrules, BlockAsts, undefined, Ws#ws.is_autoid_var}};
+    {ok, {overrules, Ws#ws.includes, BlockAsts, undefined, Ws#ws.is_autoid_var}};
 compile_tokens({ok, {base, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
     {Ws, BlockAsts} = compile_blocks(Blocks, CState),
     CStateElts = CState#cs{blocks = BlockAsts},
     {Ws1, TemplateAsts} = template_compiler_element:compile(Elements, CStateElts, Ws),
-    {ok, {undefined, BlockAsts, TemplateAsts, Ws1#ws.is_autoid_var}};
+    {ok, {undefined, Ws1#ws.includes, BlockAsts, TemplateAsts, Ws1#ws.is_autoid_var}};
 compile_tokens({error, {Loc, template_compiler_parser, Msg}}, #cs{ filename = Filename }, Options) ->
     % Try format the Yecc error
     Err = split_loc(Loc),

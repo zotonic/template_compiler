@@ -1,8 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016 Marc Worrell
+%% @copyright 2016-2023 Marc Worrell
 %% @doc Build the template module from the parts.
+%% @end
 
-%% Copyright 2016 Marc Worrell
+%% Copyright 2016-2023 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -20,16 +21,16 @@
 -author('Marc Worrell <marc@worrell.nl>').
 
 -export([
-    compile/8
+    compile/9
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
 -include("template_compiler.hrl").
 -include("template_compiler_internal.hrl").
 
-compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, undefined) ->
-    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, erl_syntax:abstract(<<>>));
-compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, TemplateAst) ->
+compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, undefined) ->
+    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>));
+compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst) ->
     Now = os:timestamp(),
     BlockNames = [ BN || {BN, _Tree, _Ws} <- BlockAsts ],
     Forms = lists:flatten(
@@ -41,6 +42,7 @@ compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, Template
                 "blocks/0,",
                 "module/0,",
                 "extends/0,",
+                "includes/0,",
                 "filename/0,",
                 "mtime/0,",
                 "is_autoid/0,"
@@ -51,6 +53,7 @@ compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, BlockAsts, Template
             "blocks() -> _@BlockNames@.",
             "module() -> _@Module@.",
             "extends() -> _@Extends@.",
+            "includes() -> _@Includes@.",
             "filename() -> _@Filename@.",
             "mtime() -> _@Mtime@.",
             "is_autoid() -> _@IsAutoid@.",

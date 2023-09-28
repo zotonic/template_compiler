@@ -1,8 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016 Marc Worrell
+%% @copyright 2016-2023 Marc Worrell
 %% @doc Template compiler internal definitions.
+%% @end
 
-%% Copyright 2016 Marc Worrell
+%% Copyright 2016-2023 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -44,7 +45,8 @@
         nr = 1 :: integer(),
         custom_tags = [],
         is_forloop_var = false :: boolean(),
-        is_autoid_var = false :: boolean()
+        is_autoid_var = false :: boolean(),
+        includes = [] :: [ binary() ]
     }).
 
 %% @doc State for the compiler. Also records the current block's arguments variable, and context variable.
