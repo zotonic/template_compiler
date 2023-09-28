@@ -55,6 +55,7 @@ Hello
 {% block a %}this is block a{% endblock %}
 World
 {% block b %}this is block b{% endblock %}
+{% optional include "foo.tpl" %}
 ```
 
 Will be compiled to an Erlang module with the following structure:
@@ -69,6 +70,7 @@ Will be compiled to an Erlang module with the following structure:
     blocks/0,
     module/0,
     extends/0,
+    includes/0,
     filename/0,
     mtime/0,
     is_autoid/0,
@@ -95,11 +97,23 @@ module() -> tpl_7bae8076a5771865123be7112468b79e9d78a640.
 %% The template that this template extends on.
 extends() -> undefined.
 
+%% The templates that this template includes.
+%% Includes which use variable names for the template name are not listed.
+includes() -> [ 
+        #{
+            template => <<"foo.tpl">>,
+            line => 5,
+            column => 20,
+            method => optional,   % normal | all | optional
+            is_catinclude => false
+        }
+    ].
+
 %% The filename of this template
 filename() -> <<"foo/bar/a.tpl">>.
 
 %% The modification time of the template file on compilation
-mtime() - {{2019,1,31},{11,51,49}}.
+mtime() - {{2023,9,28},{11,51,49}}.
 
 %% Flag if the autoid ("#id") construct is used in this template.
 is_autoid() -> false.

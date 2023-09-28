@@ -2,6 +2,8 @@
 
 -include_lib("common_test/include/ct.hrl").
 
+-include("../include/template_compiler.hrl").
+
 -compile(export_all).
 
 
@@ -40,6 +42,17 @@ include_test(_Config) ->
     % io:format(user, "~p", [Config]),
     {ok, Bin1} = template_compiler:render("include.tpl", #{}, [], undefined),
     <<"abc">> = iolist_to_binary(Bin1),
+
+    {ok, #template_file{ filename = Filename }} = template_compiler_runtime:map_template(<<"include.tpl">>, [], undefined),
+    {ok, Mod} = template_compiler:lookup(Filename, [], undefined),
+    [ #{
+        template := <<"include_b.tpl">>,
+        line := 1,
+        column := _,
+        is_catinclude := false,
+        method := normal
+      } ] = Mod:includes(),
+
     ok.
 
 include_dynamic_test(_Config) ->

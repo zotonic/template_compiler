@@ -1,8 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016 Marc Worrell
+%% @copyright 2016-2023 Marc Worrell
 %% @doc Compile main block elements to erl_syntax trees.
+%% @end
 
-%% Copyright 2016 Marc Worrell
+%% Copyright 2016-2023 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -678,7 +679,8 @@ include({_, SrcPos, _}, Method, Template, ArgsList, IsContextVars, #cs{runtime=R
             {context_vars, erl_syntax:abstract(CState#cs.context_vars)},
             {is_context_vars, erl_syntax:abstract(IsContextVars)}
         ]),
-    {Ws1, Ast}.
+    Ws2 = maybe_add_include(Template, Method, false, Ws1),
+    {Ws2, Ast}.
 
 
 catinclude({_, SrcPos, _}, Method, Template, IdAst, ArgsList, IsContextVars, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
@@ -702,9 +704,23 @@ catinclude({_, SrcPos, _}, Method, Template, IdAst, ArgsList, IsContextVars, #cs
             {context, erl_syntax:variable(CState#cs.context_var)},
             {context_vars, erl_syntax:abstract(CState#cs.context_vars)}
         ]),
-    {Ws1, Ast}.
+    Ws2 = maybe_add_include(Template, Method, true, Ws1),
+    {Ws2, Ast}.
 
-
+maybe_add_include({string_literal, SrcPos, Text}, Method, IsCatinclude, Ws) ->
+    {_, Line, Column} = SrcPos,
+    Tpl = #{
+        template => Text,
+        line => Line,
+        column => Column,
+        method => Method,
+        is_catinclude => IsCatinclude
+    },
+    Ws#ws{
+        includes = [ Tpl | Ws#ws.includes ]
+    };
+maybe_add_include(_Token, _Method, _IsCatinclude, Ws) ->
+    Ws.
 
 expr_list(ExprList, CState, Ws) ->
     lists:foldr(
