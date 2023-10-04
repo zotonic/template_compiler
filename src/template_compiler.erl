@@ -191,6 +191,7 @@ normalize_template({overrules, Template, Filename}) when is_list(Template) ->
 
 %% @doc Recursive lookup of blocks via the extends-chain of a template.
 block_lookup({ok, TplFile}, BlockMap, ExtendsStack, DebugTrace, Options, Vars, Runtime, Context) ->
+    TplFilename = TplFile#template_file.filename,
     Trace = Runtime:trace_render(TplFile#template_file.filename, Options, Context),
     case template_compiler_admin:lookup(TplFile#template_file.filename, Options, Context) of
         {ok, Module} ->
@@ -211,12 +212,20 @@ block_lookup({ok, TplFile}, BlockMap, ExtendsStack, DebugTrace, Options, Vars, R
                         undefined ->
                             {ok, Module, ExtendsStack, BlockMap1, [Trace|DebugTrace]};
                         overrules ->
+                            Options1 = [
+                                {trace_position, {TplFilename, 0, 0}}
+                                | lists:keydelete(trace_position, 1, Options)
+                            ],
                             Template = TplFile#template_file.template,
                             Next = Runtime:map_template({overrules, Template, Module:filename()}, Vars, Context),
-                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options, Vars, Runtime, Context);
+                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options1, Vars, Runtime, Context);
                         Extends when is_binary(Extends) ->
+                            Options1 = [
+                                {trace_position, {TplFilename, 0, 0}}
+                                | lists:keydelete(trace_position, 1, Options)
+                            ],
                             Next = Runtime:map_template(Extends, Vars, Context),
-                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options, Vars, Runtime, Context)
+                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options1, Vars, Runtime, Context)
                     end
             end;
         {error, _} = Error ->
