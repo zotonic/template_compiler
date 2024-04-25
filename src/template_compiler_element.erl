@@ -8,9 +8,9 @@
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
-%% 
+%%
 %%     http://www.apache.org/licenses/LICENSE-2.0
-%% 
+%%
 %% Unless required by applicable law or agreed to in writing, software
 %% distributed under the License is distributed on an "AS IS" BASIS,
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -150,8 +150,8 @@ compile({block, {identifier, SrcPos, Name}, _Elts}, CState, Ws) ->
                 erl_syntax:atom(CState#cs.runtime),
                 erl_syntax:variable(CState#cs.context_var)
             ]),
-    {value, {BlockName, _Tree, BlockWs}} = lists:keysearch(BlockName, 1, CState#cs.blocks), 
-    Ws1 = Ws#ws{is_forloop_var = Ws#ws.is_forloop_var or BlockWs#ws.is_forloop_var}, 
+    {value, {BlockName, _Tree, BlockWs}} = lists:keysearch(BlockName, 1, CState#cs.blocks),
+    Ws1 = Ws#ws{is_forloop_var = Ws#ws.is_forloop_var or BlockWs#ws.is_forloop_var},
     {Ws1, template_compiler_utils:set_pos(SrcPos, Ast)};
 compile({inherit, {_, _SrcPos, _}}, #cs{block=undefined}, Ws) ->
     {Ws, erl_syntax:abstract(<<>>)};

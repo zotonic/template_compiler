@@ -16,7 +16,7 @@ all() ->
     ].
 
 groups() ->
-    [{basic, [], 
+    [{basic, [],
         [hello_world_test
         ,hello_world2_test
         ,hello_world_block_test

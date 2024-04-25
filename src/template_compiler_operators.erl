@@ -8,9 +8,9 @@
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
-%% 
+%%
 %%     http://www.apache.org/licenses/LICENSE-2.0
-%% 
+%%
 %% Unless required by applicable law or agreed to in writing, software
 %% distributed under the License is distributed on an "AS IS" BASIS,
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -216,31 +216,31 @@ to_values({trans, _} = Tr, B, Runtime, Context) ->
     to_values(Runtime:to_simple_value(Tr, Context), B, Runtime, Context);
 to_values(A, {trans, _} = Tr, Runtime, Context) ->
     to_values(A, Runtime:to_simple_value(Tr, Context), Runtime, Context);
-to_values(A, B, _Runtime, _Context) when is_number(A), is_number(B) -> 
+to_values(A, B, _Runtime, _Context) when is_number(A), is_number(B) ->
     {A,B};
-to_values(A, B, Runtime, Context) when is_boolean(A); is_boolean(B) -> 
-    {z_convert:to_bool(Runtime:to_simple_value(A, Context)), 
+to_values(A, B, Runtime, Context) when is_boolean(A); is_boolean(B) ->
+    {z_convert:to_bool(Runtime:to_simple_value(A, Context)),
      z_convert:to_bool(Runtime:to_simple_value(B, Context))};
-to_values(A, B, Runtime, Context) when is_integer(A); is_integer(B) -> 
+to_values(A, B, Runtime, Context) when is_integer(A); is_integer(B) ->
     {to_maybe_integer(A, Runtime, Context),
      to_maybe_integer(B, Runtime, Context)};
-to_values(A, B, Runtime, Context) when is_float(A); is_float(B) -> 
+to_values(A, B, Runtime, Context) when is_float(A); is_float(B) ->
     {to_maybe_float(A, Runtime, Context),
      to_maybe_float(B, Runtime, Context)};
-to_values(A, B, _Runtime, _Context) when is_binary(A), is_binary(B) -> 
+to_values(A, B, _Runtime, _Context) when is_binary(A), is_binary(B) ->
     {A,B};
-to_values(A, B, _Runtime, _Context) when is_list(A), is_list(B) -> 
+to_values(A, B, _Runtime, _Context) when is_list(A), is_list(B) ->
     {A,B};
-to_values(A, B, Runtime, Context) when is_binary(A); is_binary(B) -> 
+to_values(A, B, Runtime, Context) when is_binary(A); is_binary(B) ->
     {to_maybe_binary(A, Runtime, Context),
      to_maybe_binary(B, Runtime, Context)};
-to_values(A, B, Runtime, Context) when is_tuple(A), is_tuple(B) -> 
-    {Runtime:to_simple_value(A, Context), 
+to_values(A, B, Runtime, Context) when is_tuple(A), is_tuple(B) ->
+    {Runtime:to_simple_value(A, Context),
      Runtime:to_simple_value(B, Context)};
-to_values(A, B, Runtime, Context) when is_binary(A); is_binary(B) -> 
+to_values(A, B, Runtime, Context) when is_binary(A); is_binary(B) ->
     {to_maybe_binary(A, Runtime, Context),
      to_maybe_binary(B, Runtime, Context)};
-to_values(A, B, Runtime, Context) -> 
+to_values(A, B, Runtime, Context) ->
     {to_maybe_list(A, Runtime, Context),
      to_maybe_list(B, Runtime, Context)}.
 
@@ -250,11 +250,11 @@ to_numbers(undefined, B, _Runtime, _Context) ->
     {undefined, B};
 to_numbers(A, undefined, _Runtime, _Context) ->
     {A, undefined};
-to_numbers(A, B, _Runtime, _Context) when is_number(A), is_number(B) -> 
+to_numbers(A, B, _Runtime, _Context) when is_number(A), is_number(B) ->
     {A,B};
-to_numbers(A, B, Runtime, Context) when is_float(A); is_float(B) -> 
+to_numbers(A, B, Runtime, Context) when is_float(A); is_float(B) ->
     {to_maybe_float(A, Runtime, Context), to_maybe_float(B, Runtime, Context)};
-to_numbers(A, B, Runtime, Context) -> 
+to_numbers(A, B, Runtime, Context) ->
     {to_maybe_integer(A, Runtime, Context), to_maybe_integer(B, Runtime, Context)}.
 
 to_maybe_integer(A, _Runtime, _Context) when is_number(A) ->

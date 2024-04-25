@@ -543,4 +543,3 @@ find_endraw_close(<<"%}", Rest/binary>>, <<"%}">>, Row, Column) ->
     {ok, Rest, Row, Column+2};
 find_endraw_close(_T, _Closer, _Row, _Colum) ->
     notfound.
-
