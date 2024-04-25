@@ -31,7 +31,6 @@
     set_pos/2
     ]).
 
--include("template_compiler.hrl").
 -include("template_compiler_internal.hrl").
 -include_lib("kernel/include/file.hrl").
 

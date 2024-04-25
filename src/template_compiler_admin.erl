@@ -40,8 +40,6 @@
     ]).
 
 -include_lib("kernel/include/logger.hrl").
--include("template_compiler.hrl").
--include("template_compiler_internal.hrl").
 
 -type gen_server_from() :: {pid(),term()}.
 
