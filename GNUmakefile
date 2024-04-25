@@ -40,7 +40,7 @@ test: $(REBAR)
 	$(REBAR) $(REBAR_OPTS) ct
 
 edoc: $(REBAR)
-	$(REBAR) ex_doc
+	ELIXIR_ERL_OPTIONS="+fnu" $(REBAR) ex_doc
 
 # Cleaning
 .PHONY: clean_logs
