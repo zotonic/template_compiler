@@ -16,7 +16,7 @@ all() ->
     ].
 
 groups() ->
-    [{basic, [], 
+    [{basic, [],
         [print_test
         ,custom_tag_test
         ,filter_tag_test
@@ -89,4 +89,3 @@ test_data_dir(Config) ->
     filename:join([
         filename:dirname(filename:dirname(?config(data_dir, Config))),
         "test-data"]).
-

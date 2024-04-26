@@ -45,20 +45,24 @@
 
 -export([scan/1, scan/2]).
 
+-export_type([template/0, tokens/0]).
+
+-type template():: string() | binary().
+-type tokens() :: [tuple()].
+
 -define(IS_EOF(S),
         (S =:= <<>> orelse S =:= <<"\n">> orelse S =:= <<"\r\n">>)).
 
 %%====================================================================
 %% API
 %%====================================================================
+
 %%--------------------------------------------------------------------
-%% @spec scan(T::template()) -> {ok, S::tokens()} | {error, Reason}
-%% @type template() = string() | binary(). Template to parse
-%% @type tokens() = [tuple()].
 %% @doc Scan the template string T and return the a token list or
 %% an error.
 %% @end
 %%--------------------------------------------------------------------
+-spec scan(template()) -> {ok, tokens()} | {error, binary()}.
 scan(Template) when is_binary(Template) ->
     scan(undefined, Template).
 
@@ -528,4 +532,3 @@ find_endraw_close(<<"%}", Rest/binary>>, <<"%}">>, Row, Column) ->
     {ok, Rest, Row, Column+2};
 find_endraw_close(_T, _Closer, _Row, _Colum) ->
     notfound.
-

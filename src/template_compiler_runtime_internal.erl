@@ -8,9 +8,9 @@
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
-%% 
+%%
 %%     http://www.apache.org/licenses/LICENSE-2.0
-%% 
+%%
 %% Unless required by applicable law or agreed to in writing, software
 %% distributed under the License is distributed on an "AS IS" BASIS,
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -89,7 +89,7 @@ forloop_fold(List, Idents, Fun, Runtime, IsContextVars, Vars, Context) ->
 
 % For loop without any forloop variable, use a direct map
 forloop_map(List, Idents, Fun, Runtime, true, Vars, Context) ->
-    [ 
+    [
         begin
             Vars1 = assign_vars(Idents, Val, Vars),
             Fun(Vars1, Runtime:set_context_vars(Vars1, Context))
@@ -184,8 +184,8 @@ block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
 
 
 %% @doc Include a template.
--spec include({File::binary(), Line::integer(), Col::integer()}, normal|optional|all, 
-        template_compiler:template(), list({atom(),term()}), atom(), list(binary()), boolean(), map(), term()) -> 
+-spec include({File::binary(), Line::integer(), Col::integer()}, normal|optional|all,
+        template_compiler:template(), list({atom(),term()}), atom(), list(binary()), boolean(), map(), term()) ->
         template_compiler:render_result().
 include(SrcPos, Method, Template, Args, Runtime, ContextVars, IsContextVars, Vars, Context) ->
     Vars1 = lists:foldl(
@@ -275,7 +275,7 @@ print(Expr) ->
     ].
 
 
-%% @doc Make an unique string (about 11 characters). Used for expanding unique args in templates. The string only 
+%% @doc Make an unique string (about 11 characters). Used for expanding unique args in templates. The string only
 %%      consists of the characters A-Z and 0-9 and is safe to use as HTML element id.
 -spec unique() -> binary().
 unique() ->

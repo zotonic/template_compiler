@@ -99,7 +99,7 @@ extends() -> undefined.
 
 %% The templates that this template includes.
 %% Includes which use variable names for the template name are not listed.
-includes() -> [ 
+includes() -> [
         #{
             template => <<"foo.tpl">>,
             line => 5,
@@ -515,7 +515,7 @@ escaped and surrounded with `<pre>...</pre>`.
 
 Whitespace Handling
 -------------------
- 
+
 - A single trailing newline is stripped, from the template, if present.
 - Other whitespace, like tabs, newlines and spaces are returned unchanged.
 
