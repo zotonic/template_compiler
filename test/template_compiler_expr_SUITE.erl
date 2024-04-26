@@ -171,7 +171,6 @@ expr_andalso(_Config) ->
     1 = erlang:get(x),
     erlang:erase(x).
 
-
 test_data_dir(Config) ->
     filename:join([
         filename:dirname(filename:dirname(?config(data_dir, Config))),

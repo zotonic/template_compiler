@@ -9,9 +9,9 @@
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
-%% 
+%%
 %%     http://www.apache.org/licenses/LICENSE-2.0
-%% 
+%%
 %% Unless required by applicable law or agreed to in writing, software
 %% distributed under the License is distributed on an "AS IS" BASIS,
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -105,13 +105,13 @@ map_template(Template, _Vars, _Context) ->
                     Error;
                 PrivDir ->
                     {ok, #template_file{
-                        template=Template, 
+                        template=Template,
                         filename=filename:join([PrivDir, SubDir, Template])
                     }}
             end;
         {ok, Dir} when is_list(Dir); is_binary(Dir) ->
             {ok, #template_file{
-                template=Template, 
+                template=Template,
                 filename=filename:join([Dir, Template])
             }};
         undefined ->
@@ -282,7 +282,7 @@ lookup_translation({trans, Tr}, TplVars, _Context) when is_map(TplVars) ->
     case lists:keyfind(Lang, 1, Tr) of
         {Lang, Text} ->
             Text;
-        false when Lang =/= en -> 
+        false when Lang =/= en ->
             case lists:keyfind(en, 1, Tr) of
                 {Lang, Text} -> Text;
                 false -> <<>>
@@ -304,7 +304,7 @@ custom_tag(Tag, Args, Vars, Context) ->
 
 %% @doc Render image/image_url/image_data_url/media/url/lib/lib_url tag.
 %%      The Expr is the media item or dispatch rule.
--spec builtin_tag(template_compiler:builtin_tag(), Expr::term(), Args::list(), Vars::map(), Context::term()) -> 
+-spec builtin_tag(template_compiler:builtin_tag(), Expr::term(), Args::list(), Vars::map(), Context::term()) ->
             template_compiler:render_result().
 builtin_tag(_Tag, _Expr, _Args, _Vars, _Context) ->
     <<>>.
@@ -365,13 +365,13 @@ to_simple_value(T, _Context) -> T.
 %% @doc Convert a value to an render_result, used for converting values in {{ ... }} expressions.
 -spec to_render_result(Value::term(), TplVars::map(), Context::term()) -> template_compiler:render_result().
 to_render_result(undefined, _TplVars, _Context) -> <<>>;
-to_render_result(B, _TplVars, _Context) when is_binary(B) -> 
+to_render_result(B, _TplVars, _Context) when is_binary(B) ->
     B;
-to_render_result(A, _TplVars, _Context) when is_atom(A) -> 
+to_render_result(A, _TplVars, _Context) when is_atom(A) ->
     atom_to_binary(A, 'utf8');
-to_render_result(N, _TplVars, _Context) when is_integer(N) -> 
+to_render_result(N, _TplVars, _Context) when is_integer(N) ->
     integer_to_binary(N);
-to_render_result(F, _TplVars, _Context) when is_float(F) -> 
+to_render_result(F, _TplVars, _Context) when is_float(F) ->
     io_lib:format("~p", [F]);
 to_render_result({{Y,M,D},{H,I,S}} = Date, TplVars, _Context)
     when is_integer(Y), is_integer(M), is_integer(D),
@@ -380,7 +380,7 @@ to_render_result({{Y,M,D},{H,I,S}} = Date, TplVars, _Context)
         {tz, maps:get(tz, TplVars, "GMT")}
     ],
     z_dateformat:format(Date, "Y-m-d H:i:s", Options);
-to_render_result(T, _TplVars, _Context) when is_tuple(T) -> 
+to_render_result(T, _TplVars, _Context) when is_tuple(T) ->
     io_lib:format("~p", [T]);
 to_render_result(L, TplVars, Context) when is_list(L) ->
     try
@@ -441,4 +441,3 @@ trace_render(Filename, Options, _Context) ->
 -spec trace_block({binary(), integer(), integer()}, atom(), atom(), term()) -> ok | {ok, iodata(), iodata()}.
 trace_block(_SrcPos, _Name, _Module, _Context) ->
     ok.
-

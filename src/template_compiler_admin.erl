@@ -8,9 +8,9 @@
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
 %% You may obtain a copy of the License at
-%% 
+%%
 %%     http://www.apache.org/licenses/LICENSE-2.0
-%% 
+%%
 %% Unless required by applicable law or agreed to in writing, software
 %% distributed under the License is distributed on an "AS IS" BASIS,
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -40,8 +40,6 @@
     ]).
 
 -include_lib("kernel/include/logger.hrl").
--include("template_compiler.hrl").
--include("template_compiler_internal.hrl").
 
 -type gen_server_from() :: {pid(),term()}.
 
@@ -142,7 +140,7 @@ handle_call({compile_request, TplKey, Filename}, From, State) ->
         false ->
             FTpl = {Filename, TplKey},
             State1 = case lists:member(FTpl, State#state.filename_keys) of
-                        false -> 
+                        false ->
                             State#state{
                                 filename_keys=[ FTpl | State#state.filename_keys ]
                             };
@@ -210,7 +208,7 @@ handle_cast({flush_context_name, ContextName}, State) ->
             end,
             Matched),
     FilenameKeys = lists:filter(
-                        fun({_Fn, K}) -> 
+                        fun({_Fn, K}) ->
                             K =/= ContextName
                         end,
                         State#state.filename_keys),
@@ -271,4 +269,3 @@ split_waiters(TplKey, State) ->
                                 end,
                                 State#state.waiting),
     {Ready, State#state{waiting=Waiting}}.
-
