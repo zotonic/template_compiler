@@ -286,41 +286,30 @@ scan(<<"_\'", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_code, Closer}) 
 scan(<<$', T/binary>>, Scanned, {SourceRef, Row, Column}, {in_identifier, Closer}) ->
     scan(T, [{string_literal, {SourceRef, Row, Column}, <<>>} | Scanned], {SourceRef, Row, Column + 1}, {in_single_quote, Closer});
 
-scan(<<"`", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_code, Closer}) ->
+scan(<<$`, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_code, Closer}) ->
     scan(T, [{atom_literal, {SourceRef, Row, Column}, <<>>} | Scanned], {SourceRef, Row, Column + 1}, {in_back_quote, Closer});
 
 scan(<<$`, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_identifier, Closer}) ->
     scan(T, [{atom_literal, {SourceRef, Row, Column}, <<>>} | Scanned], {SourceRef, Row, Column + 1}, {in_back_quote, Closer});
 
 scan(<<$\\, $", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_double_quote, Closer}) ->
-    scan(T, append_char(Scanned, $"), {SourceRef, Row, Column + 1}, {in_double_quote_slash, Closer});
-
-scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_double_quote_slash, Closer}) ->
-    scan(T, append_char(Scanned, H), {SourceRef, Row, Column + 1}, {in_double_quote, Closer});
+    scan(T, append_char(append_char(Scanned, $\\), $"), {SourceRef, Row, Column + 2}, {in_double_quote, Closer});
 
 scan(<<$\\, $', T/binary>>, Scanned, {SourceRef, Row, Column}, {in_single_quote, Closer}) ->
-    scan(T, append_char(Scanned, $'), {SourceRef, Row, Column + 1}, {in_single_quote_slash, Closer});
+    scan(T, append_char(append_char(Scanned, $\\), $'), {SourceRef, Row, Column + 2}, {in_single_quote, Closer});
 
-scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_single_quote_slash, Closer}) ->
-    scan(T, append_char(Scanned, H), {SourceRef, Row, Column + 1}, {in_single_quote, Closer});
-
-scan(<<$\\, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_back_quote, Closer}) ->
-    scan(T, append_char(Scanned, $\\), {SourceRef, Row, Column + 1}, {in_back_quote_slash, Closer});
-
-scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_back_quote_slash, Closer}) ->
-    scan(T, append_char(Scanned, H), {SourceRef, Row, Column + 1}, {in_back_quote, Closer});
-
-
+scan(<<$\\, $`, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_back_quote, Closer}) ->
+    scan(T, append_char(append_char(Scanned, $\\), $`), {SourceRef, Row, Column + 2}, {in_back_quote, Closer});
 
 % end quote
-scan(<<"\"", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_double_quote, Closer}) ->
+scan(<<$", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_double_quote, Closer}) ->
     scan(T, Scanned, {SourceRef, Row, Column + 1}, {in_code, Closer});
 
 % treat single quotes the same as double quotes
-scan(<<"\'", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_single_quote, Closer}) ->
+scan(<<$', T/binary>>, Scanned, {SourceRef, Row, Column}, {in_single_quote, Closer}) ->
     scan(T, Scanned, {SourceRef, Row, Column + 1}, {in_code, Closer});
 
-scan(<<"`", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_back_quote, Closer}) ->
+scan(<<$`, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_back_quote, Closer}) ->
     scan(T, Scanned, {SourceRef, Row, Column + 1}, {in_code, Closer});
 
 scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_double_quote, Closer}) ->
