@@ -213,6 +213,15 @@ compile({'call_with', {identifier, SrcPos, Name}, Expr}, CState, Ws) ->
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]),
     {Ws1, Ast};
+compile({'compose', {TagPos, Template, Args}, Blocks}, CState, Ws) ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
+    IsContextVar = is_context_vars_arg(Args, CState),
+    compose(TagPos, Template, ArgsList, IsContextVar, Blocks, CState, Ws1);
+compile({'catcompose', {TagPos, Template, IdExpr, Args}, Blocks}, CState, Ws) ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
+    {Ws2, IdAst} = template_compiler_expr:compile(IdExpr, CState, Ws1),
+    IsContextVar = is_context_vars_arg(Args, CState),
+    catcompose(TagPos, Template, IdAst, ArgsList, IsContextVar, Blocks, CState, Ws2);
 compile({custom_tag, {identifier, SrcPos, Name}, Args}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, true),
     TagName = template_compiler_utils:to_atom(Name),
@@ -721,6 +730,89 @@ maybe_add_include({string_literal, SrcPos, Text}, Method, IsCatinclude, Ws) ->
     };
 maybe_add_include(_Token, _Method, _IsCatinclude, Ws) ->
     Ws.
+
+
+compose({_, SrcPos, _}, Template, ArgsList, IsContextVars, Blocks, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, TemplateAst} = template_compiler_expr:compile(Template, CState, Ws),
+    ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList ]),
+    {_BlocksWs, BlocksAsts} = template_compiler:compile_blocks(Blocks, CState),
+    BlockClauses = [
+        ?Q("(_@BlockName@, Vars, Blocks, Context) -> _@BlockAst")
+        || {BlockName, BlockAst, _BlockWs} <- BlocksAsts
+    ] ++ [
+        ?Q("(_BlockName, _Vars, _Blocks, _Context) -> <<>>")
+    ],
+    BlockFunAst = erl_syntax:fun_expr(BlockClauses),
+    BlockListAst = erl_syntax:abstract([ BlockName || {BlockName, _, _} <- BlocksAsts ]),
+    Ast = ?Q([
+        "template_compiler_runtime_internal:compose("
+            "_@srcpos,"
+            "_@template,"
+            "_@args,"
+            "_@runtime,"
+            "_@context_vars,"
+            "_@is_context_vars,"
+            "_@vars,"
+            "_@block_list,",
+            "_@block_fun,",
+            "_@context)"
+        ],
+        [
+            {srcpos, erl_syntax:abstract(SrcPos)},
+            {template, TemplateAst},
+            {args, ArgsListAst},
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {runtime, erl_syntax:atom(Runtime)},
+            {context, erl_syntax:variable(CState#cs.context_var)},
+            {context_vars, erl_syntax:abstract(CState#cs.context_vars)},
+            {block_list, BlockListAst},
+            {block_fun, BlockFunAst},
+            {is_context_vars, erl_syntax:abstract(IsContextVars)}
+        ]),
+    Ws2 = maybe_add_include(Template, undefined, false, Ws1),
+    {Ws2, Ast}.
+
+catcompose({_, SrcPos, _}, Template, IdAst, ArgsList, IsContextVars, Blocks, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, TemplateAst} = template_compiler_expr:compile(Template, CState, Ws),
+    ArgsList1 = [ {erl_syntax:atom('$cat'), IdAst} | ArgsList ],
+    ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList1 ]),
+    {_BlocksWs, BlocksAsts} = template_compiler:compile_blocks(Blocks, CState),
+    BlockClauses = [
+        ?Q("(_@BlockName@, Vars, Blocks, Context) -> _@BlockAst")
+        || {BlockName, BlockAst, _BlockWs} <- BlocksAsts
+    ] ++ [
+        ?Q("(_BlockName, _Vars, _Blocks, _Context) -> <<>>")
+    ],
+    BlockFunAst = erl_syntax:fun_expr(BlockClauses),
+    BlockListAst = erl_syntax:abstract([ BlockName || {BlockName, _, _} <- BlocksAsts ]),
+    Ast = ?Q([
+        "template_compiler_runtime_internal:compose("
+            "_@srcpos,"
+            "{cat, _@template},"
+            "_@args,"
+            "_@runtime,"
+            "_@context_vars,"
+            "_@is_context_vars,"
+            "_@vars,"
+            "_@block_list,",
+            "_@block_fun,",
+            "_@context)"
+        ],
+        [
+            {srcpos, erl_syntax:abstract(SrcPos)},
+            {template, TemplateAst},
+            {args, ArgsListAst},
+            {vars, erl_syntax:variable(CState#cs.vars_var)},
+            {runtime, erl_syntax:atom(Runtime)},
+            {context, erl_syntax:variable(CState#cs.context_var)},
+            {context_vars, erl_syntax:abstract(CState#cs.context_vars)},
+            {block_list, BlockListAst},
+            {block_fun, BlockFunAst},
+            {is_context_vars, erl_syntax:abstract(IsContextVars)}
+        ]),
+    Ws2 = maybe_add_include(Template, undefined, false, Ws1),
+    {Ws2, Ast}.
+
 
 expr_list(ExprList, CState, Ws) ->
     lists:foldr(

@@ -55,6 +55,12 @@ Nonterminals
     CatIncludeTag
     NowTag
 
+    ComposeBlock
+    ComposeBraced
+    EndComposeBraced
+    CatComposeBlock
+    CatComposeBraced
+
     BlockBlock
     BlockBraced
     EndBlockBraced
@@ -172,10 +178,12 @@ Terminals
     block_keyword
     cache_keyword
     call_keyword
+    catcompose_keyword
     catinclude_keyword
     close_tag
     close_var
     comment_keyword
+    compose_keyword
     colon
     colons
     comma
@@ -188,6 +196,7 @@ Terminals
     endblock_keyword
     endcache_keyword
     endcomment_keyword
+    endcompose_keyword
     endfilter_keyword
     endfor_keyword
     endif_keyword
@@ -264,7 +273,7 @@ Left 500 '*' '/' '%'.
 Unary 600 Uminus Unot.
 
 %% Expected shift/reduce conflicts
-Expect 5.
+Expect 7.
 
 Template -> ExtendsTag BlockElements : {extends, '$1', '$2'}.
 Template -> OverrulesTag BlockElements : {overrules, '$2'}.
@@ -291,6 +300,8 @@ Elements -> Elements WithBlock : '$1' ++ ['$2'].
 Elements -> Elements CacheBlock : '$1' ++ ['$2'].
 Elements -> Elements ScriptBlock : '$1' ++ ['$2'].
 Elements -> Elements CommentBlock : '$1'.
+Elements -> Elements ComposeBlock : '$1' ++ ['$2'].
+Elements -> Elements CatComposeBlock : '$1' ++ ['$2'].
 % Tags
 Elements -> Elements TransTag : '$1' ++ ['$2'].
 Elements -> Elements TransExtTag : '$1' ++ ['$2'].
@@ -344,6 +355,13 @@ LibList -> LibList string_literal : '$1' ++ ['$2'].
 LoadTag -> open_tag load_keyword LoadNames close_tag : {load, '$3'}.
 LoadNames -> identifier : ['$1'].
 LoadNames -> LoadNames identifier : '$1' ++ ['$2'].
+
+ComposeBlock -> ComposeBraced BlockElements EndComposeBraced : {compose, '$1', '$2'}.
+ComposeBraced -> open_tag compose_keyword E OptWith WithArgs close_tag : {'$1', '$3', '$5'}.
+EndComposeBraced -> open_tag endcompose_keyword close_tag.
+
+CatComposeBlock -> CatComposeBraced BlockElements EndComposeBraced : {catcompose, '$1', '$2'}.
+CatComposeBraced -> open_tag catcompose_keyword E E OptWith WithArgs close_tag : {'$1', '$3', '$4', '$6'}.
 
 BlockBlock -> BlockBraced Elements EndBlockBraced : {block, '$1', '$2'}.
 BlockBraced -> open_tag block_keyword identifier close_tag : '$3'.

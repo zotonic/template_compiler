@@ -1,9 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016-2023 Marc Worrell
+%% @copyright 2016-2024 Marc Worrell
 %% @doc Main template compiler entry points.
 %% @end
 
-%% Copyright 2016-2023 Marc Worrell
+%% Copyright 2016-2024 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 
 -export([
     render/4,
+    render/5,
     render_block/5,
     lookup/3,
     flush/0,
@@ -31,7 +32,8 @@
     compile_binary/4,
     get_option/2,
     is_template_module/1,
-    translations/1
+    translations/1,
+    compile_blocks/2
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
@@ -92,12 +94,19 @@
 %%      returns the rendering result.
 -spec render(Template :: template(), Vars :: map() | list(), Options :: options(), Context :: term()) ->
         {ok, render_result()} | {error, term()}.
-render(Template, Vars, Options, Context) when is_list(Vars) ->
-    render(Template, props_to_map(Vars, #{}), Options, Context);
-render(Template0, Vars, Options, Context) when is_map(Vars) ->
+render(Template0, Vars, Options, Context) ->
+    render(Template0, #{}, Vars, Options, Context).
+
+%% @doc Render a template. This looks up the templates needed, ensures compilation and
+%%      returns the rendering result. Start with a block-map to find some predefined blocks.
+-spec render(Template :: template(), BlockMap :: map(), Vars :: map() | list(), Options :: options(), Context :: term()) ->
+        {ok, render_result()} | {error, term()}.
+render(Template0, BlockMap0, Vars, Options, Context) when is_list(Vars) ->
+    render(Template0, BlockMap0, props_to_map(Vars, #{}), Options, Context);
+render(Template0, BlockMap0, Vars, Options, Context) when is_map(Vars) ->
     Template = normalize_template(Template0),
     Runtime = proplists:get_value(runtime, Options, template_compiler_runtime),
-    case block_lookup(Runtime:map_template(Template, Vars, Context), #{}, [], [], Options, Vars, Runtime, Context) of
+    case block_lookup(Runtime:map_template(Template, Vars, Context), BlockMap0, [], [], Options, Vars, Runtime, Context) of
         {ok, BaseModule, ExtendsStack, BlockMap, OptDebugWrap} ->
             % Start with the render function of the "base" template
             % Optionally add the unique prefix for this rendering.
@@ -468,7 +477,7 @@ split_loc({Filename, Line}) ->
         line => Line
     }.
 
--spec compile_blocks([block_element()], #cs{}) -> {#ws{}, [{atom(), erl_syntax:syntaxTree()}]}.
+-spec compile_blocks([block_element()], #cs{}) -> {#ws{}, [{atom(), erl_syntax:syntaxTree(), #ws{}}]}.
 compile_blocks(Blocks, CState) ->
     Ws = #ws{},
     lists:foldl(
