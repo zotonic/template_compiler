@@ -1,9 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016-2023 Marc Worrell
+%% @copyright 2016-2024 Marc Worrell
 %% @doc Callback routines for compiled templates.
 %% @end
 
-%% Copyright 2016-2023 Marc Worrell
+%% Copyright 2016-2024 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@
     block_call/6,
     block_inherit/7,
     include/9,
+    compose/10,
     call/4,
     print/1,
     unique/0
@@ -152,6 +153,8 @@ block_call(SrcPos, Block, Vars, BlockMap, Runtime, Context) ->
                         After
                     ]
             end;
+        {ok, [RenderFun|_]} when is_function(RenderFun) ->
+            RenderFun(Block, Vars, BlockMap, Context);
         error ->
             % No such block, return empty data.
             <<>>
@@ -208,21 +211,21 @@ include(SrcPos, Method, Template, Args, Runtime, ContextVars, IsContextVars, Var
     end,
     include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context1).
 
-include_1(SrcPos, all, Template, Runtime, ContextVars, Vars1, Context) ->
-    Templates = Runtime:map_template_all(Template, Vars1, Context),
+include_1(SrcPos, all, Template, Runtime, ContextVars, Vars, Context) ->
+    Templates = Runtime:map_template_all(Template, Vars, Context),
     lists:map(
             fun(Tpl) ->
-                include_1(SrcPos, optional, Tpl, Runtime, ContextVars, Vars1, Context)
+                include_1(SrcPos, optional, Tpl, Runtime, ContextVars, Vars, Context)
             end,
             Templates);
-include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
+include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars, Context) ->
     {SrcFile, SrcLine, _SrcCol} = SrcPos,
     Options = [
         {runtime, Runtime},
         {trace_position, SrcPos},
         {context_vars, ContextVars}
     ],
-    case template_compiler:render(Template, Vars1, Options, Context) of
+    case template_compiler:render(Template, Vars, Options, Context) of
         {ok, Result} ->
             Result;
         {error, enoent} when Method =:= normal ->
@@ -254,6 +257,74 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars1, Context) ->
             <<>>
     end.
 
+%% @doc Compose include of a template, with overruling blocks.
+-spec compose(SrcPos, Template, Args, Runtime, ContextVars, IsContextVars, Vars, BlockList, BlockFun, Context) -> Output when
+    SrcPos :: {File::binary(), Line::integer(), Col::integer()},
+    Template :: template_compiler:template(),
+    Args :: list({atom(),term()}),
+    Runtime :: atom(),
+    ContextVars :: list(binary()),
+    IsContextVars :: boolean(),
+    Vars :: map(),
+    BlockList :: list( atom() ),
+    BlockFun :: function(),  % (_@BlockName@, Vars, Blocks, Context) -> _@BlockAst
+    Context :: term(),
+    Output :: template_compiler:render_result().
+compose(SrcPos, Template, Args, Runtime, ContextVars, IsContextVars, Vars, BlockList, BlockFun, Context) ->
+    Vars1 = lists:foldl(
+                fun
+                    ({'$cat', [Cat|_] = E}, Acc) when is_atom(Cat); is_binary(Cat); is_list(Cat) ->
+                        Acc#{ '$cat' => E };
+                    ({'$cat', E}, Acc) ->
+                        Acc#{
+                            'id' => E,
+                            '$cat' => E
+                        };
+                    ({V,E}, Acc) ->
+                        Acc#{ V => E }
+                end,
+                Vars,
+                Args),
+    Context1 = case IsContextVars of
+        true -> Runtime:set_context_vars(Args, Context);
+        false -> Context
+    end,
+    BlockMap = lists:foldl(fun(Block, Acc) -> Acc#{ Block => [ BlockFun ] } end, #{}, BlockList),
+    {SrcFile, SrcLine, _SrcCol} = SrcPos,
+    Options = [
+        {runtime, Runtime},
+        {trace_position, SrcPos},
+        {context_vars, ContextVars}
+    ],
+    case template_compiler:render(Template, BlockMap, Vars1, Options, Context1) of
+        {ok, Result} ->
+            Result;
+        {error, enoent} ->
+            ?LOG_ERROR(#{
+                text => <<"Compose template not found">>,
+                template => Template,
+                srcpos => SrcPos,
+                result => error,
+                reason => enoent,
+                at => SrcFile,
+                line => SrcLine
+            }),
+            <<>>;
+        {error, Err} when is_map(Err) ->
+            ?LOG_ERROR(Err),
+            <<>>;
+        {error, Reason} ->
+            ?LOG_ERROR(#{
+                text => <<"Compose render error">>,
+                template => Template,
+                srcpos => SrcPos,
+                result => error,
+                reason => Reason,
+                at => SrcFile,
+                line => SrcLine
+            }),
+            <<>>
+    end.
 
 %% @doc Call a module's render function.
 -spec call(Module::atom(), Args::map(), Vars::map(), Context::term()) -> template_compiler:render_result().

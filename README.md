@@ -386,6 +386,43 @@ Then `a.tpl` renders like:
 this is hello the base world template
 ```
 
+#### Template compose
+
+This includes a template, but also defines extra blocks for the template
+to overrule the blocks in the template.
+
+It is like a nameless `{% overrules %}` template, directly defined in the
+template text at the spot of the include.
+
+
+```django
+{% compose "a.tpl" what="moon" %}
+{% block a %}{{ what }}{% endblock %}
+{% endcompose %}
+```
+
+And a.tpl is like:
+
+```django
+Hello {% block a %}world{% endblock %}, and bye.
+```
+
+Then the above renders:
+
+```
+Hello moon, and bye.
+```
+
+There is also a `catcompose` to use a `catinclude`:
+
+```django
+{% catcompose "a.tpl" id what="moon" %}
+{% block a %}{{ what }}{% endblock %}
+{% endcompose %}
+
+```
+
+
 #### If tag
 
 Conditionally show or hide parts of a template:

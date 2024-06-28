@@ -83,6 +83,7 @@ identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc})
     Keywords = [
         <<"for">>, <<"empty">>, <<"endfor">>, <<"in">>, <<"include">>,
         <<"catinclude">>, <<"block">>, <<"endblock">>, <<"extends">>, <<"overrules">>,
+        <<"compose">>, <<"catcompose">>, <<"endcompose">>,
         <<"inherit">>, <<"autoescape">>, <<"endautoescape">>, <<"if">>, <<"else">>,
         <<"elif">>, <<"elseif">>, <<"endif">>, <<"not">>, <<"or">>, <<"and">>, <<"xor">>,
         <<"comment">>, <<"endcomment">>, <<"cycle">>, <<"firstof">>, <<"ifchanged">>,
