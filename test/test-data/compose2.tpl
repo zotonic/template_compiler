@@ -1,0 +1,1 @@
+A{% compose "compose_b.tpl" v=1 %}{% block a %}B{% inherit %}C{{ v }}{% endblock %}{% endcompose %}D

@@ -732,7 +732,7 @@ maybe_add_include(_Token, _Method, _IsCatinclude, Ws) ->
     Ws.
 
 
-compose({_, SrcPos, _}, Template, ArgsList, IsContextVars, Blocks, #cs{runtime=Runtime} = CState, Ws) ->
+compose({_, SrcPos, _}, Template, ArgsList, IsContextVars, Blocks, #cs{runtime=Runtime, module=Module} = CState, Ws) ->
     {Ws1, TemplateAst} = template_compiler_expr:compile(Template, CState, Ws),
     ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList ]),
     {_BlocksWs, BlocksAsts} = template_compiler:compile_blocks(Blocks, CState),
@@ -754,6 +754,7 @@ compose({_, SrcPos, _}, Template, ArgsList, IsContextVars, Blocks, #cs{runtime=R
             "_@is_context_vars,"
             "_@vars,"
             "_@block_list,",
+            "_@module,",
             "_@block_fun,",
             "_@context)"
         ],
@@ -766,6 +767,7 @@ compose({_, SrcPos, _}, Template, ArgsList, IsContextVars, Blocks, #cs{runtime=R
             {context, erl_syntax:variable(CState#cs.context_var)},
             {context_vars, erl_syntax:abstract(CState#cs.context_vars)},
             {block_list, BlockListAst},
+            {module, erl_syntax:atom(Module)},
             {block_fun, BlockFunAst},
             {is_context_vars, erl_syntax:abstract(IsContextVars)}
         ]),
