@@ -26,7 +26,7 @@
     block_call/6,
     block_inherit/7,
     include/9,
-    compose/10,
+    compose/11,
     call/4,
     print/1,
     unique/0
@@ -153,8 +153,17 @@ block_call(SrcPos, Block, Vars, BlockMap, Runtime, Context) ->
                         After
                     ]
             end;
-        {ok, [RenderFun|_]} when is_function(RenderFun) ->
-            RenderFun(Block, Vars, BlockMap, Context);
+        {ok, [{Module, RenderFun}|_]} when is_function(RenderFun) ->
+            case Runtime:trace_block(SrcPos, Block, Module, Context) of
+                ok ->
+                    RenderFun(Block, Vars, BlockMap, Context);
+                {ok, Before, After} ->
+                    [
+                        Before,
+                        RenderFun(Block, Vars, BlockMap, Context),
+                        After
+                    ]
+            end;
         error ->
             % No such block, return empty data.
             <<>>
@@ -165,8 +174,13 @@ block_call(SrcPos, Block, Vars, BlockMap, Runtime, Context) ->
 block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
     case maps:find(Block, BlockMap) of
         {ok, Modules} ->
-            case lists:dropwhile(fun(M) -> M =/= Module end, Modules) of
-                [Module, Next|_] ->
+            case lists:dropwhile(
+                    fun
+                        ({M, _F}) -> M =/= Module;
+                        (M) -> M =/= Module
+                    end, Modules)
+            of
+                [ _Module, Next | _ ] when is_atom(Next) ->
                     case Runtime:trace_block(SrcPos, Block, Next, Context) of
                         ok ->
                             Next:render_block(Block, Vars, BlockMap, Context);
@@ -177,7 +191,7 @@ block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
                                 After
                             ]
                     end;
-                _ ->
+                [] ->
                     <<>>
             end;
         error ->
@@ -258,7 +272,7 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars, Context) ->
     end.
 
 %% @doc Compose include of a template, with overruling blocks.
--spec compose(SrcPos, Template, Args, Runtime, ContextVars, IsContextVars, Vars, BlockList, BlockFun, Context) -> Output when
+-spec compose(SrcPos, Template, Args, Runtime, ContextVars, IsContextVars, Vars, BlockList, BlockModule, BlockFun, Context) -> Output when
     SrcPos :: {File::binary(), Line::integer(), Col::integer()},
     Template :: template_compiler:template(),
     Args :: list({atom(),term()}),
@@ -267,10 +281,11 @@ include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars, Context) ->
     IsContextVars :: boolean(),
     Vars :: map(),
     BlockList :: list( atom() ),
+    BlockModule :: atom(),
     BlockFun :: function(),  % (_@BlockName@, Vars, Blocks, Context) -> _@BlockAst
     Context :: term(),
     Output :: template_compiler:render_result().
-compose(SrcPos, Template, Args, Runtime, ContextVars, IsContextVars, Vars, BlockList, BlockFun, Context) ->
+compose(SrcPos, Template, Args, Runtime, ContextVars, IsContextVars, Vars, BlockList, BlockModule, BlockFun, Context) ->
     Vars1 = lists:foldl(
                 fun
                     ({'$cat', [Cat|_] = E}, Acc) when is_atom(Cat); is_binary(Cat); is_list(Cat) ->
@@ -289,7 +304,7 @@ compose(SrcPos, Template, Args, Runtime, ContextVars, IsContextVars, Vars, Block
         true -> Runtime:set_context_vars(Args, Context);
         false -> Context
     end,
-    BlockMap = lists:foldl(fun(Block, Acc) -> Acc#{ Block => [ BlockFun ] } end, #{}, BlockList),
+    BlockMap = lists:foldl(fun(Block, Acc) -> Acc#{ Block => [ {BlockModule, BlockFun} ] } end, #{}, BlockList),
     {SrcFile, SrcLine, _SrcCol} = SrcPos,
     Options = [
         {runtime, Runtime},

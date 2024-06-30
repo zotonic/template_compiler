@@ -23,6 +23,7 @@ groups() ->
         ,include_dynamic_test
         ,include_args_test
         ,compose_test
+        ,compose_inherit_test
         ]}].
 
 init_per_suite(Config) ->
@@ -76,6 +77,11 @@ include_args_test(_Config) ->
 compose_test(_Config) ->
     {ok, Bin1} = template_compiler:render("compose.tpl", #{}, [], undefined),
     <<"AxB1yC">> = iolist_to_binary(Bin1),
+    ok.
+
+compose_inherit_test(_Config) ->
+    {ok, Bin1} = template_compiler:render("compose2.tpl", #{}, [], undefined),
+    <<"AxBXYC1yD">> = iolist_to_binary(Bin1),
     ok.
 
 test_data_dir(Config) ->
