@@ -22,6 +22,7 @@ groups() ->
         [include_test
         ,include_dynamic_test
         ,include_args_test
+        ,include_undefined_test
         ,compose_test
         ,compose_inherit_test
         ]}].
@@ -72,6 +73,11 @@ include_dynamic_test(_Config) ->
 include_args_test(_Config) ->
     {ok, Bin1} = template_compiler:render("include_args.tpl", #{ a => 1, b => 2 }, [], undefined),
     <<"a3:2:truec">> = iolist_to_binary(Bin1),
+    ok.
+
+include_undefined_test(_Config) ->
+    {ok, Bin1} = template_compiler:render("include_undefined.tpl", #{ template => undefined }, [], undefined),
+    <<"ac">> = iolist_to_binary(Bin1),
     ok.
 
 compose_test(_Config) ->

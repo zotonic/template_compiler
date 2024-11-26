@@ -201,9 +201,41 @@ block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
 
 
 %% @doc Include a template.
--spec include({File::binary(), Line::integer(), Col::integer()}, normal|optional|all,
-        template_compiler:template(), list({atom(),term()}), atom(), list(binary()), boolean(), map(), term()) ->
-        template_compiler:render_result().
+-spec include(SrcPos, Method, Template, Args, Runtime, ContextVars, IsContextVars, Vars, Context) -> Output when
+    SrcPos :: {File::binary(), Line::integer(), Col::integer()},
+    Method :: normal | optional | all,
+    Template :: template_compiler:template() | undefined,
+    Args :: list({atom(),term()}),
+    Runtime :: atom(),
+    ContextVars :: list(binary()),
+    IsContextVars :: boolean(),
+    Vars :: map(),
+    Context :: term(),
+    Output :: template_compiler:render_result().
+include(SrcPos, normal, undefined, _Args, _Runtime, _ContextVars, _IsContextVars, _Vars, _Context) ->
+    {SrcFile, SrcLine, _SrcCol} = SrcPos,
+    ?LOG_ERROR(#{
+        text => <<"Included template not found">>,
+        template => undefined,
+        srcpos => SrcPos,
+        result => error,
+        reason => enoent,
+        at => SrcFile,
+        line => SrcLine
+    }),
+    <<>>;
+include(SrcPos, _Method, undefined, _Args, _Runtime, _ContextVars, _IsContextVars, _Vars, _Context) ->
+    {SrcFile, SrcLine, _SrcCol} = SrcPos,
+    ?LOG_DEBUG(#{
+        text => <<"Included template not found">>,
+        template => undefined,
+        srcpos => SrcPos,
+        result => error,
+        reason => enoent,
+        at => SrcFile,
+        line => SrcLine
+    }),
+    <<>>;
 include(SrcPos, Method, Template, Args, Runtime, ContextVars, IsContextVars, Vars, Context) ->
     Vars1 = lists:foldl(
                 fun
