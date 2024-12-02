@@ -63,6 +63,8 @@ expr_test(_Config) ->
 expr_op_test(_Config) ->
     {ok, Bin1} = template_compiler:render("expr_op.tpl", #{ a => 10, b => 5 }, [], undefined),
     <<"15|5|50|5|2.0">> = iolist_to_binary(Bin1),
+    {ok, Bin2} = template_compiler:render("expr_op.tpl", #{ a => 10.0, b => 5 }, [], undefined),
+    <<"15.0|5.0|50.0|5.0|2.0">> = iolist_to_binary(Bin1),
     ok.
 
 expr_op_eq_neq_test(_Config) ->
