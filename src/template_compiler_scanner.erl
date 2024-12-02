@@ -424,6 +424,13 @@ scan(<<"=", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
 scan(<<":", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
     scan(T, [{colon, {SourceRef, Row, Column}, <<":">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
 
+scan(<<".", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_number, Closer}) ->
+    case first_char_type(T) of
+        digit ->
+            scan(T, append_char(Scanned, $.), {SourceRef, Row, Column + 1}, {in_number, Closer});
+        _ ->
+            scan(T, [{dot, {SourceRef, Row, Column}, <<".">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer})
+    end;
 scan(<<".", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
     scan(T, [{dot, {SourceRef, Row, Column}, <<".">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
 
@@ -508,6 +515,8 @@ char_type($_) -> letter_underscore;
 char_type(C) when C >= $0, C =< $9 -> digit;
 char_type(_) -> undefined.
 
+first_char_type(<<C/utf8, _/binary>>) -> char_type(C);
+first_char_type(<<>>) -> undefined.
 
 % Find the 'endraw %}' tag
 find_endraw(<<C/utf8, Rest/binary>>, Closer, Row, Column) when C == 9; C == 32 ->
