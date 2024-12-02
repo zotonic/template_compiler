@@ -90,6 +90,7 @@ expr_literals(_Config) ->
 false
 undefined
 42
+1.61803
 <<104,101,108,108,111,32,119,111,114,108,100>>
 atom
 [a,b,c]
