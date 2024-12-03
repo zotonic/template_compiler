@@ -50,7 +50,11 @@ compile({trans_literal, SrcPos, {trans, _} = Tr}, #cs{runtime=Runtime} = CState,
             ]),
     {Ws, template_compiler_utils:set_pos(SrcPos, Ast)};
 compile({number_literal, _SrcPos, Nr}, _CState, Ws) ->
-    {Ws, erl_syntax:abstract(z_convert:to_integer(Nr))};
+    Number = case catch z_convert:to_integer(Nr) of
+                 {'EXIT', {badarg, _}} -> z_convert:to_float(Nr);
+                 N  -> N
+         end,
+    {Ws, erl_syntax:abstract(Number)};
 compile({atom_literal, _SrcPos, Atom}, _CState, Ws) ->
     {Ws, erl_syntax:abstract(template_compiler_utils:to_atom(Atom))};
 compile({find_value, LookupList}, CState, Ws) ->
