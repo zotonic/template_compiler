@@ -23,6 +23,7 @@ groups() ->
         ,hello_world_block2_test
         ,hello_world_block3_test
         ,hello_world_comment_test
+        ,block_nested_error_test
         ,block_render_test
         ,raw_test
         ]}].
@@ -70,6 +71,10 @@ hello_world_block3_test(_Config) ->
 hello_world_comment_test(_Config) ->
     {ok, Bin} = template_compiler:render("hello_world_comment.tpl", #{}, [], undefined),
     <<"Hello World!">> = iolist_to_binary(Bin),
+    ok.
+
+block_nested_error_test(_Config) ->
+    {error, {duplicate_block, <<"main">>}} = template_compiler:render("block_nested_error.tpl", #{}, [], undefined),
     ok.
 
 block_render_test(_Config) ->
