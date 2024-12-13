@@ -423,18 +423,33 @@ cs(Module, Filename, Options, Context) ->
 
 compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
-    {Ws, BlockAsts} = compile_blocks(Blocks, CState),
-    {ok, {Extend, Ws#ws.includes, BlockAsts, undefined, Ws#ws.is_autoid_var}};
+    case check_duplicate_blocks(Blocks) of
+        ok ->
+            {Ws, BlockAsts} = compile_blocks(Blocks, CState),
+            {ok, {Extend, Ws#ws.includes, BlockAsts, undefined, Ws#ws.is_autoid_var}};
+        {error, _} = Error ->
+            Error
+    end;
 compile_tokens({ok, {overrules, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
-    {Ws, BlockAsts} = compile_blocks(Blocks, CState),
-    {ok, {overrules, Ws#ws.includes, BlockAsts, undefined, Ws#ws.is_autoid_var}};
+    case check_duplicate_blocks(Blocks) of
+        ok ->
+            {Ws, BlockAsts} = compile_blocks(Blocks, CState),
+            {ok, {overrules, Ws#ws.includes, BlockAsts, undefined, Ws#ws.is_autoid_var}};
+        {error, _} = Error ->
+            Error
+    end;
 compile_tokens({ok, {base, Elements}}, CState, _Options) ->
     Blocks = find_blocks(Elements),
-    {Ws, BlockAsts} = compile_blocks(Blocks, CState),
-    CStateElts = CState#cs{blocks = BlockAsts},
-    {Ws1, TemplateAsts} = template_compiler_element:compile(Elements, CStateElts, Ws),
-    {ok, {undefined, Ws1#ws.includes, BlockAsts, TemplateAsts, Ws1#ws.is_autoid_var}};
+    case check_duplicate_blocks(Blocks) of
+        ok ->
+            {Ws, BlockAsts} = compile_blocks(Blocks, CState),
+            CStateElts = CState#cs{blocks = BlockAsts},
+            {Ws1, TemplateAsts} = template_compiler_element:compile(Elements, CStateElts, Ws),
+            {ok, {undefined, Ws1#ws.includes, BlockAsts, TemplateAsts, Ws1#ws.is_autoid_var}};
+        {error, _} = Error ->
+            Error
+    end;
 compile_tokens({error, {Loc, template_compiler_parser, Msg}}, #cs{ filename = Filename }, Options) ->
     % Try format the Yecc error
     Err = split_loc(Loc),
@@ -520,6 +535,20 @@ block_elements({cache, _, Elts}) -> Elts;
 block_elements({javascript, Elts}) -> Elts;
 block_elements({filter, _, Elts}) -> Elts;
 block_elements(_) -> [].
+
+
+check_duplicate_blocks(Blocks) ->
+    check_duplicate_blocks_1(Blocks, #{}).
+
+check_duplicate_blocks_1([], _Acc) ->
+    ok;
+check_duplicate_blocks_1([{block, {identifier, _Pos, Name}, _Elements}|Blocks], Acc) ->
+    case maps:is_key(Name, Acc) of
+        true ->
+            {error, {duplicate_block, Name}};
+        false ->
+            check_duplicate_blocks_1(Blocks, Acc#{ Name => true })
+    end.
 
 
 %% @doc Optionally drop text before {% extends %} or {% overrules %}.
