@@ -422,27 +422,24 @@ cs(Module, Filename, Options, Context) ->
     }.
 
 compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState, _Options) ->
-    Blocks = find_blocks(Elements),
-    case check_duplicate_blocks(Blocks) of
-        ok ->
+    case find_blocks(Elements) of
+        {ok, Blocks} ->
             {Ws, BlockAsts} = compile_blocks(Blocks, CState),
             {ok, {Extend, Ws#ws.includes, BlockAsts, undefined, Ws#ws.is_autoid_var}};
         {error, _} = Error ->
             Error
     end;
 compile_tokens({ok, {overrules, Elements}}, CState, _Options) ->
-    Blocks = find_blocks(Elements),
-    case check_duplicate_blocks(Blocks) of
-        ok ->
+    case find_blocks(Elements) of
+        {ok, Blocks} ->
             {Ws, BlockAsts} = compile_blocks(Blocks, CState),
             {ok, {overrules, Ws#ws.includes, BlockAsts, undefined, Ws#ws.is_autoid_var}};
         {error, _} = Error ->
             Error
     end;
 compile_tokens({ok, {base, Elements}}, CState, _Options) ->
-    Blocks = find_blocks(Elements),
-    case check_duplicate_blocks(Blocks) of
-        ok ->
+    case find_blocks(Elements) of
+        {ok, Blocks} ->
             {Ws, BlockAsts} = compile_blocks(Blocks, CState),
             CStateElts = CState#cs{blocks = BlockAsts},
             {Ws1, TemplateAsts} = template_compiler_element:compile(Elements, CStateElts, Ws),
@@ -517,12 +514,26 @@ reset_block_ws(Ws) ->
 
 %% @doc Extract all block definitions from the parse tree, returns deepest nested blocks first
 find_blocks(Elements) ->
-    find_blocks(Elements, []).
+    case find_blocks(Elements, {ok, [], []}) of
+        {ok, Acc, _Stack} ->
+            {ok, Acc};
+        {error, _} = Error ->
+            Error
+    end.
 
+find_blocks(_, {error, _} = Error) ->
+    Error;
 find_blocks(List, Acc) when is_list(List) ->
     lists:foldl(fun find_blocks/2, Acc, List);
-find_blocks({block, _Name, Elements} = Block, Acc) ->
-    find_blocks(Elements, [Block|Acc]);
+find_blocks({block, {identifier, _Pos, Name}, Elements} = Block, {ok, Acc, Stack}) ->
+    case lists:member(Name, Stack) of
+        true ->
+            {error, {duplicate_block, Name}};
+        false ->
+            Acc1 = [ Block | Acc ],
+            Stack1 = [ Name | Stack ],
+            find_blocks(Elements, {ok, Acc1, Stack1})
+    end;
 find_blocks(Element, Acc) ->
     find_blocks(block_elements(Element), Acc).
 
@@ -535,20 +546,6 @@ block_elements({cache, _, Elts}) -> Elts;
 block_elements({javascript, Elts}) -> Elts;
 block_elements({filter, _, Elts}) -> Elts;
 block_elements(_) -> [].
-
-
-check_duplicate_blocks(Blocks) ->
-    check_duplicate_blocks_1(Blocks, #{}).
-
-check_duplicate_blocks_1([], _Acc) ->
-    ok;
-check_duplicate_blocks_1([{block, {identifier, _Pos, Name}, _Elements}|Blocks], Acc) ->
-    case maps:is_key(Name, Acc) of
-        true ->
-            {error, {duplicate_block, Name}};
-        false ->
-            check_duplicate_blocks_1(Blocks, Acc#{ Name => true })
-    end.
 
 
 %% @doc Optionally drop text before {% extends %} or {% overrules %}.
