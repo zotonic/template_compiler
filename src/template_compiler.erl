@@ -514,35 +514,28 @@ reset_block_ws(Ws) ->
 
 %% @doc Extract all block definitions from the parse tree, returns deepest nested blocks first
 find_blocks(Elements) ->
-    case find_blocks(Elements, {ok, []}, []) of
-        {ok, Acc} ->
-            {ok, Acc};
-        {error, _} = Error ->
-            Error
-    end.
+    find_blocks(Elements, [], []).
 
-find_blocks(_, {error, _} = Error, _Stack) ->
-    Error;
-find_blocks([], {ok, Acc}, _Stack) ->
+find_blocks([], Acc, _Stack) ->
     {ok, Acc};
-find_blocks([B|Bs], {ok, Acc}, Stack) ->
-    case find_blocks(B, {ok, Acc}, Stack) of
+find_blocks([B|Bs], Acc, Stack) ->
+    case find_blocks(B, Acc, Stack) of
         {ok, Acc1} ->
-            find_blocks(Bs, {ok, Acc1}, Stack);
+            find_blocks(Bs, Acc1, Stack);
         {error, _} = Error ->
             Error
     end;
-find_blocks({block, {identifier, _Pos, Name}, Elements} = Block, {ok, Acc}, Stack) ->
+find_blocks({block, {identifier, _Pos, Name}, Elements} = Block, Acc, Stack) ->
     case lists:member(Name, Stack) of
         true ->
             {error, {duplicate_nested_block, Name}};
         false ->
             Acc1 = [ Block | Acc ],
             Stack1 = [ Name | Stack ],
-            find_blocks(Elements, {ok, Acc1}, Stack1)
+            find_blocks(Elements, Acc1, Stack1)
     end;
-find_blocks(Element, {ok, Acc}, Stack) ->
-    find_blocks(block_elements(Element), {ok, Acc}, Stack).
+find_blocks(Element, Acc, Stack) ->
+    find_blocks(block_elements(Element), Acc, Stack).
 
 block_elements({for, _, Loop, Empty}) -> [Loop,Empty];
 block_elements({'if', _, If, Else}) -> [If, Else];
