@@ -74,7 +74,7 @@ hello_world_comment_test(_Config) ->
     ok.
 
 block_nested_error_test(_Config) ->
-    {error, {duplicate_block, <<"main">>}} = template_compiler:render("block_nested_error.tpl", #{}, [], undefined),
+    {error, {duplicate_nested_block, <<"main">>}} = template_compiler:render("block_nested_error.tpl", #{}, [], undefined),
     ok.
 
 block_render_test(_Config) ->
