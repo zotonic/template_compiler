@@ -108,7 +108,6 @@ subtract(A, B, Runtime, Context) ->
         to_maybe_list(B, Runtime, Context),
         Runtime, Context).
 
-
 add(A, B, Runtime, Context) ->
     case to_numbers(A, B, Runtime, Context) of
         {undefined, _} -> undefined;

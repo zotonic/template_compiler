@@ -167,6 +167,7 @@ Nonterminals
     OptAsPart
     OptE
     E
+    Edot
     Uminus
     Unot.
 
@@ -270,6 +271,7 @@ Nonassoc 300 '=:=' '=/=' '==' '/=' '<' '>' '=<' '>='.
 Left 350 '++' '--'.
 Left 400 '+' '-'.
 Left 500 '*' '/' '%'.
+Left 100 Edot.
 Unary 600 Uminus Unot.
 
 %% Expected shift/reduce conflicts
@@ -544,9 +546,13 @@ E -> E '-' E  : {expr, {'sub', '$2'}, '$1', '$3'}.
 E -> E '*' E  : {expr, {'multiply', '$2'}, '$1', '$3'}.
 E -> E '/' E  : {expr, {'divide', '$2'}, '$1', '$3'}.
 E -> E '%' E  : {expr, {'modulo', '$2'}, '$1', '$3'}.
+E -> Edot : '$1'.
 E -> Uminus : '$1'.
 E -> Unot : '$1'.
 E -> Value : '$1'.
 
+Edot -> E dot identifier : {expr, {'find_value', '$2'}, '$1', '$3'}.
 Uminus -> '-' E : {expr, {'negate', '$1'}, '$2'}.
 Unot -> not_keyword E : {expr, {'not', '$1'}, '$2'}.
+
+
