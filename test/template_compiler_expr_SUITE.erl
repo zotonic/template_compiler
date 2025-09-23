@@ -187,9 +187,7 @@ expr_dot(_Config) ->
     <<"">> = iolist_to_binary(Bin4),
 
     {ok, Bin5} = template_compiler:render("expr_dot_2.tpl", #{ }, [], undefined),
-    <<"">> = iolist_to_binary(Bin5),
-
-    ok.
+    <<"">> = iolist_to_binary(Bin5).
 
 test_data_dir(Config) ->
     filename:join([
