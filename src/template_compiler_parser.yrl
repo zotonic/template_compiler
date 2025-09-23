@@ -271,8 +271,8 @@ Nonassoc 300 '=:=' '=/=' '==' '/=' '<' '>' '=<' '>='.
 Left 350 '++' '--'.
 Left 400 '+' '-'.
 Left 500 '*' '/' '%'.
-Left 100 Edot.
 Unary 600 Uminus Unot.
+Nonassoc 800 dot.
 
 %% Expected shift/reduce conflicts
 Expect 7.
