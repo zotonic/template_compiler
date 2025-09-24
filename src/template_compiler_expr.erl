@@ -141,6 +141,18 @@ compile({expr, {'and', {_, SrcPos, _}}, Arg1, Arg2}, #cs{runtime=Runtime} = CSta
                 {runtime, erl_syntax:atom(Runtime)}
             ]),
     {Ws2, Ast};
+compile({expr, {'find_value', {_, SrcPos, _}}, Arg, {identifier, _, Name}}, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, ArgAst} = compile(Arg, CState, Ws),
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "_@runtime:find_value(_@name, _@runtime:to_simple_value(_@arg, _@context), [], _@context)",
+            [
+             {name, erl_syntax:abstract(Name)},
+             {arg, ArgAst},
+             {runtime, erl_syntax:atom(Runtime)},
+             {context, erl_syntax:variable(CState#cs.context_var)}
+            ]),
+    {Ws1, Ast};
 compile({expr, {Op, {_, SrcPos, _}}, Arg1, Arg2}, #cs{runtime=Runtime} = CState, Ws) when is_atom(Op) ->
     {Ws1, Arg1Ast} = compile(Arg1, CState, Ws),
     {Ws2, Arg2Ast} = compile(Arg2, CState, Ws1),

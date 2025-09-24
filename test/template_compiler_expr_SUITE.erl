@@ -20,6 +20,7 @@ groups() ->
         [expr_test
         ,expr_op_test
         ,expr_op_eq_neq_test
+        ,expr_dot
         ,expr_filter
         ,expr_literals
         ,expr_nested
@@ -171,6 +172,22 @@ expr_andalso(_Config) ->
     <<"false">> = iolist_to_binary(Bin3),
     1 = erlang:get(x),
     erlang:erase(x).
+
+expr_dot(_Config) ->
+    {ok, Bin1} = template_compiler:render("expr_dot.tpl", #{ }, [], undefined),
+    <<"123">> = iolist_to_binary(Bin1),
+
+    {ok, Bin2} = template_compiler:render("expr_dot_2.tpl", #{ x => #{ test => 123 } }, [], undefined),
+    <<"123">> = iolist_to_binary(Bin2),
+    
+    {ok, Bin3} = template_compiler:render("expr_dot_2.tpl", #{ x => [ {test, 123} ] }, [], undefined),
+    <<"123">> = iolist_to_binary(Bin3),
+
+    {ok, Bin4} = template_compiler:render("expr_dot_2.tpl", #{ x => [ ] }, [], undefined),
+    <<"">> = iolist_to_binary(Bin4),
+
+    {ok, Bin5} = template_compiler:render("expr_dot_2.tpl", #{ }, [], undefined),
+    <<"">> = iolist_to_binary(Bin5).
 
 test_data_dir(Config) ->
     filename:join([

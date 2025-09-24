@@ -271,6 +271,7 @@ Left 350 '++' '--'.
 Left 400 '+' '-'.
 Left 500 '*' '/' '%'.
 Unary 600 Uminus Unot.
+Nonassoc 800 dot.
 
 %% Expected shift/reduce conflicts
 Expect 7.
@@ -544,9 +545,11 @@ E -> E '-' E  : {expr, {'sub', '$2'}, '$1', '$3'}.
 E -> E '*' E  : {expr, {'multiply', '$2'}, '$1', '$3'}.
 E -> E '/' E  : {expr, {'divide', '$2'}, '$1', '$3'}.
 E -> E '%' E  : {expr, {'modulo', '$2'}, '$1', '$3'}.
+E -> E dot identifier : {expr, {'find_value', '$2'}, '$1', '$3'}.
 E -> Uminus : '$1'.
 E -> Unot : '$1'.
 E -> Value : '$1'.
 
 Uminus -> '-' E : {expr, {'negate', '$1'}, '$2'}.
 Unot -> not_keyword E : {expr, {'not', '$1'}, '$2'}.
+
