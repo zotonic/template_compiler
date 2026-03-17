@@ -48,6 +48,7 @@
                 | {trace_position, {Filename::binary(), Line::integer(), Col::integer()}}
                 | {context_vars, list(binary())}
                 | {debug_points, all | [{binary(), integer(), integer()}] | map()}
+                % Internal option, not part of the external API.
                 | {debug_point_files, all | map()}.
 -type options() :: list(option()).
 -type template_file() :: #template_file{}.
