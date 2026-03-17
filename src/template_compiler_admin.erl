@@ -283,10 +283,9 @@ split_waiters(TplKey, State) ->
 flush_debug_state(State) ->
     DebugCompiled = ets:foldl(
                         fun
-                            (#tpl{key=Key, module=Module} = Tpl, Acc) ->
+                            (#tpl{module=Module} = Tpl, Acc) ->
                                 case Module:is_debug_compiled() of
                                     true ->
-                                        ets:delete(?MODULE, Key),
                                         [Tpl|Acc];
                                     false ->
                                         Acc
@@ -294,6 +293,11 @@ flush_debug_state(State) ->
                         end,
                         [],
                         ?MODULE),
+    lists:foreach(
+        fun (#tpl{key=Key}) ->
+            ets:delete(?MODULE, Key)
+        end,
+        DebugCompiled),
     DebugKeys = [ Key || #tpl{key=Key} <- DebugCompiled ],
     FilenameKeys = lists:filter(
                         fun({_Fn, Key}) ->
