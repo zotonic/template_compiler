@@ -83,8 +83,8 @@
 
 -callback trace_compile(atom(), binary(), template_compiler:options(), term()) -> ok.
 -callback trace_render(binary(), template_compiler:options(), term()) -> ok | {ok, iodata(), iodata()}.
--callback trace_debug(binary(), template_compiler:options(), term()) -> ok.
--callback trace_block({binary(),integer(),integer()}, atom(), atom(), term()) -> ok | {ok, iodata(), iodata()}.
+-callback trace_debug({binary(), integer(), integer()}, map(), term()) -> ok.
+-callback trace_block({binary(), integer(), integer()}, atom(), atom(), term()) -> ok | {ok, iodata(), iodata()}.
 
 
 -include_lib("kernel/include/logger.hrl").
