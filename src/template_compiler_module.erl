@@ -1,9 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016-2023 Marc Worrell
+%% @copyright 2016-2026 Marc Worrell
 %% @doc Build the template module from the parts.
 %% @end
 
-%% Copyright 2016-2023 Marc Worrell
+%% Copyright 2016-2026 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -27,11 +27,18 @@
 -include_lib("syntax_tools/include/merl.hrl").
 
 compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, undefined) ->
-    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>));
+    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>), [], false);
+compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, {undefined, DebugPoints, IsDebugCompiled}) ->
+    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>), DebugPoints, IsDebugCompiled);
+compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, {TemplateAst, DebugPoints, IsDebugCompiled}) ->
+    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, DebugPoints, IsDebugCompiled);
 compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst) ->
+    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, [], false).
+
+compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, DebugPoints, IsDebugCompiled) ->
     Now = os:timestamp(),
     BlockNames = [ BN || {BN, _Tree, _Ws} <- BlockAsts ],
-    Forms = lists:flatten(
+    Forms1 = lists:flatten(
         ?Q(["-module('@Module@').",
             "-export([",
                 "render/3,",
@@ -41,6 +48,8 @@ compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts
                 "module/0,",
                 "extends/0,",
                 "includes/0,",
+                "debug_points/0,",
+                "is_debug_compiled/0,",
                 "filename/0,",
                 "mtime/0,",
                 "is_autoid/0,"
@@ -61,6 +70,10 @@ compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts
             [
                 {functions, blocksfun(BlockAsts)}
             ])),
+    Forms = Forms1 ++ [
+        function(debug_points, lists:usort(DebugPoints)),
+        function(is_debug_compiled, IsDebugCompiled)
+    ],
     [
         merl:quote(1, "-file(\""++unicode:characters_to_list(Filename)++"\", 1).")
         | Forms
@@ -74,3 +87,8 @@ blocksfun(Blocks) ->
         ?Q("(_BlockName, _Vars, _Blocks, _Context) -> <<>>")
     ],
     erl_syntax:function(erl_syntax:atom(render_block), Clauses).
+
+function(Name, Value) ->
+    erl_syntax:function(
+        erl_syntax:atom(Name),
+        [erl_syntax:clause([], none, [erl_syntax:abstract(Value)])]).

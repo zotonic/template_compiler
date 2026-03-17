@@ -1,10 +1,10 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016-2023 Marc Worrell
+%% @copyright 2016-2026 Marc Worrell
 %% @doc Simple runtime for the compiled templates. Needs to be
 %%      copied and adapted for different environments.
 %% @end
 
-%% Copyright 2016-2023 Marc Worrell
+%% Copyright 2016-2026 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@
     escape/2,
     trace_compile/4,
     trace_render/3,
+    trace_debug/3,
     trace_block/4
     ]).
 
@@ -82,6 +83,7 @@
 
 -callback trace_compile(atom(), binary(), template_compiler:options(), term()) -> ok.
 -callback trace_render(binary(), template_compiler:options(), term()) -> ok | {ok, iodata(), iodata()}.
+-callback trace_debug(binary(), template_compiler:options(), term()) -> ok.
 -callback trace_block({binary(),integer(),integer()}, atom(), atom(), term()) -> ok | {ok, iodata(), iodata()}.
 
 
@@ -419,7 +421,12 @@ trace_compile(_Module, Filename, Options, _Context) ->
 
 %% @doc Called when a template is rendered (could be from an include) - the return is
 %%      kept in a trace for displaying template extends recursion information.
--spec trace_render(binary(), template_compiler:options(), term()) -> ok | {ok, iodata(), iodata()}.
+-spec trace_render(TemplateFilename, Options, Context) -> ok | {ok, Before, After} when
+    TemplateFilename :: binary(),
+    Options :: template_compiler:options(),
+    Context :: term(),
+    Before :: iodata(),
+    After :: iodata().
 trace_render(Filename, Options, _Context) ->
     case proplists:get_value(trace_position, Options) of
         {File, Line, _Col} ->
@@ -437,7 +444,28 @@ trace_render(Filename, Options, _Context) ->
     end,
     ok.
 
-%% @doc Called when a block function is called
--spec trace_block({binary(), integer(), integer()}, atom(), atom(), term()) -> ok | {ok, iodata(), iodata()}.
+%% @doc Called when an enabled template debug checkpoint is hit.
+-spec trace_debug(SrcPos, Vars, Context) -> ok when
+    SrcPos :: {File, Line, Col},
+    File :: binary(),
+    Line :: integer(),
+    Col :: integer(),
+    Vars :: map(),
+    Context :: term().
+trace_debug(_SrcPos, _Vars, _Context) ->
+    ok.
+
+%% @doc Called when a block function is called. The optionally returned prefix and
+%% postfix are inserted into the output stream before and after the block content, respectively.
+-spec trace_block(SrcPos, BlockName, Module, Context) -> ok | {ok, Before, After} when
+    SrcPos :: {Filename, Line, Column},
+    Filename :: binary(),
+    Line :: integer(),
+    Column :: integer(),
+    BlockName :: atom(),
+    Module :: atom(),
+    Context :: term(),
+    Before :: iodata(),
+    After :: iodata().
 trace_block(_SrcPos, _Name, _Module, _Context) ->
     ok.

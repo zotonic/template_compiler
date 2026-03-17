@@ -1,9 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016-2023 Marc Worrell
+%% @copyright 2016-2026 Marc Worrell
 %% @doc Template compiler internal definitions.
 %% @end
 
-%% Copyright 2016-2023 Marc Worrell
+%% Copyright 2016-2026 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -46,7 +46,8 @@
         custom_tags = [],
         is_forloop_var = false :: boolean(),
         is_autoid_var = false :: boolean(),
-        includes = [] :: [ binary() ]
+        includes = [] :: [ binary() ],
+        debug_points = [] :: [ {binary(), integer(), integer()} ]
     }).
 
 %% @doc State for the compiler. Also records the current block's arguments variable, and context variable.
@@ -60,5 +61,6 @@
         vars_var = "Vars" :: string(),
         context_var = "Context" :: string(),
         context_vars = [] :: list(binary()),
-        is_autoescape = false :: boolean()
+        is_autoescape = false :: boolean(),
+        is_debug_points = false :: boolean()
     }).
