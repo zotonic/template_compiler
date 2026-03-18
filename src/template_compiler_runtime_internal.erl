@@ -1,9 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016-2024 Marc Worrell
+%% @copyright 2016-2026 Marc Worrell
 %% @doc Callback routines for compiled templates.
 %% @end
 
-%% Copyright 2016-2024 Marc Worrell
+%% Copyright 2016-2026 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@
     include/9,
     compose/11,
     call/4,
+    debug_checkpoint/4,
     print/1,
     unique/0
     ]).
@@ -266,8 +267,11 @@ include_1(SrcPos, all, Template, Runtime, ContextVars, Vars, Context) ->
             Templates);
 include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars, Context) ->
     {SrcFile, SrcLine, _SrcCol} = SrcPos,
+    DebugPoints = maps:get('$debug_points', Vars, #{}),
     Options = [
         {runtime, Runtime},
+        {debug_points, DebugPoints},
+        {debug_point_files, debug_point_files_map(DebugPoints)},
         {trace_position, SrcPos},
         {context_vars, ContextVars}
     ],
@@ -338,8 +342,11 @@ compose(SrcPos, Template, Args, Runtime, ContextVars, IsContextVars, Vars, Block
     end,
     BlockMap = lists:foldl(fun(Block, Acc) -> Acc#{ Block => [ {BlockModule, BlockFun} ] } end, #{}, BlockList),
     {SrcFile, SrcLine, _SrcCol} = SrcPos,
+    DebugPoints = maps:get('$debug_points', Vars1, #{}),
     Options = [
         {runtime, Runtime},
+        {debug_points, DebugPoints},
+        {debug_point_files, debug_point_files_map(DebugPoints)},
         {trace_position, SrcPos},
         {context_vars, ContextVars}
     ],
@@ -380,6 +387,32 @@ call(Module, Args, Vars, Context) ->
         {ok, Result} -> Result;
         {error, _} -> <<>>
     end.
+
+
+-spec debug_checkpoint({binary(), integer(), integer()}, map(), atom(), term()) -> ok.
+debug_checkpoint(SrcPos, Vars, Runtime, Context) ->
+    case is_debug_enabled(SrcPos, Vars) of
+        true ->
+            Runtime:trace_debug(SrcPos, sanitize_debug_vars(Vars), Context);
+        false ->
+            ok
+    end.
+
+sanitize_debug_vars(Vars) when is_map(Vars) ->
+    maps:without(['$debug_points', '$autoid'], Vars);
+sanitize_debug_vars(Vars) ->
+    Vars.
+
+is_debug_enabled(_SrcPos, #{ '$debug_points' := all }) ->
+    true;
+is_debug_enabled(SrcPos, #{ '$debug_points' := DebugPoints }) when is_map(DebugPoints) ->
+    maps:is_key(SrcPos, DebugPoints);
+is_debug_enabled(_SrcPos, _Vars) ->
+    false.
+
+debug_point_files_map(DebugPoints) ->
+    template_compiler:debug_point_files_map(DebugPoints).
+
 
 
 %% @doc Echo the HTML escape value within &lt;pre&gt; tags.

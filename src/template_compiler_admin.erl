@@ -1,9 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016-2023 Marc Worrell
+%% @copyright 2016-2026 Marc Worrell
 %% @doc Administrate all compiled templates and compilers in flight.
 %% @end
 
-%% Copyright 2016-2023 Marc Worrell
+%% Copyright 2016-2026 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@
 -export([
     lookup/3,
     flush/0,
+    flush_debug/0,
     flush_file/1,
     flush_context_name/1
     ]).
@@ -67,7 +68,9 @@ lookup(Filename, Options, Context) ->
     TplKey = {ContextName, Runtime, Filename},
     case ets:lookup(?MODULE, TplKey) of
         [#tpl{module=Module}] ->
-            case Runtime:is_modified(Filename, Module:mtime(), Context) of
+            case Runtime:is_modified(Filename, Module:mtime(), Context)
+                orelse should_recompile_debug(Filename, Module, Options)
+            of
                 true -> compile_file(Filename, TplKey, Options, Context);
                 false -> {ok, Module}
             end;
@@ -106,6 +109,11 @@ compile_file(Filename, TplKey, Options, Context) ->
 -spec flush() -> ok.
 flush() ->
     gen_server:cast(?MODULE, flush).
+
+%% @doc Flush all template mappings for modules compiled with debug points enabled
+-spec flush_debug() -> ok.
+flush_debug() ->
+    gen_server:call(?MODULE, flush_debug, infinity).
 
 %% @doc Ping that a template has been changed
 -spec flush_file(file:filename_all()) -> ok.
@@ -170,6 +178,8 @@ handle_call({compile_done, Result, TplKey}, _From, State) ->
             end,
             Waiters),
     {reply, ok, State2};
+handle_call(flush_debug, _From, State) ->
+    {reply, ok, flush_debug_state(State)};
 handle_call(Msg, _From, State) ->
     {stop, {unknown_call, Msg}, State}.
 
@@ -209,7 +219,7 @@ handle_cast({flush_context_name, ContextName}, State) ->
             Matched),
     FilenameKeys = lists:filter(
                         fun({_Fn, K}) ->
-                            K =/= ContextName
+                            element(1, K) =/= ContextName
                         end,
                         State#state.filename_keys),
     {noreply, State#state{filename_keys=FilenameKeys}};
@@ -269,3 +279,44 @@ split_waiters(TplKey, State) ->
                                 end,
                                 State#state.waiting),
     {Ready, State#state{waiting=Waiting}}.
+
+flush_debug_state(State) ->
+    DebugCompiled = ets:foldl(
+                        fun
+                            (#tpl{module=Module} = Tpl, Acc) ->
+                                case Module:is_debug_compiled() of
+                                    true ->
+                                        [Tpl|Acc];
+                                    false ->
+                                        Acc
+                                end
+                        end,
+                        [],
+                        ?MODULE),
+    lists:foreach(
+        fun (#tpl{key=Key}) ->
+            ets:delete(?MODULE, Key)
+        end,
+        DebugCompiled),
+    DebugKeys = [ Key || #tpl{key=Key} <- DebugCompiled ],
+    FilenameKeys = lists:filter(
+                        fun({_Fn, Key}) ->
+                            not lists:member(Key, DebugKeys)
+                        end,
+                        State#state.filename_keys),
+    State#state{filename_keys=FilenameKeys}.
+
+should_recompile_debug(Filename, Module, Options) ->
+    case Module:is_debug_compiled() of
+        false ->
+            has_debug_points(Filename, template_compiler:get_option(debug_point_files, Options));
+        true ->
+            false
+    end.
+
+has_debug_points(_Filename, all) ->
+    true;
+has_debug_points(Filename, DebugPointFiles) when is_map(DebugPointFiles) ->
+    maps:is_key(Filename, DebugPointFiles);
+has_debug_points(_Filename, _) ->
+    false.

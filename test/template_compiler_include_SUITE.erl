@@ -25,6 +25,9 @@ groups() ->
         ,include_undefined_test
         ,compose_test
         ,compose_inherit_test
+        ,debug_points_metadata_test
+        ,debug_points_runtime_test
+        ,flush_debug_test
         ]}].
 
 init_per_suite(Config) ->
@@ -89,6 +92,69 @@ compose_inherit_test(_Config) ->
     {ok, Bin1} = template_compiler:render("compose2.tpl", #{}, [], undefined),
     <<"AxBXYC1yD">> = iolist_to_binary(Bin1),
     ok.
+
+debug_points_metadata_test(_Config) ->
+    {ok, #template_file{ filename = Filename }} = template_compiler_runtime:map_template(<<"debug_value.tpl">>, [], undefined),
+    {ok, Mod1} = template_compiler:lookup(Filename, [], undefined),
+    false = Mod1:is_debug_compiled(),
+    [Point|_] = Mod1:debug_points(),
+
+    {ok, Mod2} = template_compiler:lookup(Filename, [{debug_points, [Point]}], undefined),
+    true = (Mod1 =:= Mod2),
+    true = Mod2:is_debug_compiled(),
+    true = (Mod1:debug_points() =:= Mod2:debug_points()),
+    ok.
+
+debug_points_runtime_test(_Config) ->
+    Context = #{ trace_pid => self() },
+    {ok, #template_file{ filename = Filename }} = template_compiler_runtime:map_template(<<"debug_value.tpl">>, [], undefined),
+    {ok, Mod0} = template_compiler:lookup(Filename, [], Context),
+    [Point|_] = Mod0:debug_points(),
+    Options0 = [
+        {runtime, template_compiler_debug_runtime},
+        {debug_points, [Point]}
+    ],
+    {ok, Mod} = template_compiler:lookup(Filename, Options0, Context),
+    [Point|_] = Mod:debug_points(),
+
+    {ok, Bin1} = template_compiler:render("debug_value.tpl", #{ a => 1 }, Options0, Context),
+    <<"1">> = iolist_to_binary(Bin1),
+    receive
+        {trace_debug, _, Vars1} ->
+            false = maps:is_key(debug_vars, Vars1)
+    after 50 ->
+        ok
+    end,
+
+    {ok, Bin2} = template_compiler:render("debug_value.tpl", #{ a => 2 }, Options0, Context),
+    <<"2">> = iolist_to_binary(Bin2),
+    {TracePos, DebugVars} = receive_debug_trace(Filename, 1000),
+    2 = maps:get(a, DebugVars),
+    false = maps:is_key('$template', DebugVars),
+    false = maps:is_key('$line', DebugVars),
+    false = maps:is_key('$column', DebugVars),
+    Point = TracePos,
+    ok.
+
+flush_debug_test(_Config) ->
+    {ok, #template_file{ filename = Filename }} = template_compiler_runtime:map_template(<<"debug_value.tpl">>, [], undefined),
+    {ok, Mod0} = template_compiler:lookup(Filename, [], undefined),
+    [Point|_] = Mod0:debug_points(),
+    {ok, Mod1} = template_compiler:lookup(Filename, [{debug_points, [Point]}], undefined),
+    true = Mod1:is_debug_compiled(),
+    ok = template_compiler:flush_debug(),
+    {ok, Mod2} = template_compiler:lookup(Filename, [], undefined),
+    false = Mod2:is_debug_compiled(),
+    true = (Mod1 =:= Mod2),
+    ok.
+
+receive_debug_trace(Filename, Timeout) ->
+    receive
+        {trace_debug, {Filename, _, _} = SrcPos, Vars} ->
+            {SrcPos, Vars}
+    after Timeout ->
+        ct:fail(no_debug_checkpoint)
+    end.
 
 test_data_dir(Config) ->
     filename:join([

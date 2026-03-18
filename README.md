@@ -2,9 +2,8 @@ Template Compiler for Erlang / Elixir
 =====================================
 
 ![Test](https://github.com/zotonic/template_compiler/workflows/Test/badge.svg)
-[![Join the chat at https://gitter.im/zotonic/zotonic](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/zotonic/zotonic?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-This is the template compiler used by [The Erlang Content Management Framework and CMS Zotonic](http://zotonic.com/).
+This is the template compiler used by [The Erlang Content Management Framework and CMS Zotonic](https://zotonic.com/).
 
 This compiler is a complete rewrite of the erlydtl fork used in Zotonic. In contrast with ErlyDTL the template_compiler generates small Erlang modules which are shared between different templates and sites.
 
@@ -71,6 +70,8 @@ Will be compiled to an Erlang module with the following structure:
     module/0,
     extends/0,
     includes/0,
+    debug_points/0,
+    is_debug_compiled/0,
     filename/0,
     mtime/0,
     is_autoid/0,
@@ -109,6 +110,15 @@ includes() -> [
         }
     ].
 
+%% All possible debug checkpoints in this template module.
+debug_points() -> [
+        {<<"foo/bar/a.tpl">>, 1, 1},
+        {<<"foo/bar/a.tpl">>, 3, 5}
+    ].
+
+%% Flag if the template was compiled with runtime debug checkpoints enabled.
+is_debug_compiled() -> false.
+
 %% The filename of this template
 filename() -> <<"foo/bar/a.tpl">>.
 
@@ -131,6 +141,13 @@ Runtime Module
 The template_compiler uses a runtime module which implements template lookup and vatiable resolution methods.
 There is a default runtime module in `template_compiler_runtime`.
 
+The runtime can also implement tracing hooks:
+
+ * `trace_compile/4` is called when a template module is compiled.
+ * `trace_render/3` is called when a template is rendered or included.
+ * `trace_block/4` is called when a block function is rendered.
+ * `trace_debug/3` is called as `trace_debug(SrcPos, Vars, Context)` when an enabled debug checkpoint is hit.
+
 
 How to use
 ----------
@@ -138,7 +155,7 @@ How to use
 Render a template to an iolist:
 
 ```erlang
-Vars = #{ <<"a">> => 1 },                 % Template variables, use a map
+Vars = #{ <<"a">> => 1 },           % Template variables, use a map
 Options = [],                       % Render and compilation options
 Context = your_request_context,     % Context passed to the runtime module and filters
 {ok, IOList} = template_compiler:render("hello.tpl", Vars, Options, Context).
@@ -146,6 +163,39 @@ Context = your_request_context,     % Context passed to the runtime module and f
 
 The `template_compiler:render/4` function looks up the template, ensures it is compiled, and then
 calls the compiled render function of the template or the templates it extends (which are also compiled etc.).
+
+#### Debug options
+
+Templates can optionally be compiled with runtime debug checkpoints:
+
+```erlang
+Options = [
+    {debug_points, [
+        {<<"hello.tpl">>, 3, 5}
+    ]}
+].
+```
+
+The supported debug-related options are:
+
+ * `{debug_points, all | [SrcPos] | map()}` selects which checkpoints are active at render time.
+   `SrcPos` is `{Filename, Line, Column}`. Lists are internally converted to a map for quick lookup.
+   If a template is rendered with a debug point in this option and its module is not yet compiled
+   with debug checkpoints enabled, then it is recompiled with debug checkpoints enabled.
+   When the option is empty (the default), rendering behavior stays the same as before.
+
+When an enabled checkpoint is hit, the runtime callback `trace_debug(SrcPos, Vars, Context)` is called.
+`Vars` contains the current template variables at that point, and `SrcPos` contains the source filename,
+line and column of the checkpoint.
+
+Compiled template modules expose two debug-related callbacks:
+
+ * `debug_points/0` returns all possible `{Filename, Line, Column}` checkpoints in the module.
+ * `is_debug_compiled/0` returns `true` if the template was compiled with runtime debug checkpoints enabled.
+
+After a debugging session, `template_compiler:flush_debug/0` can be used to clear all cached
+modules that are compiled with debug checkpoints enabled. The next render of those templates
+recompiles them without debug checkpoints.
 
 
 Use `template_compiler:compile_file/3` and `template_compiler:compile_binary/4` to compile a template file or in-memory binary to a module:
@@ -157,6 +207,44 @@ Use `template_compiler:compile_file/3` and `template_compiler:compile_binary/4` 
 The Filename is used to reference the compiled binary.
 
 
+#### Syntax highlighted HTML
+
+Use `template_compiler:highlight_file/1` to return syntax highlighted HTML for a template source file:
+
+```erlang
+{ok, Html} = template_compiler:highlight_file("/full/path/to/hello.tpl").
+```
+
+This returns an HTML binary generated from the template parse tree built by the compiler scanner and parser.
+
+Use `template_compiler:highlight_binary/2` to highlight an in-memory template source:
+
+```erlang
+{ok, Html} = template_compiler:highlight_binary(<<"Hello {{ name }}">>, <<"hello.tpl">>).
+```
+
+The filename argument is used for parsing context and source positions in the generated output.
+
+For a convenience variant without an explicit filename:
+
+```erlang
+{ok, Html} = template_compiler:highlight_binary(<<"Hello {{ name }}">>).
+```
+
+This uses a dummy template filename internally.
+
+Use `template_compiler:highlight_module/1` to return syntax highlighted HTML for an already compiled template module:
+
+```erlang
+{ok, Mod} = template_compiler:lookup(TemplateFilename, Options, Context),
+{ok, Html} = template_compiler:highlight_module(Mod).
+```
+
+When highlighting a compiled template module, the highlighter also reads the module's `debug_points/0`
+callback and inserts checkbox inputs for those source positions in the generated HTML. The checkbox
+value is `Line:Column`.
+
+
 #### Force recompilation
 
 Sometimes (for example when template lookups or translations are changed) it is necessary to check all templates if they
@@ -165,6 +253,7 @@ need to be recompiled.
 For this are the flush functions:
 
  * `template_compiler:flush()` forces a check on all templates.
+ * `template_compiler:flush_debug()` forces a recheck of all templates currently compiled with debug checkpoints enabled.
  * `template_compiler:flush_file(TemplateFile)` forces check on the given template.
  * `template_compiler:flush_context(Context)` forces check on templates compiled within the given request context.
 

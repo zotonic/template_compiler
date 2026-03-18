@@ -1,9 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2016-2023 Marc Worrell
+%% @copyright 2016-2026 Marc Worrell
 %% @doc Compile main block elements to erl_syntax trees.
 %% @end
 
-%% Copyright 2016-2023 Marc Worrell
+%% Copyright 2016-2026 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ compile({trans_text, SrcPos, Tr}, #cs{runtime=Runtime} = CState, Ws) ->
                 erl_syntax:variable(CState#cs.vars_var),
                 erl_syntax:variable(CState#cs.context_var)
             ]),
-    {Ws, template_compiler_utils:set_pos(SrcPos, Ast)};
+    maybe_debug_element(SrcPos, template_compiler_utils:set_pos(SrcPos, Ast), CState, Ws);
 compile({trans_ext, Tr, Args}, CState, Ws) ->
     trans_ext(Tr, Args, CState, Ws);
 compile({value, {_, SrcPos, _}, Expr, []}, #cs{runtime=Runtime} = CState, Ws) ->
@@ -74,9 +74,9 @@ compile({value, {_, SrcPos, _}, Expr, []}, #cs{runtime=Runtime} = CState, Ws) ->
                         {runtime, erl_syntax:atom(Runtime)},
                         {context, erl_syntax:variable(CState#cs.context_var)}
                     ]),
-            {Ws1, Ast2};
+            maybe_debug_element(SrcPos, Ast2, CState, Ws1);
         false ->
-            {Ws1, Ast}
+            maybe_debug_element(SrcPos, Ast, CState, Ws1)
     end;
 compile({value, {_, SrcPos, _} = TagSrc, Expr, With}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, WithExprAsts} = with_args(With, CState, Ws, false),
@@ -108,7 +108,7 @@ compile({value, {_, SrcPos, _} = TagSrc, Expr, With}, #cs{runtime=Runtime} = CSt
                     {context, erl_syntax:variable(CState#cs.context_var)},
                     {context1, erl_syntax:variable(CState2#cs.context_var)}
                 ]),
-            {Ws4, Ast};
+            maybe_debug_element(SrcPos, Ast, CState, Ws4);
         false ->
             {Ws3, WithAst} = compile({value, TagSrc, Expr, []}, CState1, Ws2),
             Ast = merl:qquote(
@@ -122,7 +122,7 @@ compile({value, {_, SrcPos, _} = TagSrc, Expr, With}, #cs{runtime=Runtime} = CSt
                     {map, MapAst},
                     {with, WithAst}
                 ]),
-            {Ws3, Ast}
+            maybe_debug_element(SrcPos, Ast, CState, Ws3)
     end;
 compile({date, now, {_, SrcPos, _}, {string_literal, _SrcPos, Format}}, CState, Ws) ->
     Ast = merl:qquote(
@@ -132,7 +132,7 @@ compile({date, now, {_, SrcPos, _}, {string_literal, _SrcPos, Format}}, CState, 
                 {format, erl_syntax:abstract(Format)},
                 {context, erl_syntax:variable(CState#cs.context_var)}
             ]),
-    {Ws, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, Ws);
 compile({load, Names}, _CState, Ws) ->
     % We don't do anything with this. Present for compatibility only.
     CustomTags = [ Name || {identifier, _, Name} <- Names ],
@@ -152,7 +152,7 @@ compile({block, {identifier, SrcPos, Name}, _Elts}, CState, Ws) ->
             ]),
     {value, {BlockName, _Tree, BlockWs}} = lists:keysearch(BlockName, 1, CState#cs.blocks),
     Ws1 = Ws#ws{is_forloop_var = Ws#ws.is_forloop_var or BlockWs#ws.is_forloop_var},
-    {Ws1, template_compiler_utils:set_pos(SrcPos, Ast)};
+    maybe_debug_element(SrcPos, template_compiler_utils:set_pos(SrcPos, Ast), CState, Ws1);
 compile({inherit, {_, _SrcPos, _}}, #cs{block=undefined}, Ws) ->
     {Ws, erl_syntax:abstract(<<>>)};
 compile({inherit, {_, SrcPos, _}}, #cs{block=Block, module=Module} = CState, Ws) ->
@@ -168,7 +168,7 @@ compile({inherit, {_, SrcPos, _}}, #cs{block=Block, module=Module} = CState, Ws)
                 erl_syntax:atom(CState#cs.runtime),
                 erl_syntax:variable(CState#cs.context_var)
             ]),
-    {Ws#ws{is_forloop_var=true}, template_compiler_utils:set_pos(SrcPos, Ast)};
+    maybe_debug_element(SrcPos, template_compiler_utils:set_pos(SrcPos, Ast), CState, Ws#ws{is_forloop_var=true});
 compile({'include', TagPos, Method, Template, Args}, CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
     IsContextVar = is_context_vars_arg(Args, CState),
@@ -195,7 +195,7 @@ compile({'call', {identifier, SrcPos, Name}, Args}, CState, Ws) ->
             {vars, erl_syntax:variable(CState#cs.vars_var)},
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]),
-    {Ws1, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, Ws1);
 compile({'call_with', {identifier, SrcPos, Name}, Expr}, CState, Ws) ->
     {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
     Module = template_compiler_utils:to_atom(Name),
@@ -212,7 +212,7 @@ compile({'call_with', {identifier, SrcPos, Name}, Expr}, CState, Ws) ->
             {vars, erl_syntax:variable(CState#cs.vars_var)},
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]),
-    {Ws1, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, Ws1);
 compile({'compose', {TagPos, Template, Args}, Blocks}, CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
     IsContextVar = is_context_vars_arg(Args, CState),
@@ -240,7 +240,7 @@ compile({custom_tag, {identifier, SrcPos, Name}, Args}, #cs{runtime=Runtime} = C
             {vars, erl_syntax:variable(CState#cs.vars_var)},
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]),
-    {Ws1, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, Ws1);
 compile({Tag, {_, SrcPos, _}, Expr, Args}, #cs{runtime=Runtime} = CState, Ws)
     when Tag =:= image;
          Tag =:= image_url;
@@ -275,7 +275,7 @@ compile({Tag, {_, SrcPos, _}, Expr, Args}, #cs{runtime=Runtime} = CState, Ws)
                     {context, erl_syntax:variable(CState#cs.context_var)},
                     {context1, erl_syntax:variable(CsCtx#cs.context_var)}
                 ]),
-            {Ws4, Ast};
+            maybe_debug_element(SrcPos, Ast, CState, Ws4);
         false ->
             Ast = merl:qquote(
                 template_compiler_utils:pos(SrcPos),
@@ -293,7 +293,7 @@ compile({Tag, {_, SrcPos, _}, Expr, Args}, #cs{runtime=Runtime} = CState, Ws)
                     {vars, erl_syntax:variable(CState#cs.vars_var)},
                     {context, erl_syntax:variable(CState#cs.context_var)}
                 ]),
-            {Ws2, Ast}
+            maybe_debug_element(SrcPos, Ast, CState, Ws2)
     end;
 compile({url, {_, SrcPos, _}, Expr, Args}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
@@ -329,7 +329,7 @@ compile({url, {_, SrcPos, _}, Expr, Args}, #cs{runtime=Runtime} = CState, Ws) ->
                     {context, erl_syntax:variable(CState#cs.context_var)},
                     {context1, erl_syntax:variable(CsCtx#cs.context_var)}
                 ]),
-            {Ws4, Ast};
+            maybe_debug_element(SrcPos, Ast, CState, Ws4);
         false ->
             Ast = merl:qquote(
                 template_compiler_utils:pos(SrcPos),
@@ -346,7 +346,7 @@ compile({url, {_, SrcPos, _}, Expr, Args}, #cs{runtime=Runtime} = CState, Ws) ->
                     {vars, erl_syntax:variable(CState#cs.vars_var)},
                     {context, erl_syntax:variable(CState#cs.context_var)}
                 ]),
-            {Ws2, Ast}
+            maybe_debug_element(SrcPos, Ast, CState, Ws2)
     end;
 compile({Lib, {_, SrcPos, _}, LibList, Args}, #cs{runtime=Runtime} = CState, Ws) when Lib =:= lib; Lib =:= lib_url ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
@@ -368,7 +368,7 @@ compile({Lib, {_, SrcPos, _}, LibList, Args}, #cs{runtime=Runtime} = CState, Ws)
             {vars, erl_syntax:variable(CState#cs.vars_var)},
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]),
-    {Ws1, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, Ws1);
 compile({print, {_, SrcPos, _}, Expr}, CState, Ws) ->
     {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, Ws),
     Ast = merl:qquote(
@@ -377,7 +377,7 @@ compile({print, {_, SrcPos, _}, Expr}, CState, Ws) ->
         [
             {expr, ExprAst}
         ]),
-    {Ws1, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, Ws1);
 compile({'ifequal', {{_, _SrcPos, _} = Token, Expr1, Expr2}, IfElts, ElseElts}, CState, Ws) ->
     compile({'if', {'as', Token, {expr, {'eq', Token}, Expr1, Expr2}, undefined}, IfElts, ElseElts}, CState, Ws);
 compile({'ifnotequal', {{_, _SrcPos, _} = Token, Expr1, Expr2}, IfElts, ElseElts}, CState, Ws) ->
@@ -400,7 +400,7 @@ compile({'if', {'as', {_, SrcPos, _}, Expr, undefined}, IfElts, ElseElts}, #cs{r
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]
     ),
-    {Ws3, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, Ws3);
 compile({'if', {'as', {_, SrcPos, _}, Expr, {identifier, _Pos, Name} = Ident}, IfElts, ElseElts}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, V} = template_compiler_utils:var(Ws),
     VAst = erl_syntax:variable(V),
@@ -435,7 +435,7 @@ compile({'if', {'as', {_, SrcPos, _}, Expr, {identifier, _Pos, Name} = Ident}, I
                     {vars, erl_syntax:variable(CState#cs.vars_var)},
                     {vars1, erl_syntax:variable(CState1#cs.vars_var)}
                 ]),
-            {Ws6, Ast};
+            maybe_debug_element(SrcPos, Ast, CState, Ws6);
         false ->
             {Ws5, IfClauseAst} = compile(IfElts, CState1, Ws4),
             Ast = merl:qquote(
@@ -458,7 +458,7 @@ compile({'if', {'as', {_, SrcPos, _}, Expr, {identifier, _Pos, Name} = Ident}, I
                     {vars, erl_syntax:variable(CState#cs.vars_var)},
                     {vars1, erl_syntax:variable(CState1#cs.vars_var)}
                 ]),
-            {Ws5, Ast}
+            maybe_debug_element(SrcPos, Ast, CState, Ws5)
     end;
 compile({'for', {'in', {_, SrcPos, _}, Idents, ListExpr}, LoopElts, EmptyElts}, #cs{runtime=Runtime} = CState, Ws) ->
     {CsLoop0, WsLoop0} = template_compiler_utils:next_vars_var(CState, Ws#ws{is_forloop_var=false}),
@@ -497,7 +497,7 @@ compile({'for', {'in', {_, SrcPos, _}, Idents, ListExpr}, LoopElts, EmptyElts}, 
             {context, erl_syntax:variable(CState#cs.context_var)},
             {contextloop, erl_syntax:variable(CsLoop#cs.context_var)}
         ]),
-    {WsExpr, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, WsExpr);
 compile({'with', {{_, SrcPos, _}, Exprs, Idents}, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ExprAsts} = expr_list(Exprs, CState, Ws),
     VarsAsts = erl_syntax:abstract(idents_as_atoms(Idents)),
@@ -527,7 +527,7 @@ compile({'with', {{_, SrcPos, _}, Exprs, Idents}, Elts}, #cs{runtime=Runtime} = 
                     {context, erl_syntax:variable(CState#cs.context_var)},
                     {context1, erl_syntax:variable(CsCtx#cs.context_var)}
                 ]),
-            {Ws4, Ast};
+            maybe_debug_element(SrcPos, Ast, CState, Ws4);
         false ->
             {Ws3, BodyAst} = compile(Elts, CsWith, Ws2),
             Ast = merl:qquote(
@@ -546,7 +546,7 @@ compile({'with', {{_, SrcPos, _}, Exprs, Idents}, Elts}, #cs{runtime=Runtime} = 
                     {vars, erl_syntax:variable(CState#cs.vars_var)},
                     {vars1, erl_syntax:variable(CsWith#cs.vars_var)}
                 ]),
-            {Ws3, Ast}
+            maybe_debug_element(SrcPos, Ast, CState, Ws3)
     end;
 compile({cache, {{_, SrcPos, _}, CacheTime, Args}, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
@@ -576,7 +576,7 @@ compile({cache, {{_, SrcPos, _}, CacheTime, Args}, Elts}, #cs{runtime=Runtime} =
             {varsbody, erl_syntax:variable(CsBody1#cs.vars_var)},
             {contextbody, erl_syntax:variable(CsBody1#cs.context_var)}
         ]),
-    {Ws5, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, Ws5);
 compile({javascript, {_, SrcPos, _}, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, BodyAst} = compile(Elts, CState, Ws),
     Ast = merl:qquote(
@@ -591,7 +591,7 @@ compile({javascript, {_, SrcPos, _}, Elts}, #cs{runtime=Runtime} = CState, Ws) -
             {vars, erl_syntax:variable(CState#cs.vars_var)},
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]),
-    {Ws1, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, Ws1);
 compile({filter, {{_, SrcPos, _}, Filters}, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, BodyAst} = compile(Elts, CState, Ws),
     Expr = lists:foldl(
@@ -610,7 +610,7 @@ compile({filter, {{_, SrcPos, _}, Filters}, Elts}, #cs{runtime=Runtime} = CState
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {vars, erl_syntax:variable(CState#cs.vars_var)}
             ]),
-    {Ws2, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, Ws2);
 compile({spaceless, {_, SrcPos, _}, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
     {Ws1, BodyAst} = compile(Elts, CState, Ws),
     Ast = merl:qquote(
@@ -622,7 +622,7 @@ compile({spaceless, {_, SrcPos, _}, Elts}, #cs{runtime=Runtime} = CState, Ws) ->
                 {context, erl_syntax:variable(CState#cs.context_var)},
                 {vars, erl_syntax:variable(CState#cs.vars_var)}
             ]),
-    {Ws1, Ast};
+    maybe_debug_element(SrcPos, Ast, CState, Ws1);
 compile({autoescape, {identifier, _, <<"on">>}, Elts}, CState, Ws) ->
     compile(Elts, CState#cs{is_autoescape = true}, Ws);
 compile({autoescape, {identifier, _, <<"off">>}, Elts}, CState, Ws) ->
@@ -689,7 +689,7 @@ include({_, SrcPos, _}, Method, Template, ArgsList, IsContextVars, #cs{runtime=R
             {is_context_vars, erl_syntax:abstract(IsContextVars)}
         ]),
     Ws2 = maybe_add_include(Template, Method, false, Ws1),
-    {Ws2, Ast}.
+    maybe_debug_element(SrcPos, Ast, CState, Ws2).
 
 
 catinclude({_, SrcPos, _}, Method, Template, IdAst, ArgsList, IsContextVars, #cs{runtime=Runtime} = CState, Ws) when is_atom(Method) ->
@@ -714,7 +714,7 @@ catinclude({_, SrcPos, _}, Method, Template, IdAst, ArgsList, IsContextVars, #cs
             {context_vars, erl_syntax:abstract(CState#cs.context_vars)}
         ]),
     Ws2 = maybe_add_include(Template, Method, true, Ws1),
-    {Ws2, Ast}.
+    maybe_debug_element(SrcPos, Ast, CState, Ws2).
 
 maybe_add_include({string_literal, SrcPos, Text}, Method, IsCatinclude, Ws) ->
     {_, Line, Column} = SrcPos,
@@ -730,6 +730,28 @@ maybe_add_include({string_literal, SrcPos, Text}, Method, IsCatinclude, Ws) ->
     };
 maybe_add_include(_Token, _Method, _IsCatinclude, Ws) ->
     Ws.
+
+maybe_debug_element({Filename, Line, Column} = SrcPos, Ast, #cs{is_debug_points=IsDebugPoints, vars_var=VarsVar, runtime=Runtime, context_var=ContextVar}, Ws) ->
+    Ws1 = Ws#ws{debug_points = [ {Filename, Line, Column} | Ws#ws.debug_points ]},
+    case IsDebugPoints of
+        true ->
+            DebugAst = merl:qquote(
+                template_compiler_utils:pos(SrcPos),
+                "begin "
+                    "template_compiler_runtime_internal:debug_checkpoint(_@srcpos, _@vars, _@runtime, _@context),"
+                    "_@ast "
+                "end",
+                [
+                    {srcpos, erl_syntax:abstract(SrcPos)},
+                    {vars, erl_syntax:variable(VarsVar)},
+                    {runtime, erl_syntax:atom(Runtime)},
+                    {context, erl_syntax:variable(ContextVar)},
+                    {ast, Ast}
+                ]),
+            {Ws1, DebugAst};
+        false ->
+            {Ws1, Ast}
+    end.
 
 
 compose({_, SrcPos, _}, Template, ArgsList, IsContextVars, Blocks, #cs{runtime=Runtime, module=Module} = CState, Ws) ->
@@ -772,9 +794,9 @@ compose({_, SrcPos, _}, Template, ArgsList, IsContextVars, Blocks, #cs{runtime=R
             {is_context_vars, erl_syntax:abstract(IsContextVars)}
         ]),
     Ws2 = maybe_add_include(Template, undefined, false, Ws1),
-    {Ws2, Ast}.
+    maybe_debug_element(SrcPos, Ast, CState, Ws2).
 
-catcompose({_, SrcPos, _}, Template, IdAst, ArgsList, IsContextVars, Blocks, #cs{runtime=Runtime} = CState, Ws) ->
+catcompose({_, SrcPos, _}, Template, IdAst, ArgsList, IsContextVars, Blocks, #cs{runtime=Runtime, module=Module} = CState, Ws) ->
     {Ws1, TemplateAst} = template_compiler_expr:compile(Template, CState, Ws),
     ArgsList1 = [ {erl_syntax:atom('$cat'), IdAst} | ArgsList ],
     ArgsListAst = erl_syntax:list([ erl_syntax:tuple([A,B]) || {A,B} <- ArgsList1 ]),
@@ -797,6 +819,7 @@ catcompose({_, SrcPos, _}, Template, IdAst, ArgsList, IsContextVars, Blocks, #cs
             "_@is_context_vars,"
             "_@vars,"
             "_@block_list,",
+            "_@module,",
             "_@block_fun,",
             "_@context)"
         ],
@@ -809,11 +832,12 @@ catcompose({_, SrcPos, _}, Template, IdAst, ArgsList, IsContextVars, Blocks, #cs
             {context, erl_syntax:variable(CState#cs.context_var)},
             {context_vars, erl_syntax:abstract(CState#cs.context_vars)},
             {block_list, BlockListAst},
+            {module, erl_syntax:atom(Module)},
             {block_fun, BlockFunAst},
             {is_context_vars, erl_syntax:abstract(IsContextVars)}
         ]),
     Ws2 = maybe_add_include(Template, undefined, false, Ws1),
-    {Ws2, Ast}.
+    maybe_debug_element(SrcPos, Ast, CState, Ws2).
 
 
 expr_list(ExprList, CState, Ws) ->
