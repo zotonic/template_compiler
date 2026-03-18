@@ -22,9 +22,12 @@
 
 -export([
     highlight_file/1,
+    highlight_binary/1,
     highlight_binary/2,
     highlight_module/1
 ]).
+
+-define(DUMMY_TEMPLATE_FILENAME, <<"template.tpl">>).
 
 -define(STYLE_PRE, <<"background:#f8fafc;color:#0f172a;padding:1rem 1.25rem;border:1px solid #e2e8f0;border-radius:8px;overflow:auto;white-space:pre-wrap;font-family:Menlo,Consolas,monospace;font-size:13px;line-height:1.5;">>).
 -define(STYLE_CHECKBOX, <<"display:inline-flex;align-items:center;vertical-align:middle;margin-right:0.45rem;">>).
@@ -65,6 +68,11 @@ highlight_module(Module) when is_atom(Module) ->
         {error, _} = Error ->
             Error
     end.
+
+%% @doc Return syntax highlighted HTML for an in-memory template source.
+-spec highlight_binary(binary()) -> {ok, binary()} | {error, term()}.
+highlight_binary(Bin) when is_binary(Bin) ->
+    highlight_binary(Bin, ?DUMMY_TEMPLATE_FILENAME).
 
 %% @doc Return syntax highlighted HTML for an in-memory template source.
 -spec highlight_binary(binary(), file:filename_all()) -> {ok, binary()} | {error, term()}.

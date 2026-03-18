@@ -25,6 +25,7 @@
     render/5,
     render_block/5,
     highlight_file/1,
+    highlight_binary/1,
     highlight_binary/2,
     highlight_module/1,
     lookup/3,
@@ -173,6 +174,11 @@ render_block(Block, Template0, Vars, Options, Context) when is_map(Vars) ->
 -spec highlight_file(file:filename_all()) -> {ok, binary()} | {error, term()}.
 highlight_file(Filename) ->
     template_compiler_highlight:highlight_file(Filename).
+
+%% @doc Return syntax highlighted HTML for an in-memory template source.
+-spec highlight_binary(binary()) -> {ok, binary()} | {error, term()}.
+highlight_binary(Bin) ->
+    template_compiler_highlight:highlight_binary(Bin).
 
 %% @doc Return syntax highlighted HTML for an in-memory template source.
 -spec highlight_binary(binary(), file:filename_all()) -> {ok, binary()} | {error, term()}.

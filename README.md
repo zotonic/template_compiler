@@ -225,6 +225,14 @@ Use `template_compiler:highlight_binary/2` to highlight an in-memory template so
 
 The filename argument is used for parsing context and source positions in the generated output.
 
+For a convenience variant without an explicit filename:
+
+```erlang
+{ok, Html} = template_compiler:highlight_binary(<<"Hello {{ name }}">>).
+```
+
+This uses a dummy template filename internally.
+
 Use `template_compiler:highlight_module/1` to return syntax highlighted HTML for an already compiled template module:
 
 ```erlang

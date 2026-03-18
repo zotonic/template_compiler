@@ -399,7 +399,7 @@ debug_checkpoint(SrcPos, Vars, Runtime, Context) ->
     end.
 
 sanitize_debug_vars(Vars) when is_map(Vars) ->
-    maps:remove('$debug_points', Vars);
+    maps:without(['$debug_points', '$autoid'], Vars);
 sanitize_debug_vars(Vars) ->
     Vars.
 
@@ -412,17 +412,6 @@ is_debug_enabled(_SrcPos, _Vars) ->
 
 debug_point_files_map(DebugPoints) ->
     template_compiler:debug_point_files_map(DebugPoints).
-
-
-
-
-
-
-
-
-
-
-
 
 
 

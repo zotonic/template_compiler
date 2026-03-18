@@ -1,19 +1,3 @@
-%% @copyright 2026 Marc Worrell
-%%
-%% Copyright 2026 Marc Worrell
-%%
-%% Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
-%%
 -module(template_compiler_highlight_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
@@ -36,6 +20,7 @@ all() ->
 groups() ->
     [{basic, [],
         [highlight_file_test
+        ,highlight_binary_test
         ,highlight_escape_text_test
         ,highlight_escape_string_literal_test
         ,highlight_module_test
@@ -61,6 +46,14 @@ highlight_file_test(Config) ->
     true = is_binary(Html),
     {_, _} = binary:match(Html, <<"template-compiler-highlight">>),
     {_, _} = binary:match(Html, <<"Hello World!">>),
+    ok.
+
+highlight_binary_test(_Config) ->
+    {ok, Html} = template_compiler:highlight_binary(<<"Hello {{ name }}!">>),
+    true = is_binary(Html),
+    {_, _} = binary:match(Html, <<"template-compiler-highlight">>),
+    {_, _} = binary:match(Html, <<"Hello ">>),
+    {_, _} = binary:match(Html, <<"{{">>),
     ok.
 
 highlight_escape_text_test(_Config) ->
