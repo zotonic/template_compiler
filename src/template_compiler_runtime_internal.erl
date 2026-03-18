@@ -410,20 +410,20 @@ is_debug_enabled(SrcPos, #{ '$debug_points' := DebugPoints }) when is_map(DebugP
 is_debug_enabled(_SrcPos, _Vars) ->
     false.
 
-debug_point_files_map(all) ->
-    all;
-debug_point_files_map(DebugPoints) when is_map(DebugPoints) ->
-    maps:fold(
-        fun
-            ({Filename, _Line, _Col}, _Value, Acc) ->
-                Acc#{ Filename => true };
-            (_Key, _Value, Acc) ->
-                Acc
-        end,
-        #{},
-        DebugPoints);
-debug_point_files_map(_) ->
-    #{}.
+debug_point_files_map(DebugPoints) ->
+    template_compiler:debug_point_files_map(DebugPoints).
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 %% @doc Echo the HTML escape value within &lt;pre&gt; tags.
