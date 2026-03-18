@@ -21,6 +21,11 @@ groups() ->
     [{basic, [],
         [highlight_file_test
         ,highlight_binary_test
+        ,highlight_line_numbers_test
+        ,highlight_model_expr_test
+        ,highlight_model_bracket_expr_test
+        ,highlight_trans_literal_test
+        ,highlight_trans_tag_test
         ,highlight_escape_text_test
         ,highlight_escape_string_literal_test
         ,highlight_module_test
@@ -54,6 +59,60 @@ highlight_binary_test(_Config) ->
     {_, _} = binary:match(Html, <<"template-compiler-highlight">>),
     {_, _} = binary:match(Html, <<"Hello ">>),
     {_, _} = binary:match(Html, <<"{{">>),
+    ok.
+
+highlight_line_numbers_test(_Config) ->
+    {ok, Html} = template_compiler:highlight_binary(<<"a\nb">>),
+    {_, _} = binary:match(Html, <<"template-compiler-line-number">>),
+    {_, _} = binary:match(Html, <<"data-line=\"1\"">>),
+    {_, _} = binary:match(Html, <<"data-line=\"2\"">>),
+    ok.
+
+highlight_model_expr_test(Config) ->
+    Filename = filename:join([test_data_dir(Config), "expr_model_call.tpl"]),
+    {ok, Html} = template_compiler:highlight_file(Filename),
+    nomatch = binary:match(Html, <<"{model,">>),
+    {_, _} = binary:match(Html, <<"m">>),
+    {_, _} = binary:match(Html, <<"foo">>),
+    {_, _} = binary:match(Html, <<"bar">>),
+    {_, _} = binary:match(Html, <<"baz">>),
+    nomatch = binary:match(Html, <<".3">>),
+    {_, _} = binary:match(Html, <<"[">>),
+    {_, _} = binary:match(Html, <<"3">>),
+    {_, _} = binary:match(Html, <<"]">>),
+    {_, _} = binary:match(Html, <<"::">>),
+    ok.
+
+highlight_model_bracket_expr_test(_Config) ->
+    {ok, Html} = template_compiler:highlight_binary(<<"{{ m.foo[a + 1] }}">>),
+    nomatch = binary:match(Html, <<"{model,">>),
+    {_, _} = binary:match(Html, <<"foo">>),
+    {_, _} = binary:match(Html, <<"[">>),
+    {_, _} = binary:match(Html, <<"a">>),
+    {_, _} = binary:match(Html, <<"+">>),
+    {_, _} = binary:match(Html, <<"1">>),
+    {_, _} = binary:match(Html, <<"]">>),
+    ok.
+
+highlight_trans_literal_test(Config) ->
+    Filename = filename:join([test_data_dir(Config), "trans_string.tpl"]),
+    {ok, Html} = template_compiler:highlight_file(Filename),
+    nomatch = binary:match(Html, <<"{trans,">>),
+    {_, _} = binary:match(Html, <<"{{">>),
+    {_, _} = binary:match(Html, <<"_">>),
+    {_, _} = binary:match(Html, <<"Hello">>),
+    {_, _} = binary:match(Html, <<"}}">>),
+    ok.
+
+highlight_trans_tag_test(_Config) ->
+    {ok, Html} = template_compiler:highlight_binary(<<"{% trans \"hello {name}\" name=\"piet\" %}">>),
+    nomatch = binary:match(Html, <<"{trans_ext,">>),
+    {_, _} = binary:match(Html, <<"{%">>),
+    {_, _} = binary:match(Html, <<"trans">>),
+    {_, _} = binary:match(Html, <<"hello {name}">>),
+    {_, _} = binary:match(Html, <<"name">>),
+    {_, _} = binary:match(Html, <<"piet">>),
+    {_, _} = binary:match(Html, <<"%}">>),
     ok.
 
 highlight_escape_text_test(_Config) ->

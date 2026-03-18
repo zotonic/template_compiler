@@ -29,7 +29,9 @@
 
 -define(DUMMY_TEMPLATE_FILENAME, <<"template.tpl">>).
 
--define(STYLE_PRE, <<"background:#f8fafc;color:#0f172a;padding:1rem 1.25rem;border:1px solid #e2e8f0;border-radius:8px;overflow:auto;white-space:pre-wrap;font-family:Menlo,Consolas,monospace;font-size:13px;line-height:1.5;">>).
+-define(STYLE_PRE, <<"background:#f8fafc;color:#0f172a;padding:1rem 1.25rem;border:1px solid #e2e8f0;border-radius:8px;overflow:auto;white-space:pre-wrap;font-family:Menlo,Consolas,monospace;font-size:12px;line-height:1.5;">>).
+-define(STYLE_LINE, <<"display:block;padding-left:4.5em;position:relative;min-height:1.5em;">>).
+-define(STYLE_LINE_NO, <<"position:absolute;left:0;width:3.5em;text-align:right;color:#94a3b8;user-select:none;">>).
 -define(STYLE_CHECKBOX, <<"display:inline-flex;align-items:center;vertical-align:middle;margin-right:0.45rem;">>).
 -define(STYLE_TEXT, <<"color:#334155;">>).
 -define(STYLE_DELIM, <<"color:#64748b;">>).
@@ -90,20 +92,27 @@ highlight_file(Filename, DebugPoints) ->
 highlight_binary(Bin, Filename, DebugPoints) when is_binary(Bin) ->
     case template_compiler_scanner:scan(Filename, Bin) of
         {ok, Tokens} ->
-            case template_compiler_parser:parse(Tokens) of
+            Tokens1 = normalize_tokens(Tokens),
+            case template_compiler_parser:parse(Tokens1) of
                 {ok, Tree} ->
                     {ok, iolist_to_binary(render_document(Tree, debug_points_map(DebugPoints)))};
                 {error, _} = Error ->
-                    Error
+                    case maybe_parse_trans_tag(Tokens1) of
+                        {ok, Tree} ->
+                            {ok, iolist_to_binary(render_document(Tree, debug_points_map(DebugPoints)))};
+                        error ->
+                            Error
+                    end
             end;
         {error, _} = Error ->
             Error
     end.
 
 render_document(Tree, DebugPointMap) ->
+    Content = iolist_to_binary(render_template(Tree, DebugPointMap)),
     [
         <<"<pre class=\"template-compiler-highlight\" style=\"">>, ?STYLE_PRE, <<"\"><code>">>,
-        render_template(Tree, DebugPointMap),
+        render_lines(Content),
         <<"</code></pre>">>
     ].
 
@@ -310,9 +319,9 @@ render_expr({expr, {Op, Token}, Arg1, Arg2}) ->
     render_binary_expr(Op, Token, Arg1, Arg2);
 render_expr({apply_filter, Expr, {filter, {identifier, _Pos, Name}, Args}}) ->
     [render_expr(Expr), operator(<<"|">>), ident(Name), render_filter_args(Args)];
-render_expr({model, [{identifier, _Pos, <<"m">>} | Path], none}) ->
+render_expr({model, Path, none}) ->
     [keyword(<<"m">>), render_model_path(Path)];
-render_expr({model, [{identifier, _Pos, <<"m">>} | Path], Payload}) ->
+render_expr({model, Path, Payload}) ->
     [keyword(<<"m">>), render_model_path(Path), operator(<<"::">>), render_expr(Payload)];
 render_expr(Value) when Value =:= true; Value =:= false; Value =:= undefined ->
     literal(atom_to_binary(Value, utf8));
@@ -345,8 +354,12 @@ render_lookup_ident(Part) ->
 
 render_model_path([]) ->
     [];
+render_model_path([{identifier, _Pos, Name} | Rest]) ->
+    [operator(<<".">>), ident(Name), render_model_path(Rest)];
+render_model_path([{expr, Expr} | Rest]) ->
+    [operator(<<"[">>), render_expr(Expr), operator(<<"]">>), render_model_path(Rest)];
 render_model_path([Part|Rest]) ->
-    [operator(<<".">>), render_lookup_ident(Part), render_model_path(Rest)].
+    [operator(<<"[">>), render_expr(Part), operator(<<"]">>), render_model_path(Rest)].
 
 render_expr_list([]) ->
     [];
@@ -408,10 +421,10 @@ render_cache_open(CacheTime, Args) ->
     [space(), render_expr(CacheTime)] ++ render_args_tail(Args).
 
 render_var(Content) ->
-    [delim(<<"{{">>), Content, delim(<<"}}">>)].
+    [delim(<<"{{ ">>), Content, delim(<<" }}">>)].
 
 render_tag(Content) ->
-    [delim(<<"{%">>), Content, delim(<<"%}">>)].
+    [delim(<<"{% ">>), Content, delim(<<" %}">>)].
 
 maybe_newline([]) ->
     [];
@@ -445,11 +458,7 @@ delim(Text) ->
     span(?STYLE_DELIM, Text).
 
 span(Style, Text) ->
-    [
-        <<"<span style=\"">>, Style, <<"\">">>,
-        escape_text(Text),
-        <<"</span>">>
-    ].
+    span_lines(Style, escape_text(Text)).
 
 escape_text(Text) when is_binary(Text) ->
     z_html:escape(Text);
@@ -457,6 +466,166 @@ escape_text(Text) when is_list(Text) ->
     z_html:escape(iolist_to_binary(Text));
 escape_text(Text) ->
     z_html:escape(z_convert:to_binary(Text)).
+
+normalize_tokens(Tokens) ->
+    normalize_tokens(Tokens, []).
+
+normalize_tokens([], Acc) ->
+    lists:reverse(Acc);
+normalize_tokens([{trans_keyword, _, _} = Trans, {string_literal, SrcPos, Text} | Ts], Acc) ->
+    Acc1 = [{trans_literal, SrcPos, unescape_trim(Text)}, Trans | Acc],
+    normalize_tokens(Ts, Acc1);
+normalize_tokens([{trans_text, SrcPos, Text} | Ts], Acc) ->
+    Acc1 = [{trans_text, SrcPos, unescape_trim(Text)} | Acc],
+    normalize_tokens(Ts, Acc1);
+normalize_tokens([{trans_literal, SrcPos, Text} | Ts], Acc) ->
+    Acc1 = [{trans_literal, SrcPos, unescape_trim(Text)} | Acc],
+    normalize_tokens(Ts, Acc1);
+normalize_tokens([{string_literal, SrcPos, Text} | Ts], Acc) ->
+    Acc1 = [{string_literal, SrcPos, template_compiler_utils:unescape_string_literal(Text)} | Acc],
+    normalize_tokens(Ts, Acc1);
+normalize_tokens([T | Ts], Acc) ->
+    normalize_tokens(Ts, [T | Acc]).
+
+unescape_trim(Text) ->
+    Unescaped = template_compiler_utils:unescape_string_literal(Text),
+    z_string:trim(Unescaped).
+
+maybe_parse_trans_tag([
+    {open_tag, _OpenPos, _Open},
+    {trans_keyword, _TransPos, _Keyword},
+    {trans_literal, _LiteralPos, Text}
+    | Rest
+]) ->
+    case split_close_tag(Rest) of
+        {ok, ArgTokens, _CloseTag} ->
+            case parse_trans_args(ArgTokens) of
+                {ok, Args} ->
+                    {ok, {base, [{trans_ext, normalize_trans_text(Text), Args}]}};
+                error ->
+                    error
+            end;
+        error ->
+            error
+    end;
+maybe_parse_trans_tag(_) ->
+    error.
+
+normalize_trans_text({trans, _} = Tr) ->
+    Tr;
+normalize_trans_text(Text) when is_binary(Text) ->
+    {trans, [{en, Text}]}.
+
+split_close_tag(Tokens) ->
+    case lists:reverse(Tokens) of
+        [{close_tag, _ClosePos, _Close} = CloseTag | RevArgs] ->
+            {ok, lists:reverse(RevArgs), CloseTag};
+        _ ->
+            error
+    end.
+
+parse_trans_args([]) ->
+    {ok, []};
+parse_trans_args([{identifier, _Pos, _Name} = Ident | Rest]) ->
+    case Rest of
+        [] ->
+            {ok, [{Ident, true}]};
+        [{identifier, _NextPos, _NextName} | _] ->
+            case parse_trans_args(Rest) of
+                {ok, Args} -> {ok, [{Ident, true} | Args]};
+                error -> error
+            end;
+        [{equal, _EqPos, _Eq} | ExprTokens] ->
+            case split_trans_arg_expr(ExprTokens) of
+                {ok, Expr, Rest1} ->
+                    case parse_trans_args(Rest1) of
+                        {ok, Args} -> {ok, [{Ident, Expr} | Args]};
+                        error -> error
+                    end;
+                error ->
+                    error
+            end;
+        _ ->
+            error
+    end;
+parse_trans_args(_) ->
+    error.
+
+split_trans_arg_expr(Tokens) ->
+    split_trans_arg_expr(Tokens, length(Tokens)).
+
+split_trans_arg_expr(_Tokens, 0) ->
+    error;
+split_trans_arg_expr(Tokens, N) ->
+    Prefix = lists:sublist(Tokens, N),
+    Suffix = lists:nthtail(N, Tokens),
+    case is_valid_trans_arg_suffix(Suffix) of
+        false ->
+            split_trans_arg_expr(Tokens, N - 1);
+        true ->
+            case parse_expr_tokens(Prefix) of
+                {ok, Expr} ->
+                    {ok, Expr, Suffix};
+                error ->
+                    split_trans_arg_expr(Tokens, N - 1)
+            end
+    end.
+
+is_valid_trans_arg_suffix([]) ->
+    true;
+is_valid_trans_arg_suffix([{identifier, _Pos, _Name} | _]) ->
+    true;
+is_valid_trans_arg_suffix(_) ->
+    false.
+
+parse_expr_tokens(Tokens) ->
+    Open = {open_var, {<<"highlight-trans">>, 1, 1}, <<"{{">>},
+    Close = {close_var, {<<"highlight-trans">>, 1, 1}, <<"}}">>},
+    case template_compiler_parser:parse([Open | Tokens] ++ [Close]) of
+        {ok, {base, [{value, _OpenVar, Expr, []}]}} ->
+            {ok, Expr};
+        _ ->
+            error
+    end.
+
+render_lines(Content) ->
+    render_lines(binary:split(Content, <<"\n">>, [global]), 1).
+
+render_lines([], _LineNo) ->
+    [];
+render_lines([Line], LineNo) ->
+    [render_line(LineNo, Line)];
+render_lines([Line|Rest], LineNo) ->
+    [render_line(LineNo, Line), <<"\n">>, render_lines(Rest, LineNo + 1)].
+
+render_line(LineNo, Content) ->
+    [
+        <<"<span class=\"template-compiler-line\" style=\"">>, ?STYLE_LINE, <<"\" data-line=\"">>, integer_to_binary(LineNo), <<"\">">>,
+        <<"<span class=\"template-compiler-line-number\" style=\"">>, ?STYLE_LINE_NO, <<"\">">>, integer_to_binary(LineNo), <<"</span>">>,
+        Content,
+        <<"</span>">>
+    ].
+
+span_lines(_Style, <<>>) ->
+    [];
+span_lines(Style, EscapedText) ->
+    span_line_parts(binary:split(EscapedText, <<"\n">>, [global]), Style).
+
+span_line_parts([], _Style) ->
+    [];
+span_line_parts([Part], Style) ->
+    span_single(Style, Part);
+span_line_parts([Part|Rest], Style) ->
+    [span_single(Style, Part), <<"\n">>, span_line_parts(Rest, Style)].
+
+span_single(_Style, <<>>) ->
+    [];
+span_single(Style, Text) ->
+    [
+        <<"<span style=\"">>, Style, <<"\">">>,
+        Text,
+        <<"</span>">>
+    ].
 
 token_text(Text) when is_binary(Text) ->
     Text;
