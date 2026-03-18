@@ -36,6 +36,8 @@ all() ->
 groups() ->
     [{basic, [],
         [highlight_file_test
+        ,highlight_escape_text_test
+        ,highlight_escape_string_literal_test
         ,highlight_module_test
         ]}].
 
@@ -59,6 +61,21 @@ highlight_file_test(Config) ->
     true = is_binary(Html),
     {_, _} = binary:match(Html, <<"template-compiler-highlight">>),
     {_, _} = binary:match(Html, <<"Hello World!">>),
+    ok.
+
+highlight_escape_text_test(_Config) ->
+    Template = <<"<script>alert(\"x\")</script>&'">>,
+    {ok, Html} = template_compiler:highlight_binary(Template, <<"escape_text.tpl">>),
+    nomatch = binary:match(Html, <<"<script>">>),
+    nomatch = binary:match(Html, <<"</script>">>),
+    {_, _} = binary:match(Html, <<"&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;&amp;&#39;">>),
+    ok.
+
+highlight_escape_string_literal_test(_Config) ->
+    Template = <<"{{ \"<b>&\\\"\" }}">>,
+    {ok, Html} = template_compiler:highlight_binary(Template, <<"escape_string.tpl">>),
+    nomatch = binary:match(Html, <<"<b>">>),
+    nomatch = binary:match(Html, <<"</b>">>),
     ok.
 
 highlight_module_test(_Config) ->
