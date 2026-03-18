@@ -443,7 +443,7 @@ keyword(Text) ->
     span(?STYLE_KEYWORD, Text).
 
 string(Text) ->
-    [operator(<<"\"">>), span(?STYLE_STRING, escape_text(Text)), operator(<<"\"">>)].
+    [operator(<<"\"">>), span(?STYLE_STRING, Text), operator(<<"\"">>)].
 
 ident(Text) ->
     span(?STYLE_IDENT, Text).
