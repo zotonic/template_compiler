@@ -207,6 +207,36 @@ Use `template_compiler:compile_file/3` and `template_compiler:compile_binary/4` 
 The Filename is used to reference the compiled binary.
 
 
+#### Syntax highlighted HTML
+
+Use `template_compiler:highlight_file/1` to return syntax highlighted HTML for a template source file:
+
+```erlang
+{ok, Html} = template_compiler:highlight_file("/full/path/to/hello.tpl").
+```
+
+This returns an HTML binary generated from the template parse tree built by the compiler scanner and parser.
+
+Use `template_compiler:highlight_binary/2` to highlight an in-memory template source:
+
+```erlang
+{ok, Html} = template_compiler:highlight_binary(<<"Hello {{ name }}">>, <<"hello.tpl">>).
+```
+
+The filename argument is used for parsing context and source positions in the generated output.
+
+Use `template_compiler:highlight_module/1` to return syntax highlighted HTML for an already compiled template module:
+
+```erlang
+{ok, Mod} = template_compiler:lookup(TemplateFilename, Options, Context),
+{ok, Html} = template_compiler:highlight_module(Mod).
+```
+
+When highlighting a compiled template module, the highlighter also reads the module's `debug_points/0`
+callback and inserts checkbox inputs for those source positions in the generated HTML. The checkbox
+value is `Line:Column`.
+
+
 #### Force recompilation
 
 Sometimes (for example when template lookups or translations are changed) it is necessary to check all templates if they

@@ -24,6 +24,9 @@
     render/4,
     render/5,
     render_block/5,
+    highlight_file/1,
+    highlight_binary/2,
+    highlight_module/1,
     lookup/3,
     flush/0,
     flush_debug/0,
@@ -164,6 +167,22 @@ render_block(Block, Template0, Vars, Options, Context) when is_map(Vars) ->
         {error, _} = Error ->
             Error
     end.
+
+%% @doc Return syntax highlighted HTML for a template source file.
+-spec highlight_file(file:filename_all()) -> {ok, binary()} | {error, term()}.
+highlight_file(Filename) ->
+    template_compiler_highlight:highlight_file(Filename).
+
+%% @doc Return syntax highlighted HTML for an in-memory template source.
+-spec highlight_binary(binary(), file:filename_all()) -> {ok, binary()} | {error, term()}.
+highlight_binary(Bin, Filename) ->
+    template_compiler_highlight:highlight_binary(Bin, Filename).
+
+%% @doc Return syntax highlighted HTML for a compiled template module,
+%%      including checkbox inputs for the module's debug points.
+-spec highlight_module(module()) -> {ok, binary()} | {error, term()}.
+highlight_module(Module) ->
+    template_compiler_highlight:highlight_module(Module).
 
 
 maybe_wrap(RenderResult, []) ->
