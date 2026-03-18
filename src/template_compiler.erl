@@ -35,6 +35,7 @@
     compile_file/3,
     compile_binary/4,
     get_option/2,
+    debug_point_files_map/1,
     is_template_module/1,
     translations/1,
     compile_blocks/2
