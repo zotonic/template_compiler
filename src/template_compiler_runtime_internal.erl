@@ -393,10 +393,15 @@ call(Module, Args, Vars, Context) ->
 debug_checkpoint(SrcPos, Vars, Runtime, Context) ->
     case is_debug_enabled(SrcPos, Vars) of
         true ->
-            Runtime:trace_debug(SrcPos, Vars, Context);
+            Runtime:trace_debug(SrcPos, sanitize_debug_vars(Vars), Context);
         false ->
             ok
     end.
+
+sanitize_debug_vars(Vars) when is_map(Vars) ->
+    maps:remove('$debug_points', Vars);
+sanitize_debug_vars(Vars) ->
+    Vars.
 
 is_debug_enabled(_SrcPos, #{ '$debug_points' := all }) ->
     true;
