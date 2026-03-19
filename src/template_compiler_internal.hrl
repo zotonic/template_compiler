@@ -17,10 +17,6 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
-
-%% @doc Increment this with compiler bug fixes
--define(COMPILER_VERSION, 1).
-
 -type linecol() :: {Line::integer(), Column::integer(), file:filename_all()}.
 
 -type token() :: {atom(), linecol(), term()}

@@ -415,17 +415,18 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
             IsDebugPoints = has_debug_points(Filename, DebugPointFiles),
             Tokens1 = maybe_drop_text(Tokens, Tokens),
             Tokens2 = expand_translations(Tokens1, Runtime, Context),
-            Module = module_name(Runtime, Filename, ContextVars, Tokens2),
+            ContentChecksum = content_checksum(Tokens2),
+            Module = module_name(Runtime, Filename, ContextVars),
             case erlang:module_loaded(Module) of
                 true ->
-                    case Module:is_debug_compiled() =:= IsDebugPoints of
+                    case is_matching_module(Module, ContentChecksum, IsDebugPoints) of
                         true ->
                             {ok, Module};
                         false ->
-                            compile_binary_1(Module, Filename, Mtime, Runtime, IsDebugPoints, Tokens2, Options1, Context)
+                            compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, IsDebugPoints, Tokens2, Options1, Context)
                     end;
                 false ->
-                    compile_binary_1(Module, Filename, Mtime, Runtime, IsDebugPoints, Tokens2, Options1, Context)
+                    compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, IsDebugPoints, Tokens2, Options1, Context)
             end;
         {error, _} = Error ->
             Error
@@ -459,17 +460,28 @@ translations(Filename) ->
 
 %%%% --------------------------------- Internal ----------------------------------
 
-module_name(Runtime, Filename, SpecialContextArgs, Tokens) ->
+module_name(Runtime, Filename, SpecialContextArgs) ->
     Term = {
-        ?COMPILER_VERSION,
+        compiler_version(),
         unicode:characters_to_binary(Filename),
         Runtime,
-        SpecialContextArgs,
-        remove_srcpos(Tokens)
+        SpecialContextArgs
     },
-    TokenChecksum = crypto:hash(sha, term_to_binary(Term)),
-    Hex = z_string:to_lower(z_url:hex_encode(TokenChecksum)),
+    IdentityChecksum = crypto:hash(sha, term_to_binary(Term)),
+    Hex = z_string:to_lower(z_url:hex_encode(IdentityChecksum)),
     binary_to_atom(iolist_to_binary(["tpl_",Hex]), 'utf8').
+
+-spec compiler_version() -> string().
+compiler_version() ->
+    case application:get_key(template_compiler, vsn) of
+        {ok, Vsn} ->
+            Vsn;
+        undefined ->
+            "unknown"
+    end.
+
+content_checksum(Tokens) ->
+    crypto:hash(sha, term_to_binary(remove_srcpos(Tokens))).
 
 % Ensure that duplicate files have the same checksum by removing the filename.
 remove_srcpos(Tokens) ->
@@ -516,7 +528,12 @@ compile_forms(Filename, Forms) ->
             {error, {compile, Es, Ws}}
     end.
 
-compile_binary_1(Module, Filename, Mtime, Runtime, IsDebugPoints, Tokens, Options, Context) ->
+is_matching_module(Module, ContentChecksum, IsDebugPoints) ->
+    erlang:function_exported(Module, content_checksum, 0)
+        andalso Module:is_debug_compiled() =:= IsDebugPoints
+        andalso Module:content_checksum() =:= ContentChecksum.
+
+compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, IsDebugPoints, Tokens, Options, Context) ->
     Runtime:trace_compile(Module, Filename, Options, Context),
     case compile_tokens(
             template_compiler_parser:parse(Tokens),
@@ -525,7 +542,7 @@ compile_binary_1(Module, Filename, Mtime, Runtime, IsDebugPoints, Tokens, Option
     of
         {ok, {Extends, Includes, BlockAsts, TemplateAst, IsAutoid, DebugPoints}} ->
             Forms = template_compiler_module:compile(
-                                Module, Filename, Mtime, IsAutoid, Runtime,
+                                Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime,
                                 Extends, Includes, BlockAsts, {TemplateAst, DebugPoints, IsDebugPoints}),
             compile_forms(Filename, Forms);
         {error, _} = Error ->

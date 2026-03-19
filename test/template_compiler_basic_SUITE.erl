@@ -27,6 +27,7 @@ groups() ->
         ,block_nested_spaceless_error_test
         ,block_nested_javascript_error_test
         ,block_nested_filter_error_test
+        ,compile_binary_stable_module_name_test
         ,block_render_test
         ,raw_test
         ]}].
@@ -93,6 +94,20 @@ block_nested_javascript_error_test(_Config) ->
 block_nested_filter_error_test(_Config) ->
     {error, {duplicate_nested_block, <<"main">>}} =
         template_compiler:render("block_nested_filter.tpl", #{}, [], undefined),
+    ok.
+
+compile_binary_stable_module_name_test(Config) ->
+    Filename = filename:join([test_data_dir(Config), "stable_module_name.tpl"]),
+    {ok, Mod1} = template_compiler:compile_binary(<<"Hello">>, Filename, [], undefined),
+    Checksum1 = Mod1:content_checksum(),
+    Timestamp1 = Mod1:timestamp(),
+    {ok, Mod2} = template_compiler:compile_binary(<<"Hello">>, Filename, [], undefined),
+    Mod1 = Mod2,
+    Checksum1 = Mod2:content_checksum(),
+    Timestamp1 = Mod2:timestamp(),
+    {ok, Mod3} = template_compiler:compile_binary(<<"Bye">>, Filename, [], undefined),
+    Mod1 = Mod3,
+    true = Checksum1 =/= Mod3:content_checksum(),
     ok.
 
 block_render_test(_Config) ->
