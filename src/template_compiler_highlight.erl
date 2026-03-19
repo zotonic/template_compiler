@@ -327,13 +327,14 @@ span_open_style(Style) ->
 debug_checkbox({Filename, Line, Col}) ->
     Value = iolist_to_binary([integer_to_binary(Line), <<":">>, integer_to_binary(Col)]),
     AriaLabel = iolist_to_binary([
-        <<"Toggle debug at ">>, Filename, <<" ">>,
-        integer_to_binary(Line), <<":">>, integer_to_binary(Col)
+        <<"Toggle debug at ">>, integer_to_binary(Line), <<":">>, integer_to_binary(Col)
     ]),
     [
-        <<"<label class=\"template-compiler-debug-point\" style=\"">>, ?STYLE_CHECKBOX, <<"\">">>,
+        <<"<label class=\"template-compiler-debug-point\" style=\"">>, ?STYLE_CHECKBOX,
+            <<"\" aria-label=\"">>, escape_attr(AriaLabel),
+            <<"\" title=\"">>, escape_attr(AriaLabel),
+        <<"\">">>,
         <<"<input type=\"checkbox\" value=\"">>, escape_attr(Value),
-        <<"\" aria-label=\"">>, escape_attr(AriaLabel),
         <<"\" data-template=\"">>, escape_attr(Filename),
         <<"\" data-line=\"">>, integer_to_binary(Line),
         <<"\" data-column=\"">>, integer_to_binary(Col), <<"\">">>,
