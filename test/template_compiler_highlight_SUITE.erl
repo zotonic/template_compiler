@@ -183,6 +183,11 @@ highlight_module_test(_Config) ->
     {_, _} = binary:match(Html, <<"template-compiler-debug-point">>),
     {_, _} = binary:match(Html, <<"<input type=\"checkbox\"">>),
     {_, _} = binary:match(Html, <<"value=\"", Value/binary, "\"">>),
+    assert_in_order(Html, [
+        <<"value=\"", Value/binary, "\"">>,
+        <<"</label>">>,
+        <<"<span style=\"color:#1d4ed8;\">a</span>">>
+    ]),
     ok.
 
 test_data_dir(Config) ->

@@ -34,7 +34,7 @@
 -define(DUMMY_TEMPLATE_FILENAME, <<"template.tpl">>).
 
 -define(STYLE_PRE, <<"background:#f8fafc;color:#0f172a;padding:1rem 1.25rem;border:1px solid #e2e8f0;border-radius:8px;overflow:auto;white-space:pre-wrap;font-family:Menlo,Consolas,monospace;font-size:12px;line-height:1.5;">>).
--define(STYLE_LINE, <<"display:block;padding-left:4.5em;position:relative;min-height:1.5em;">>).
+-define(STYLE_LINE, <<"display:inline-block;padding-left:4.5em;position:relative;min-height:1.5em;">>).
 -define(STYLE_LINE_NO, <<"position:absolute;left:0;width:3.5em;text-align:right;color:#94a3b8;user-select:none;">>).
 -define(STYLE_CHECKBOX, <<"display:inline-flex;align-items:center;vertical-align:middle;margin-right:0.45rem;">>).
 -define(STYLE_TEXT, <<"color:#334155;">>).
