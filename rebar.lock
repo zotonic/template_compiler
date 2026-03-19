@@ -1,22 +1,22 @@
 {"1.2.0",
-[{<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.13.0">>},1},
- {<<"qdate_localtime">>,{pkg,<<"qdate_localtime">>,<<"1.2.1">>},0},
+[{<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.16.0">>},1},
+ {<<"qdate_localtime">>,{pkg,<<"qdate_localtime">>,<<"1.2.2">>},0},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.7">>},2},
  {<<"tls_certificate_check">>,
-  {pkg,<<"tls_certificate_check">>,<<"1.24.0">>},
+  {pkg,<<"tls_certificate_check">>,<<"1.29.0">>},
   1},
- {<<"zotonic_stdlib">>,{pkg,<<"zotonic_stdlib">>,<<"1.21.0">>},0}]}.
+ {<<"zotonic_stdlib">>,{pkg,<<"zotonic_stdlib">>,<<"1.26.1">>},0}]}.
 [
 {pkg_hash,[
- {<<"cowlib">>, <<"DB8F7505D8332D98EF50A3EF34B34C1AFDDEC7506E4EE4DD4A3A266285D282CA">>},
- {<<"qdate_localtime">>, <<"72E1034DC6B7FEE8F588281EDDD0BD0DC5260005D758052F50634D265D382C18">>},
+ {<<"cowlib">>, <<"54592074EBBBB92EE4746C8A8846E5605052F29309D3A873468D76CDF932076F">>},
+ {<<"qdate_localtime">>, <<"43E1B20102F50A8B2A2BE7042C2F6BE989AD96CA2CC319DB5DF56E122E8873F6">>},
  {<<"ssl_verify_fun">>, <<"354C321CF377240C7B8716899E182CE4890C5938111A1296ADD3EC74CF1715DF">>},
- {<<"tls_certificate_check">>, <<"D00E2887551FF8CDAE4D0340D90D9FCBC4943C7B5F49D32ED4BC23AFF4DB9A44">>},
- {<<"zotonic_stdlib">>, <<"1CA23CFF237DC5BEBA0F7492C7C2E91D7FA081E526D9C0641F5341A005BFDF12">>}]},
+ {<<"tls_certificate_check">>, <<"4473005EB0BBDAD215D7083A230E2E076F538D9EA472C8009FD22006A4CFC5F6">>},
+ {<<"zotonic_stdlib">>, <<"C801A63EC5070528F58B65D7C863393312FF6AC6E72094120D6F4D3FB2403F1C">>}]},
 {pkg_hash_ext,[
- {<<"cowlib">>, <<"E1E1284DC3FC030A64B1AD0D8382AE7E99DA46C3246B815318A4B848873800A4">>},
- {<<"qdate_localtime">>, <<"1109958D205C65C595C8C5694CB83EBAF2DBE770CF902E4DCE8AFB2C4123764D">>},
+ {<<"cowlib">>, <<"7F478D80D66B747344F0EA7708C187645CFCC08B11AA424632F78E25BF05DB51">>},
+ {<<"qdate_localtime">>, <<"A38D5F1C5AE14B22F471E442B262AECCAFB915B664C7C364443DC73179C50FDA">>},
  {<<"ssl_verify_fun">>, <<"FE4C190E8F37401D30167C8C405EDA19469F34577987C76DDE613E838BBC67F8">>},
- {<<"tls_certificate_check">>, <<"90B25A58EE433D91C17F036D4D354BF8859A089BFDA60E68A86F8EECAE45EF1B">>},
- {<<"zotonic_stdlib">>, <<"FDE512C8F2268E1807EFB885FA39102A146C0EB6E3DD3D49F4D5C9681169C5C7">>}]}
+ {<<"tls_certificate_check">>, <<"5B0D0E5CB0F928BC4F210DF667304ED91C5BFF2A391CE6BDEDFBFE70A8F096C5">>},
+ {<<"zotonic_stdlib">>, <<"8258023EC90D439C5A1BCA4A4D4ADF673FDB483E038EE1D5EA171228343B4E41">>}]}
 ].
