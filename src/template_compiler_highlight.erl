@@ -1,11 +1,10 @@
 %% @author Marc Worrell <marc@worrell.nl>
 %% @copyright 2026 Marc Worrell
-%% @doc Generate syntax highlighted HTML from template source plus parser annotations.
-%%      The highlighter scans and parses the template, derives source-position
-%%      annotations from the tokens and parsed constructs, adds debug-point
-%%      annotations, and then merges those annotations back into the original
-%%      template text to emit spans, checkboxes, and line numbers without
-%%      reconstructing the source.
+%% @doc Generate syntax highlighted HTML from template source.
+%%      The highlighter scans the template, derives source-position
+%%      annotations from the tokens, adds debug-point annotations, and then
+%%      merges those annotations back into the original template text to emit
+%%      spans, checkboxes, and line numbers without reconstructing the source.
 %% @end
 
 %% Copyright 2026 Marc Worrell
@@ -97,33 +96,14 @@ highlight_file(Filename, DebugPoints) ->
 highlight_binary(Bin, Filename, DebugPoints) when is_binary(Bin) ->
     case template_compiler_scanner:scan(Filename, Bin) of
         {ok, RawTokens} ->
-            Tokens = normalize_tokens(RawTokens),
-            case ensure_parse_tree(Tokens) of
-                {ok, _Tree} ->
-                    SourceIndex = source_index(Bin),
-                    Annotations = annotations(Bin, RawTokens, Tokens, SourceIndex),
-                    {ok, iolist_to_binary(render_document(Bin, SourceIndex, Annotations, debug_points_map(DebugPoints)))};
-                {error, _} = Error ->
-                    Error
-            end;
+            SourceIndex = source_index(Bin),
+            Annotations = annotations(Bin, RawTokens, SourceIndex),
+            {ok, iolist_to_binary(render_document(Bin, SourceIndex, Annotations, debug_points_map(DebugPoints)))};
         {error, _} = Error ->
             Error
     end.
 
-ensure_parse_tree(Tokens) ->
-    case template_compiler_parser:parse(Tokens) of
-        {ok, _} = Ok ->
-            Ok;
-        {error, _} = Error ->
-            case maybe_parse_trans_tag(Tokens) of
-                {ok, _} = Ok ->
-                    Ok;
-                error ->
-                    Error
-            end
-    end.
-
-annotations(Bin, RawTokens, _Tokens, SourceIndex) ->
+annotations(Bin, RawTokens, SourceIndex) ->
     {TokenAnnotations, _Cursor} = token_annotations(Bin, RawTokens, SourceIndex, 0, []),
     split_annotations(TokenAnnotations, SourceIndex).
 
@@ -584,126 +564,3 @@ token_text(colons, _Text) ->
     <<"::">>;
 token_text(_Token, Text) ->
     Text.
-
-normalize_tokens(Tokens) ->
-    normalize_tokens(Tokens, []).
-
-normalize_tokens([], Acc) ->
-    lists:reverse(Acc);
-normalize_tokens([{trans_keyword, _, _} = Trans, {string_literal, SrcPos, Text} | Ts], Acc) ->
-    NormalizedText = unescape_trim(Text),
-    Acc1 = [{trans_literal, SrcPos, {trans, [{en, NormalizedText}]}}, Trans | Acc],
-    normalize_tokens(Ts, Acc1);
-normalize_tokens([{trans_text, SrcPos, Text} | Ts], Acc) ->
-    Acc1 = [{trans_text, SrcPos, unescape_trim(Text)} | Acc],
-    normalize_tokens(Ts, Acc1);
-normalize_tokens([{trans_literal, SrcPos, Text} | Ts], Acc) ->
-    NormalizedText = unescape_trim(Text),
-    Acc1 = [{trans_literal, SrcPos, {trans, [{en, NormalizedText}]}} | Acc],
-    normalize_tokens(Ts, Acc1);
-normalize_tokens([{string_literal, SrcPos, Text} | Ts], Acc) ->
-    Acc1 = [{string_literal, SrcPos, template_compiler_utils:unescape_string_literal(Text)} | Acc],
-    normalize_tokens(Ts, Acc1);
-normalize_tokens([T | Ts], Acc) ->
-    normalize_tokens(Ts, [T | Acc]).
-
-unescape_trim(Text) ->
-    Unescaped = template_compiler_utils:unescape_string_literal(Text),
-    z_string:trim(Unescaped).
-
-maybe_parse_trans_tag([
-    {open_tag, _OpenPos, _Open},
-    {trans_keyword, _TransPos, _Keyword},
-    {trans_literal, _LiteralPos, Text}
-    | Rest
-]) ->
-    case split_close_tag(Rest) of
-        {ok, ArgTokens, _CloseTag} ->
-            case parse_trans_args(ArgTokens) of
-                {ok, Args} ->
-                    {ok, {base, [{trans_ext, normalize_trans_text(Text), Args}]}};
-                error ->
-                    error
-            end;
-        error ->
-            error
-    end;
-maybe_parse_trans_tag(_) ->
-    error.
-
-normalize_trans_text({trans, _} = Tr) ->
-    Tr;
-normalize_trans_text(Text) when is_binary(Text) ->
-    {trans, [{en, Text}]}.
-
-split_close_tag(Tokens) ->
-    case lists:reverse(Tokens) of
-        [{close_tag, _ClosePos, _Close} = CloseTag | RevArgs] ->
-            {ok, lists:reverse(RevArgs), CloseTag};
-        _ ->
-            error
-    end.
-
-parse_trans_args([]) ->
-    {ok, []};
-parse_trans_args([{identifier, _Pos, _Name} = Ident | Rest]) ->
-    case Rest of
-        [] ->
-            {ok, [{Ident, true}]};
-        [{identifier, _NextPos, _NextName} | _] ->
-            case parse_trans_args(Rest) of
-                {ok, Args} -> {ok, [{Ident, true} | Args]};
-                error -> error
-            end;
-        [{equal, _EqPos, _Eq} | ExprTokens] ->
-            case split_trans_arg_expr(ExprTokens) of
-                {ok, Expr, Rest1} ->
-                    case parse_trans_args(Rest1) of
-                        {ok, Args} -> {ok, [{Ident, Expr} | Args]};
-                        error -> error
-                    end;
-                error ->
-                    error
-            end;
-        _ ->
-            error
-    end;
-parse_trans_args(_) ->
-    error.
-
-split_trans_arg_expr(Tokens) ->
-    split_trans_arg_expr(Tokens, length(Tokens)).
-
-split_trans_arg_expr(_Tokens, 0) ->
-    error;
-split_trans_arg_expr(Tokens, N) ->
-    Prefix = lists:sublist(Tokens, N),
-    Suffix = lists:nthtail(N, Tokens),
-    case is_valid_trans_arg_suffix(Suffix) of
-        false ->
-            split_trans_arg_expr(Tokens, N - 1);
-        true ->
-            case parse_expr_tokens(Prefix) of
-                {ok, Expr} ->
-                    {ok, Expr, Suffix};
-                error ->
-                    split_trans_arg_expr(Tokens, N - 1)
-            end
-    end.
-
-is_valid_trans_arg_suffix([]) ->
-    true;
-is_valid_trans_arg_suffix([{identifier, _Pos, _Name} | _]) ->
-    true;
-is_valid_trans_arg_suffix(_) ->
-    false.
-
-parse_expr_tokens(Tokens) ->
-    Open = {open_var, {<<"highlight-trans">>, 1, 1}, <<"{{">>},
-    Close = {close_var, {<<"highlight-trans">>, 1, 1}, <<"}}">>},
-    case template_compiler_parser:parse([Open | Tokens] ++ [Close]) of
-        {ok, {base, [{value, _OpenVar, Expr, []}]}} ->
-            {ok, Expr};
-        _ ->
-            error
-    end.
