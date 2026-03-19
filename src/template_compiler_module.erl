@@ -21,21 +21,21 @@
 -author('Marc Worrell <marc@worrell.nl>').
 
 -export([
-    compile/9
+    compile/10
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
 
-compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, undefined) ->
-    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>), [], false);
-compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, {undefined, DebugPoints, IsDebugCompiled}) ->
-    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>), DebugPoints, IsDebugCompiled);
-compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, {TemplateAst, DebugPoints, IsDebugCompiled}) ->
-    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, DebugPoints, IsDebugCompiled);
-compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst) ->
-    compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, [], false).
+compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, undefined) ->
+    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>), [], false);
+compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, {undefined, DebugPoints, IsDebugCompiled}) ->
+    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>), DebugPoints, IsDebugCompiled);
+compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, {TemplateAst, DebugPoints, IsDebugCompiled}) ->
+    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, DebugPoints, IsDebugCompiled);
+compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst) ->
+    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, [], false).
 
-compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, DebugPoints, IsDebugCompiled) ->
+compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, DebugPoints, IsDebugCompiled) ->
     Now = os:timestamp(),
     BlockNames = [ BN || {BN, _Tree, _Ws} <- BlockAsts ],
     Forms1 = lists:flatten(
@@ -49,6 +49,7 @@ compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts
                 "extends/0,",
                 "includes/0,",
                 "debug_points/0,",
+                "content_checksum/0,",
                 "is_debug_compiled/0,",
                 "filename/0,",
                 "mtime/0,",
@@ -61,6 +62,7 @@ compile(Module, Filename, Mtime, IsAutoid, Runtime, Extends, Includes, BlockAsts
             "module() -> _@Module@.",
             "extends() -> _@Extends@.",
             "includes() -> _@Includes@.",
+            "content_checksum() -> _@ContentChecksum@.",
             "filename() -> _@Filename@.",
             "mtime() -> _@Mtime@.",
             "is_autoid() -> _@IsAutoid@.",
