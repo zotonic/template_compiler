@@ -21,6 +21,13 @@ groups() ->
     [{basic, [],
         [highlight_file_test
         ,highlight_binary_test
+        ,highlight_line_numbers_test
+        ,highlight_model_expr_test
+        ,highlight_unicode_model_expr_test
+        ,highlight_model_bracket_expr_test
+        ,highlight_trans_literal_test
+        ,highlight_trans_tag_test
+        ,highlight_unicode_trans_tag_test
         ,highlight_escape_text_test
         ,highlight_escape_string_literal_test
         ,highlight_module_test
@@ -56,6 +63,91 @@ highlight_binary_test(_Config) ->
     {_, _} = binary:match(Html, <<"{{">>),
     ok.
 
+highlight_line_numbers_test(_Config) ->
+    {ok, Html} = template_compiler:highlight_binary(<<"a\nb">>),
+    {_, _} = binary:match(Html, <<"template-compiler-line-number">>),
+    {_, _} = binary:match(Html, <<"data-line=\"1\"">>),
+    {_, _} = binary:match(Html, <<"data-line=\"2\"">>),
+    ok.
+
+highlight_model_expr_test(Config) ->
+    Filename = filename:join([test_data_dir(Config), "expr_model_call.tpl"]),
+    {ok, Html} = template_compiler:highlight_file(Filename),
+    nomatch = binary:match(Html, <<"{model,">>),
+    {_, _} = binary:match(Html, <<"m">>),
+    {_, _} = binary:match(Html, <<"foo">>),
+    {_, _} = binary:match(Html, <<"bar">>),
+    {_, _} = binary:match(Html, <<"baz">>),
+    nomatch = binary:match(Html, <<".3">>),
+    {_, _} = binary:match(Html, <<"[">>),
+    {_, _} = binary:match(Html, <<"3">>),
+    {_, _} = binary:match(Html, <<"]">>),
+    {_, _} = binary:match(Html, <<"::">>),
+    ok.
+
+highlight_unicode_model_expr_test(_Config) ->
+    Template = <<"é"/utf8, "{{ m.foo[3]::4 }}">>,
+    {ok, Html} = template_compiler:highlight_binary(Template, <<"unicode_expr.tpl">>),
+    nomatch = binary:match(Html, <<"{model,">>),
+    assert_in_order(Html, [
+        <<"1</span>é{{ "/utf8>>,
+        <<"<span style=\"color:#0f766e;font-weight:600;\">m</span>">>,
+        <<"<span style=\"color:#be123c;font-weight:600;\">.</span>">>,
+        <<"<span style=\"color:#1d4ed8;\">foo</span>">>,
+        <<"<span style=\"color:#be123c;font-weight:600;\">[</span>">>,
+        <<"3">>,
+        <<"<span style=\"color:#be123c;font-weight:600;\">]</span>">>,
+        <<"<span style=\"color:#be123c;font-weight:600;\">::</span>">>,
+        <<"4 }}</span>">>
+    ]),
+    ok.
+
+highlight_model_bracket_expr_test(_Config) ->
+    {ok, Html} = template_compiler:highlight_binary(<<"{{ m.foo[a + 1] }}">>),
+    nomatch = binary:match(Html, <<"{model,">>),
+    {_, _} = binary:match(Html, <<"foo">>),
+    {_, _} = binary:match(Html, <<"[">>),
+    {_, _} = binary:match(Html, <<"a">>),
+    {_, _} = binary:match(Html, <<"+">>),
+    {_, _} = binary:match(Html, <<"1">>),
+    {_, _} = binary:match(Html, <<"]">>),
+    ok.
+
+highlight_trans_literal_test(Config) ->
+    Filename = filename:join([test_data_dir(Config), "trans_string.tpl"]),
+    {ok, Html} = template_compiler:highlight_file(Filename),
+    nomatch = binary:match(Html, <<"{trans,">>),
+    {_, _} = binary:match(Html, <<"{{">>),
+    {_, _} = binary:match(Html, <<"_">>),
+    {_, _} = binary:match(Html, <<"Hello">>),
+    {_, _} = binary:match(Html, <<"}}">>),
+    ok.
+
+highlight_trans_tag_test(_Config) ->
+    {ok, Html} = template_compiler:highlight_binary(<<"{% trans \"hello {name}\" name=\"piet\" %}">>),
+    nomatch = binary:match(Html, <<"{trans_ext,">>),
+    {_, _} = binary:match(Html, <<"{%">>),
+    {_, _} = binary:match(Html, <<"trans">>),
+    {_, _} = binary:match(Html, <<"hello {name}">>),
+    {_, _} = binary:match(Html, <<"name">>),
+    {_, _} = binary:match(Html, <<"piet">>),
+    {_, _} = binary:match(Html, <<"%}">>),
+    ok.
+
+highlight_unicode_trans_tag_test(_Config) ->
+    Template = <<"ø"/utf8, "{% trans \"héllo {name}\" name=\"søren\" %}"/utf8>>,
+    {ok, Html} = template_compiler:highlight_binary(Template, <<"unicode_trans.tpl">>),
+    nomatch = binary:match(Html, <<"{trans_ext,">>),
+    assert_in_order(Html, [
+        <<"1</span>ø{% "/utf8>>,
+        <<"<span style=\"color:#0f766e;font-weight:600;\">trans</span> ">>,
+        <<"<span style=\"color:#b45309;\">&quot;héllo {name}&quot;</span> "/utf8>>,
+        <<"<span style=\"color:#1d4ed8;\">name</span>">>,
+        <<"<span style=\"color:#be123c;font-weight:600;\">=</span>">>,
+        <<"<span style=\"color:#b45309;\">&quot;søren&quot;</span> %}"/utf8>>
+    ]),
+    ok.
+
 highlight_escape_text_test(_Config) ->
     Template = <<"<script>alert(\"x\")</script>&'">>,
     {ok, Html} = template_compiler:highlight_binary(Template, <<"escape_text.tpl">>),
@@ -87,3 +179,17 @@ test_data_dir(Config) ->
     filename:join([
         filename:dirname(filename:dirname(?config(data_dir, Config))),
         "test-data"]).
+
+assert_in_order(Bin, Parts) ->
+    assert_in_order(Bin, Parts, 0).
+
+assert_in_order(_Bin, [], _Offset) ->
+    ok;
+assert_in_order(Bin, [Part | Rest], Offset) ->
+    Scope = byte_size(Bin) - Offset,
+    case binary:match(Bin, Part, [{scope, {Offset, Scope}}]) of
+        {Pos, Len} ->
+            assert_in_order(Bin, Rest, Pos + Len);
+        nomatch ->
+            ct:fail({missing_in_order, Part, Offset})
+    end.

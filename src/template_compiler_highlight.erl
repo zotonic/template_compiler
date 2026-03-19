@@ -1,6 +1,11 @@
 %% @author Marc Worrell <marc@worrell.nl>
 %% @copyright 2026 Marc Worrell
-%% @doc Generate syntax highlighted HTML from template parse trees.
+%% @doc Generate syntax highlighted HTML from template source plus parser annotations.
+%%      The highlighter scans and parses the template, derives source-position
+%%      annotations from the tokens and parsed constructs, adds debug-point
+%%      annotations, and then merges those annotations back into the original
+%%      template text to emit spans, checkboxes, and line numbers without
+%%      reconstructing the source.
 %% @end
 
 %% Copyright 2026 Marc Worrell
@@ -29,7 +34,9 @@
 
 -define(DUMMY_TEMPLATE_FILENAME, <<"template.tpl">>).
 
--define(STYLE_PRE, <<"background:#f8fafc;color:#0f172a;padding:1rem 1.25rem;border:1px solid #e2e8f0;border-radius:8px;overflow:auto;white-space:pre-wrap;font-family:Menlo,Consolas,monospace;font-size:13px;line-height:1.5;">>).
+-define(STYLE_PRE, <<"background:#f8fafc;color:#0f172a;padding:1rem 1.25rem;border:1px solid #e2e8f0;border-radius:8px;overflow:auto;white-space:pre-wrap;font-family:Menlo,Consolas,monospace;font-size:12px;line-height:1.5;">>).
+-define(STYLE_LINE, <<"display:block;padding-left:4.5em;position:relative;min-height:1.5em;">>).
+-define(STYLE_LINE_NO, <<"position:absolute;left:0;width:3.5em;text-align:right;color:#94a3b8;user-select:none;">>).
 -define(STYLE_CHECKBOX, <<"display:inline-flex;align-items:center;vertical-align:middle;margin-right:0.45rem;">>).
 -define(STYLE_TEXT, <<"color:#334155;">>).
 -define(STYLE_DELIM, <<"color:#64748b;">>).
@@ -89,10 +96,13 @@ highlight_file(Filename, DebugPoints) ->
 
 highlight_binary(Bin, Filename, DebugPoints) when is_binary(Bin) ->
     case template_compiler_scanner:scan(Filename, Bin) of
-        {ok, Tokens} ->
-            case template_compiler_parser:parse(Tokens) of
-                {ok, Tree} ->
-                    {ok, iolist_to_binary(render_document(Tree, debug_points_map(DebugPoints)))};
+        {ok, RawTokens} ->
+            Tokens = normalize_tokens(RawTokens),
+            case ensure_parse_tree(Tokens) of
+                {ok, _Tree} ->
+                    SourceIndex = source_index(Bin),
+                    Annotations = annotations(Bin, RawTokens, Tokens, SourceIndex),
+                    {ok, iolist_to_binary(render_document(Bin, SourceIndex, Annotations, debug_points_map(DebugPoints)))};
                 {error, _} = Error ->
                     Error
             end;
@@ -100,370 +110,352 @@ highlight_binary(Bin, Filename, DebugPoints) when is_binary(Bin) ->
             Error
     end.
 
-render_document(Tree, DebugPointMap) ->
+ensure_parse_tree(Tokens) ->
+    case template_compiler_parser:parse(Tokens) of
+        {ok, _} = Ok ->
+            Ok;
+        {error, _} = Error ->
+            case maybe_parse_trans_tag(Tokens) of
+                {ok, _} = Ok ->
+                    Ok;
+                error ->
+                    Error
+            end
+    end.
+
+annotations(Bin, RawTokens, _Tokens, SourceIndex) ->
+    {TokenAnnotations, _Cursor} = token_annotations(Bin, RawTokens, SourceIndex, 0, []),
+    split_annotations(TokenAnnotations, SourceIndex).
+
+token_annotations(_Bin, [], _SourceIndex, Cursor, Acc) ->
+    {lists:reverse(Acc), Cursor};
+token_annotations(Bin, [Token | Rest], SourceIndex, Cursor, Acc) ->
+    {Annotations, NextCursor} = token_annotation(Token, Bin, SourceIndex, Cursor),
+    token_annotations(Bin, Rest, SourceIndex, NextCursor, lists:reverse(Annotations, Acc)).
+
+trans_literal_annotations(Start, Stop) ->
+    trans_literal_annnotations(Start, Stop).
+
+token_annotation({string_literal, _SrcPos, _Text}, Bin, _SourceIndex, Cursor) ->
+    case locate_quoted_span(Bin, Cursor) of
+        {Start, Stop} ->
+            {[#{start => Start, stop => Stop, kind => string}], Stop};
+        error ->
+            {[], Cursor}
+    end;
+token_annotation({trans_literal, _SrcPos, _Text}, Bin, _SourceIndex, Cursor) ->
+    case locate_trans_literal_span(Bin, Cursor) of
+        {Start, Stop} ->
+            {trans_literal_annotations(Start, Stop), Stop};
+        error ->
+            {[], Cursor}
+    end;
+token_annotation({atom_literal, _SrcPos, _Text}, Bin, _SourceIndex, Cursor) ->
+    case locate_quoted_span(Bin, Cursor) of
+        {Start, Stop} ->
+            {[#{start => Start, stop => Stop, kind => literal}], Stop};
+        error ->
+            {[], Cursor}
+    end;
+token_annotation({identifier, _SrcPos, Text}, Bin, _SourceIndex, Cursor) ->
+    Kind = case Text of
+        <<"true">> -> literal;
+        <<"false">> -> literal;
+        <<"undefined">> -> literal;
+        _ -> ident
+    end,
+    locate_annotation(Bin, Cursor, Text, Kind);
+token_annotation({Token, _SrcPos, Text}, Bin, _SourceIndex, Cursor) when is_atom(Token) ->
+    case classify_token(Token) of
+        undefined ->
+            {[], Cursor};
+        {Kind, token_text} ->
+            locate_annotation(Bin, Cursor, token_text(Token, Text), Kind);
+        {Kind, token_length, _Length} ->
+            locate_annotation(Bin, Cursor, token_text(Token, Text), Kind)
+    end.
+
+classify_token(Token) ->
+    case is_keyword_token(Token) of
+        true ->
+            {keyword, token_text};
+        false ->
+            case Token of
+                open_map -> {operator, token_length, 2};
+                colons -> {operator, token_length, 2};
+                equal -> {operator, token_text};
+                colon -> {operator, token_text};
+                pipe -> {operator, token_text};
+                comma -> {operator, token_text};
+                dot -> {operator, token_text};
+                hash -> {operator, token_text};
+                open_bracket -> {operator, token_text};
+                close_bracket -> {operator, token_text};
+                open_curly -> {operator, token_text};
+                close_curly -> {operator, token_text};
+                '(' -> {operator, token_text};
+                ')' -> {operator, token_text};
+                '+' -> {operator, token_text};
+                '-' -> {operator, token_text};
+                '*' -> {operator, token_text};
+                '/' -> {operator, token_text};
+                '%' -> {operator, token_text};
+                '<' -> {operator, token_text};
+                '>' -> {operator, token_text};
+                '=<'
+                    -> {operator, token_text};
+                '>='
+                    -> {operator, token_text};
+                '=='
+                    -> {operator, token_text};
+                '/='
+                    -> {operator, token_text};
+                '=/='
+                    -> {operator, token_text};
+                '=:='
+                    -> {operator, token_text};
+                '++'
+                    -> {operator, token_text};
+                '--'
+                    -> {operator, token_text};
+                _ ->
+                    undefined
+            end
+    end.
+
+is_keyword_token(Token) ->
+    case atom_to_binary(Token, utf8) of
+        <<_/binary>> = Name ->
+            binary:longest_common_suffix([Name, <<"_keyword">>]) =:= 8
+    end.
+
+trans_literal_annnotations(Start, Stop) when Stop > Start + 1 ->
+    [
+        #{start => Start, stop => Start + 1, kind => operator},
+        #{start => Start + 1, stop => Stop, kind => string}
+    ];
+trans_literal_annnotations(_, _) ->
+    [].
+
+quoted_span(Bin, Start) ->
+    case byte_at(Bin, Start) of
+        $" ->
+            find_quote_end(Bin, Start + 1, $");
+        $' ->
+            find_quote_end(Bin, Start + 1, $');
+        $` ->
+            find_quote_end(Bin, Start + 1, $`);
+        _ ->
+            error
+    end.
+
+find_quote_end(Bin, Pos, _Quote) when Pos >= byte_size(Bin) ->
+    {ok, byte_size(Bin)};
+find_quote_end(Bin, Pos, Quote) ->
+    case utf8_at(Bin, Pos) of
+        {$\\, NextPos} ->
+            find_quote_end(Bin, next_utf8_offset(Bin, NextPos), Quote);
+        {Quote, NextPos} ->
+            {ok, NextPos};
+        {_Char, NextPos} ->
+            find_quote_end(Bin, NextPos, Quote);
+        error ->
+            {ok, byte_size(Bin)}
+    end.
+
+split_annotations(Annotations, SourceIndex) ->
+    lists:flatmap(
+        fun(Ann) -> split_annotation(Ann, SourceIndex) end,
+        Annotations).
+
+split_annotation(#{start := Start, stop := Stop, kind := Kind}, #{lines := Lines, starts := Starts}) ->
+    lists:foldl(
+        fun({Line, LineStart}, Acc) ->
+            LineEnd = LineStart + byte_size(Line),
+            PieceStart = erlang:max(Start, LineStart),
+            PieceEnd = erlang:min(Stop, LineEnd),
+            case PieceStart < PieceEnd of
+                true -> [#{start => PieceStart, stop => PieceEnd, kind => Kind} | Acc];
+                false -> Acc
+            end
+        end,
+        [],
+        lists:zip(Lines, Starts)).
+
+render_document(Bin, SourceIndex, Annotations, DebugPointMap) ->
+    Events = build_events(Annotations, DebugPointMap, SourceIndex),
     [
         <<"<pre class=\"template-compiler-highlight\" style=\"">>, ?STYLE_PRE, <<"\"><code>">>,
-        render_template(Tree, DebugPointMap),
+        render_lines(Bin, SourceIndex, Events, 1),
         <<"</code></pre>">>
     ].
 
-render_template({base, Elements}, DebugPointMap) ->
-    render_elements(Elements, DebugPointMap);
-render_template({extends, Template, Elements}, DebugPointMap) ->
+build_events(Annotations, DebugPointMap, SourceIndex) ->
+    {OpenMap, CloseMap} = lists:foldl(
+        fun(#{start := Start, stop := Stop, kind := Kind}, Acc) ->
+            {OpenAcc, CloseAcc} = Acc,
+            {
+                map_prepend(Start, span_open(Kind), OpenAcc),
+                map_prepend(Stop, <<"</span>">>, CloseAcc)
+            }
+        end,
+        {#{}, #{}},
+        Annotations),
+    DebugEvents = build_debug_events(DebugPointMap, SourceIndex),
+    #{
+        open => OpenMap,
+        close => CloseMap,
+        checkbox => DebugEvents
+    }.
+
+build_debug_events(DebugPointMap, SourceIndex) when is_map(DebugPointMap) ->
+    maps:fold(
+        fun
+            ({_Filename, _Line, _Col} = SrcPos, _Value, Acc) ->
+                case safe_srcpos_to_offset(SourceIndex, SrcPos) of
+                    {ok, Offset} ->
+                        map_prepend(Offset, debug_checkbox(SrcPos), Acc);
+                    error ->
+                        Acc
+                end;
+            (_Key, _Value, Acc) ->
+                Acc
+        end,
+        #{},
+        DebugPointMap).
+
+span_open(text) ->
+    span_open_style(?STYLE_TEXT);
+span_open(delim) ->
+    span_open_style(?STYLE_DELIM);
+span_open(keyword) ->
+    span_open_style(?STYLE_KEYWORD);
+span_open(string) ->
+    span_open_style(?STYLE_STRING);
+span_open(ident) ->
+    span_open_style(?STYLE_IDENT);
+span_open(literal) ->
+    span_open_style(?STYLE_LITERAL);
+span_open(operator) ->
+    span_open_style(?STYLE_OPERATOR);
+span_open(comment) ->
+    span_open_style(?STYLE_COMMENT).
+
+span_open_style(Style) ->
+    [<<"<span style=\"">>, Style, <<"\">">>].
+
+debug_checkbox({Filename, Line, Col}) ->
+    Value = iolist_to_binary([integer_to_binary(Line), <<":">>, integer_to_binary(Col)]),
+    AriaLabel = iolist_to_binary([
+        <<"Toggle debug at ">>, Filename, <<" ">>,
+        integer_to_binary(Line), <<":">>, integer_to_binary(Col)
+    ]),
     [
-        render_tag([keyword(<<"extends">>), space(), render_expr(Template)]),
-        maybe_newline(Elements),
-        render_elements(Elements, DebugPointMap)
-    ];
-render_template({overrules, Elements}, DebugPointMap) ->
-    [
-        render_tag([keyword(<<"overrules">>)]),
-        maybe_newline(Elements),
-        render_elements(Elements, DebugPointMap)
+        <<"<label class=\"template-compiler-debug-point\" style=\"">>, ?STYLE_CHECKBOX, <<"\">">>,
+        <<"<input type=\"checkbox\" value=\"">>, escape_attr(Value),
+        <<"\" aria-label=\"">>, escape_attr(AriaLabel),
+        <<"\" data-template=\"">>, escape_attr(Filename),
+        <<"\" data-line=\"">>, integer_to_binary(Line),
+        <<"\" data-column=\"">>, integer_to_binary(Col), <<"\">">>,
+        <<"</label>">>
     ].
 
-render_elements(Elements, DebugPointMap) when is_list(Elements) ->
-    [ render_element(E, DebugPointMap) || E <- Elements ].
-
-render_element(Element, DebugPointMap) ->
+render_lines(_Bin, #{lines := [], starts := []}, _Events, _LineNo) ->
+    [];
+render_lines(Bin, #{lines := [Line], starts := [Start]}, Events, LineNo) ->
+    render_line(Bin, LineNo, Start, Line, Events);
+render_lines(Bin, #{lines := [Line | RestLines], starts := [Start | RestStarts]} = SourceIndex, Events, LineNo) ->
     [
-        render_debug_checkbox(element_src_pos(Element), DebugPointMap),
-        render_element_content(Element, DebugPointMap)
+        render_line(Bin, LineNo, Start, Line, Events),
+        <<"\n">>,
+        render_lines(Bin, SourceIndex#{lines := RestLines, starts := RestStarts}, Events, LineNo + 1)
     ].
 
-render_element_content({text, _SrcPos, Text}, _DebugPointMap) ->
-    span(?STYLE_TEXT, Text);
-render_element_content({value, _OpenVar, Expr, []}, _DebugPointMap) ->
-    render_var(render_expr(Expr));
-render_element_content({value, _OpenVar, Expr, With}, _DebugPointMap) ->
-    render_var([render_expr(Expr), space(), keyword(<<"with">>), space(), render_args(With)]);
-render_element_content({trans_ext, Tr, Args}, _DebugPointMap) ->
-    render_tag([keyword(<<"trans">>), space(), render_expr({trans_literal, undefined, Tr}) | render_args_tail(Args)]);
-render_element_content({date, now, _Tag, Format}, _DebugPointMap) ->
-    render_tag([keyword(<<"now">>), space(), render_expr(Format)]);
-render_element_content({load, Names}, _DebugPointMap) ->
-    render_tag([keyword(<<"load">>) | render_load_names(Names)]);
-render_element_content({block, {identifier, _Pos, Name}, Elts}, DebugPointMap) ->
+render_line(_Bin, LineNo, Start, Line, Events) ->
+    End = Start + byte_size(Line),
     [
-        render_tag([keyword(<<"block">>), space(), ident(Name)]),
-        render_elements(Elts, DebugPointMap),
-        render_tag([keyword(<<"endblock">>)])
-    ];
-render_element_content({inherit, _Tag}, _DebugPointMap) ->
-    render_tag([keyword(<<"inherit">>)]);
-render_element_content({include, _Tag, Method, Template, Args}, _DebugPointMap) ->
-    render_include(<<"include">>, Method, Template, undefined, Args);
-render_element_content({catinclude, _Tag, Method, Template, IdExpr, Args}, _DebugPointMap) ->
-    render_include(<<"catinclude">>, Method, Template, IdExpr, Args);
-render_element_content({compose, {_Tag, Template, Args}, Blocks}, DebugPointMap) ->
-    render_compose(<<"compose">>, Template, undefined, Args, Blocks, DebugPointMap);
-render_element_content({catcompose, {_Tag, Template, IdExpr, Args}, Blocks}, DebugPointMap) ->
-    render_compose(<<"catcompose">>, Template, IdExpr, Args, Blocks, DebugPointMap);
-render_element_content({'call', {identifier, _Pos, Name}, Args}, _DebugPointMap) ->
-    render_tag([keyword(<<"call">>), space(), ident(Name) | render_args_tail(Args)]);
-render_element_content({call_with, {identifier, _Pos, Name}, Expr}, _DebugPointMap) ->
-    render_tag([keyword(<<"call">>), space(), ident(Name), space(), keyword(<<"with">>), space(), render_expr(Expr)]);
-render_element_content({custom_tag, {identifier, _Pos, Name}, Args}, _DebugPointMap) ->
-    render_tag([ident(Name) | render_args_tail(Args)]);
-render_element_content({Tag, _TagPos, Expr, Args}, _DebugPointMap) when Tag =:= image; Tag =:= image_url; Tag =:= image_data_url; Tag =:= media; Tag =:= url ->
-    render_tag([keyword(atom_to_binary(Tag, utf8)), space(), render_expr(Expr) | render_args_tail(Args)]);
-render_element_content({LibTag, _TagPos, LibList, Args}, _DebugPointMap) when LibTag =:= lib; LibTag =:= lib_url ->
-    render_tag([keyword(atom_to_binary(LibTag, utf8)) | render_libs_and_args(LibList, Args)]);
-render_element_content({print, _TagPos, Expr}, _DebugPointMap) ->
-    render_tag([keyword(<<"print">>), space(), render_expr(Expr)]);
-render_element_content({'if', Cond, IfElts, ElseElts}, DebugPointMap) ->
-    render_if(Cond, IfElts, ElseElts, DebugPointMap);
-render_element_content({'ifequal', {Tag, Expr1, Expr2}, IfElts, ElseElts}, DebugPointMap) ->
-    render_if_compare(<<"ifequal">>, Tag, Expr1, Expr2, IfElts, ElseElts, DebugPointMap);
-render_element_content({'ifnotequal', {Tag, Expr1, Expr2}, IfElts, ElseElts}, DebugPointMap) ->
-    render_if_compare(<<"ifnotequal">>, Tag, Expr1, Expr2, IfElts, ElseElts, DebugPointMap);
-render_element_content({for, {'in', _Tag, Idents, ListExpr}, LoopElts, EmptyElts}, DebugPointMap) ->
-    [
-        render_tag([keyword(<<"for">>), space(), render_ident_list(Idents), space(), keyword(<<"in">>), space(), render_expr(ListExpr)]),
-        render_elements(LoopElts, DebugPointMap),
-        render_empty_part(EmptyElts, DebugPointMap),
-        render_tag([keyword(<<"endfor">>)])
-    ];
-render_element_content({with, {_Tag, Exprs, Idents}, Elts}, DebugPointMap) ->
-    [
-        render_tag([keyword(<<"with">>), space(), render_expr_list(Exprs), space(), keyword(<<"as">>), space(), render_ident_list(Idents)]),
-        render_elements(Elts, DebugPointMap),
-        render_tag([keyword(<<"endwith">>)])
-    ];
-render_element_content({cache, {CacheTime, Args, _Tag}, Elts}, DebugPointMap) ->
-    [
-        render_tag([keyword(<<"cache">>) | render_cache_open(CacheTime, Args)]),
-        render_elements(Elts, DebugPointMap),
-        render_tag([keyword(<<"endcache">>)])
-    ];
-render_element_content({javascript, _TagPos, Elts}, DebugPointMap) ->
-    [
-        render_tag([keyword(<<"javascript">>)]),
-        render_elements(Elts, DebugPointMap),
-        render_tag([keyword(<<"endjavascript">>)])
-    ];
-render_element_content({filter, {_Tag, Filters}, Elts}, DebugPointMap) ->
-    [
-        render_tag([keyword(<<"filter">>), space(), render_filters(Filters)]),
-        render_elements(Elts, DebugPointMap),
-        render_tag([keyword(<<"endfilter">>)])
-    ];
-render_element_content({spaceless, _TagPos, Elts}, DebugPointMap) ->
-    [
-        render_tag([keyword(<<"spaceless">>)]),
-        render_elements(Elts, DebugPointMap),
-        render_tag([keyword(<<"endspaceless">>)])
-    ];
-render_element_content({autoescape, {identifier, _Pos, OnOff}, Elts}, DebugPointMap) ->
-    [
-        render_tag([keyword(<<"autoescape">>), space(), ident(OnOff)]),
-        render_elements(Elts, DebugPointMap),
-        render_tag([keyword(<<"endautoescape">>)])
-    ];
-render_element_content({cycle, _TagPos, Exprs}, _DebugPointMap) ->
-    render_tag([keyword(<<"cycle">>), space(), render_expr_list(Exprs)]);
-render_element_content(Other, _DebugPointMap) ->
-    span(?STYLE_COMMENT, iolist_to_binary(io_lib:format("~tp", [Other]))).
-
-render_if({'as', _Tag, Expr, undefined}, IfElts, ElseElts, DebugPointMap) ->
-    [
-        render_tag([keyword(<<"if">>), space(), render_expr(Expr)]),
-        render_elements(IfElts, DebugPointMap),
-        render_else_part(ElseElts, DebugPointMap),
-        render_tag([keyword(<<"endif">>)])
-    ];
-render_if({'as', _Tag, Expr, {identifier, _Pos, Name}}, IfElts, ElseElts, DebugPointMap) ->
-    [
-        render_tag([keyword(<<"if">>), space(), render_expr(Expr), space(), keyword(<<"as">>), space(), ident(Name)]),
-        render_elements(IfElts, DebugPointMap),
-        render_else_part(ElseElts, DebugPointMap),
-        render_tag([keyword(<<"endif">>)])
-    ].
-
-render_if_compare(Name, _Tag, Expr1, Expr2, IfElts, ElseElts, DebugPointMap) ->
-    [
-        render_tag([keyword(Name), space(), render_expr(Expr1), space(), render_expr(Expr2)]),
-        render_elements(IfElts, DebugPointMap),
-        render_else_part(ElseElts, DebugPointMap),
-        render_tag([keyword(<<"end", Name/binary>>)])
-    ].
-
-render_else_part([], _DebugPointMap) ->
-    [];
-render_else_part(ElseElts, DebugPointMap) ->
-    [render_tag([keyword(<<"else">>)]), render_elements(ElseElts, DebugPointMap)].
-
-render_empty_part([], _DebugPointMap) ->
-    [];
-render_empty_part(EmptyElts, DebugPointMap) ->
-    [render_tag([keyword(<<"empty">>)]), render_elements(EmptyElts, DebugPointMap)].
-
-render_include(Name, Method, Template, undefined, Args) ->
-    render_tag(render_include_parts(Name, Method, [render_expr(Template)], Args));
-render_include(Name, Method, Template, IdExpr, Args) ->
-    render_tag(render_include_parts(Name, Method, [render_expr(Template), space(), render_expr(IdExpr)], Args)).
-
-render_include_parts(Name, Method, Parts, Args) ->
-    MethodParts = case Method of
-        optional -> [keyword(<<"optional">>), space()];
-        all -> [keyword(<<"all">>), space()];
-        normal -> []
-    end,
-    MethodParts ++ [keyword(Name), space()] ++ Parts ++ render_args_tail(Args).
-
-render_compose(Name, Template, undefined, Args, Blocks, DebugPointMap) ->
-    [
-        render_tag([keyword(Name), space(), render_expr(Template) | render_args_tail(Args)]),
-        render_elements(Blocks, DebugPointMap),
-        render_tag([keyword(<<"endcompose">>)])
-    ];
-render_compose(Name, Template, IdExpr, Args, Blocks, DebugPointMap) ->
-    [
-        render_tag([keyword(Name), space(), render_expr(Template), space(), render_expr(IdExpr) | render_args_tail(Args)]),
-        render_elements(Blocks, DebugPointMap),
-        render_tag([keyword(<<"endcompose">>)])
-    ].
-
-render_expr({string_literal, _Pos, Text}) ->
-    string(Text);
-render_expr({trans_literal, _Pos, {trans, Tr}}) ->
-    [operator(<<"_">>), string(proplists:get_value(en, Tr, <<>>))];
-render_expr({number_literal, _Pos, Nr}) ->
-    literal(Nr);
-render_expr({atom_literal, _Pos, Atom}) ->
-    [operator(<<"`">>), literal(Atom), operator(<<"`">>)];
-render_expr({find_value, LookupList}) ->
-    render_lookup(LookupList);
-render_expr({auto_id, {Ident, Var}}) ->
-    [operator(<<"#">>), render_lookup_ident(Ident), operator(<<"-">>), render_lookup_ident(Var)];
-render_expr({auto_id, Ident}) ->
-    [operator(<<"#">>), render_lookup_ident(Ident)];
-render_expr({map_value, Args}) ->
-    [operator(<<"%{">>), render_args(Args), operator(<<"}">>)];
-render_expr({tuple_value, {identifier, _Pos, Name}, Args}) ->
-    [operator(<<"{">>), ident(Name), maybe_space_args(Args), render_args(Args), operator(<<"}">>)];
-render_expr({value_list, Exprs}) ->
-    [operator(<<"[">>), render_expr_list(Exprs), operator(<<"]">>)];
-render_expr({expr, {Op, Token}, Arg}) ->
-    render_unary_expr(Op, Token, Arg);
-render_expr({expr, {Op, Token}, Arg1, Arg2}) ->
-    render_binary_expr(Op, Token, Arg1, Arg2);
-render_expr({apply_filter, Expr, {filter, {identifier, _Pos, Name}, Args}}) ->
-    [render_expr(Expr), operator(<<"|">>), ident(Name), render_filter_args(Args)];
-render_expr({model, [{identifier, _Pos, <<"m">>} | Path], none}) ->
-    [keyword(<<"m">>), render_model_path(Path)];
-render_expr({model, [{identifier, _Pos, <<"m">>} | Path], Payload}) ->
-    [keyword(<<"m">>), render_model_path(Path), operator(<<"::">>), render_expr(Payload)];
-render_expr(Value) when Value =:= true; Value =:= false; Value =:= undefined ->
-    literal(atom_to_binary(Value, utf8));
-render_expr(Value) when is_binary(Value) ->
-    string(Value);
-render_expr(Value) ->
-    span(?STYLE_COMMENT, iolist_to_binary(io_lib:format("~tp", [Value]))).
-
-render_unary_expr(_Op, {TokenName, _Pos, TokenText}, Arg) when TokenName =:= '-'; TokenName =:= not_keyword ->
-    [operator(token_text(TokenText)), render_expr(Arg)];
-render_unary_expr(Op, _Token, Arg) ->
-    [operator(atom_to_binary(Op, utf8)), render_expr(Arg)].
-
-render_binary_expr(_Op, {_TokenName, _Pos, TokenText}, Arg1, Arg2) ->
-    [render_expr(Arg1), space(), operator(token_text(TokenText)), space(), render_expr(Arg2)].
-
-render_lookup([Part]) ->
-    render_lookup_ident(Part);
-render_lookup([Part|Rest]) ->
-    [render_lookup_ident(Part), operator(<<".">>), render_lookup(Rest)].
-
-render_lookup_ident({identifier, _Pos, Name}) ->
-    ident(Name);
-render_lookup_ident({number_literal, _Pos, Nr}) ->
-    literal(Nr);
-render_lookup_ident({string_literal, _Pos, Text}) ->
-    string(Text);
-render_lookup_ident(Part) ->
-    span(?STYLE_COMMENT, iolist_to_binary(io_lib:format("~tp", [Part]))).
-
-render_model_path([]) ->
-    [];
-render_model_path([Part|Rest]) ->
-    [operator(<<".">>), render_lookup_ident(Part), render_model_path(Rest)].
-
-render_expr_list([]) ->
-    [];
-render_expr_list([Expr]) ->
-    render_expr(Expr);
-render_expr_list([Expr|Rest]) ->
-    [render_expr(Expr), operator(<<",">>), space(), render_expr_list(Rest)].
-
-render_ident_list([Ident]) ->
-    render_lookup_ident(Ident);
-render_ident_list([Ident|Rest]) ->
-    [render_lookup_ident(Ident), operator(<<",">>), space(), render_ident_list(Rest)].
-
-render_args([]) ->
-    [];
-render_args([{Ident, true}]) ->
-    render_lookup_ident(Ident);
-render_args([{Ident, true}|Rest]) ->
-    [render_lookup_ident(Ident), space(), render_args(Rest)];
-render_args([{Ident, Expr}]) ->
-    [render_lookup_ident(Ident), operator(<<"=">>), render_expr(Expr)];
-render_args([{Ident, Expr}|Rest]) ->
-    [render_lookup_ident(Ident), operator(<<"=">>), render_expr(Expr), space(), render_args(Rest)].
-
-render_args_tail([]) ->
-    [];
-render_args_tail(Args) ->
-    [space(), render_args(Args)].
-
-render_filter_args([]) ->
-    [];
-render_filter_args(Args) ->
-    [operator(<<":">>), render_expr_list(Args)].
-
-render_filters([]) ->
-    [];
-render_filters([{filter, {identifier, _Pos, Name}, Args}]) ->
-    [ident(Name), render_filter_args(Args)];
-render_filters([{filter, {identifier, _Pos, Name}, Args}|Rest]) ->
-    [ident(Name), render_filter_args(Args), space(), render_filters(Rest)].
-
-render_load_names([]) ->
-    [];
-render_load_names([Name]) ->
-    [space(), render_lookup_ident(Name)];
-render_load_names([Name|Rest]) ->
-    [space(), render_lookup_ident(Name), render_load_names(Rest)].
-
-render_libs_and_args(LibList, Args) ->
-    LibParts = case LibList of
-        [] -> [];
-        _ -> [space(), render_expr_list(LibList)]
-    end,
-    LibParts ++ render_args_tail(Args).
-
-render_cache_open(undefined, Args) ->
-    render_args_tail(Args);
-render_cache_open(CacheTime, Args) ->
-    [space(), render_expr(CacheTime)] ++ render_args_tail(Args).
-
-render_var(Content) ->
-    [delim(<<"{{">>), Content, delim(<<"}}">>)].
-
-render_tag(Content) ->
-    [delim(<<"{%">>), Content, delim(<<"%}">>)].
-
-maybe_newline([]) ->
-    [];
-maybe_newline(_Elements) ->
-    <<"\n">>.
-
-maybe_space_args([]) ->
-    [];
-maybe_space_args(_Args) ->
-    space().
-
-space() ->
-    <<" ">>.
-
-keyword(Text) ->
-    span(?STYLE_KEYWORD, Text).
-
-string(Text) ->
-    [operator(<<"\"">>), span(?STYLE_STRING, escape_text(Text)), operator(<<"\"">>)].
-
-ident(Text) ->
-    span(?STYLE_IDENT, Text).
-
-literal(Text) ->
-    span(?STYLE_LITERAL, z_convert:to_binary(Text)).
-
-operator(Text) ->
-    span(?STYLE_OPERATOR, Text).
-
-delim(Text) ->
-    span(?STYLE_DELIM, Text).
-
-span(Style, Text) ->
-    [
-        <<"<span style=\"">>, Style, <<"\">">>,
-        escape_text(Text),
+        <<"<span class=\"template-compiler-line\" style=\"">>, ?STYLE_LINE, <<"\" data-line=\"">>, integer_to_binary(LineNo), <<"\">">>,
+        <<"<span class=\"template-compiler-line-number\" style=\"">>, ?STYLE_LINE_NO, <<"\">">>, integer_to_binary(LineNo), <<"</span>">>,
+        render_segment(Line, Start, End, Start, relevant_positions(Start, End, Events), Events),
         <<"</span>">>
     ].
 
-escape_text(Text) when is_binary(Text) ->
-    z_html:escape(Text);
-escape_text(Text) when is_list(Text) ->
-    z_html:escape(iolist_to_binary(Text));
-escape_text(Text) ->
-    z_html:escape(z_convert:to_binary(Text)).
+render_segment(Line, _Start, End, Cursor, [], _Events) ->
+    escape_text(binary:part(Line, {Cursor - (End - byte_size(Line)), End - Cursor}));
+render_segment(Line, Start, End, Cursor, [Pos | Rest], Events) ->
+    [
+        escape_text(binary:part(Line, {Cursor - Start, Pos - Cursor})),
+        emit_at(Pos, Events),
+        render_segment(Line, Start, End, Pos, Rest, Events)
+    ].
 
-token_text(Text) when is_binary(Text) ->
-    Text;
-token_text(Text) when is_list(Text) ->
-    unicode:characters_to_binary(Text);
-token_text(Text) when is_atom(Text) ->
-    atom_to_binary(Text, utf8).
+emit_at(Pos, #{open := OpenMap, close := CloseMap, checkbox := CheckboxMap}) ->
+    [
+        lists:reverse(maps:get(Pos, CloseMap, [])),
+        lists:reverse(maps:get(Pos, CheckboxMap, [])),
+        lists:reverse(maps:get(Pos, OpenMap, []))
+    ].
+
+relevant_positions(Start, End, #{open := OpenMap, close := CloseMap, checkbox := CheckboxMap}) ->
+    lists:usort(
+        [ Pos || Pos <- maps:keys(OpenMap), Start =< Pos, Pos =< End ] ++
+        [ Pos || Pos <- maps:keys(CloseMap), Start =< Pos, Pos =< End ] ++
+        [ Pos || Pos <- maps:keys(CheckboxMap), Start =< Pos, Pos =< End ]).
+
+map_prepend(Key, Value, Map) ->
+    Map#{ Key => [Value | maps:get(Key, Map, [])] }.
+
+source_index(Bin) ->
+    Lines = binary:split(Bin, <<"\n">>, [global]),
+    Starts = source_line_starts(Lines, 0, []),
+    #{
+        lines => Lines,
+        starts => Starts
+    }.
+
+source_line_starts([], _Offset, Acc) ->
+    lists:reverse(Acc);
+source_line_starts([Line | Rest], Offset, Acc) ->
+    NextOffset = Offset + byte_size(Line) + 1,
+    source_line_starts(Rest, NextOffset, [Offset | Acc]).
+
+srcpos_to_offset(#{lines := Lines, starts := Starts}, {_Filename, LineNo, Column}) ->
+    Line = lists:nth(LineNo, Lines),
+    Start = lists:nth(LineNo, Starts),
+    Start + utf8_prefix_bytes(Line, Column - 1).
+
+safe_srcpos_to_offset(SourceIndex, {_Filename, LineNo, Column} = SrcPos) when LineNo >= 1, Column >= 1 ->
+    try
+        {ok, srcpos_to_offset(SourceIndex, SrcPos)}
+    catch
+        _:_ -> error
+    end;
+safe_srcpos_to_offset(_SourceIndex, _SrcPos) ->
+    error.
+
+utf8_prefix_bytes(_Bin, 0) ->
+    0;
+utf8_prefix_bytes(Bin, Count) when Count > 0 ->
+    utf8_prefix_bytes(Bin, Count, 0).
+
+utf8_prefix_bytes(_Bin, 0, Bytes) ->
+    Bytes;
+utf8_prefix_bytes(<<>>, _Count, Bytes) ->
+    Bytes;
+utf8_prefix_bytes(Bin, Count, Bytes) ->
+    <<Char/utf8, Rest/binary>> = Bin,
+    utf8_prefix_bytes(Rest, Count - 1, Bytes + byte_size(<<Char/utf8>>)).
+
+byte_at(Bin, Offset) when Offset >= 0, Offset < byte_size(Bin) ->
+    binary:at(Bin, Offset);
+byte_at(_Bin, _Offset) ->
+    undefined.
+
+escape_text(Text) when is_binary(Text) ->
+    z_html:escape(Text).
+
+escape_attr(Text) ->
+    z_html:escape(z_convert:to_binary(Text)).
 
 debug_points_map(DebugPoints) when is_list(DebugPoints) ->
     maps:from_keys(DebugPoints, true);
@@ -472,91 +464,246 @@ debug_points_map(DebugPoints) when is_map(DebugPoints) ->
 debug_points_map(_) ->
     #{}.
 
-render_debug_checkbox({Filename, Line, Col} = SrcPos, DebugPointMap) ->
-    case maps:is_key(SrcPos, DebugPointMap) of
+locate_annotation(Bin, Cursor, Text, Kind) ->
+    case locate_text_span(Bin, Cursor, Text) of
+        {Start, Stop} ->
+            {[#{start => Start, stop => Stop, kind => Kind}], Stop};
+        error ->
+            {[], Cursor}
+    end.
+
+locate_text_span(_Bin, Cursor, <<>>) ->
+    {Cursor, Cursor};
+locate_text_span(Bin, Cursor, Text) when is_binary(Text) ->
+    locate_text_span_1(Bin, Cursor, Text).
+
+locate_text_span_1(Bin, Cursor, Text) when Cursor =< byte_size(Bin) ->
+    case has_prefix(Bin, Cursor, Text) of
         true ->
-            Value = iolist_to_binary([integer_to_binary(Line), <<":">>, integer_to_binary(Col)]),
-            AriaLabel = iolist_to_binary([
-                <<"Toggle debug at ">>, Filename, <<" ">>,
-                integer_to_binary(Line), <<":">>, integer_to_binary(Col)
-            ]),
-            [
-                <<"<label class=\"template-compiler-debug-point\" style=\"">>, ?STYLE_CHECKBOX, <<"\">">>,
-                <<"<input type=\"checkbox\" value=\"">>, escape_attr(Value),
-                <<"\" aria-label=\"">>, escape_attr(AriaLabel),
-                <<"\" data-template=\"">>, escape_attr(Filename),
-                <<"\" data-line=\"">>, integer_to_binary(Line), <<"\" data-column=\"">>, integer_to_binary(Col), <<"\">">>,
-                <<"</label>">>
-            ];
+            {Cursor, Cursor + byte_size(Text)};
+        false when Cursor < byte_size(Bin) ->
+            locate_text_span_1(Bin, next_utf8_offset(Bin, Cursor), Text);
         false ->
-            []
+            error
+    end.
+
+locate_quoted_span(Bin, Cursor) ->
+    case find_next_quote_start(Bin, Cursor) of
+        {ok, Start} ->
+            case quoted_span(Bin, Start) of
+                {ok, Stop} ->
+                    {Start, Stop};
+                error ->
+                    error
+            end;
+        error ->
+            error
+    end.
+
+find_next_quote_start(Bin, Cursor) when Cursor < byte_size(Bin) ->
+    find_next_quote_start_1(Bin, Cursor);
+find_next_quote_start(_Bin, _Cursor) ->
+    error.
+
+find_next_quote_start_1(Bin, Cursor) when Cursor < byte_size(Bin) ->
+    case utf8_at(Bin, Cursor) of
+        {$", _NextPos} ->
+            {ok, Cursor};
+        {$', _NextPos} ->
+            {ok, Cursor};
+        {$`, _NextPos} ->
+            {ok, Cursor};
+        {_Char, NextPos} ->
+            find_next_quote_start_1(Bin, NextPos);
+        error ->
+            error
     end;
-render_debug_checkbox(_, _DebugPointMap) ->
-    [].
+find_next_quote_start_1(_Bin, _Cursor) ->
+    error.
 
-element_src_pos({text, SrcPos, _Text}) ->
-    SrcPos;
-element_src_pos({value, OpenVar, _Expr, _With}) ->
-    tag_src_pos(OpenVar);
-element_src_pos({date, now, Tag, _Format}) ->
-    tag_src_pos(Tag);
-element_src_pos({block, {identifier, SrcPos, _Name}, _Elts}) ->
-    SrcPos;
-element_src_pos({inherit, Tag}) ->
-    tag_src_pos(Tag);
-element_src_pos({include, Tag, _Method, _Template, _Args}) ->
-    tag_src_pos(Tag);
-element_src_pos({catinclude, Tag, _Method, _Template, _IdExpr, _Args}) ->
-    tag_src_pos(Tag);
-element_src_pos({compose, {Tag, _Template, _Args}, _Blocks}) ->
-    tag_src_pos(Tag);
-element_src_pos({catcompose, {Tag, _Template, _IdExpr, _Args}, _Blocks}) ->
-    tag_src_pos(Tag);
-element_src_pos({'call', {identifier, SrcPos, _Name}, _Args}) ->
-    SrcPos;
-element_src_pos({call_with, {identifier, SrcPos, _Name}, _Expr}) ->
-    SrcPos;
-element_src_pos({custom_tag, {identifier, SrcPos, _Name}, _Args}) ->
-    SrcPos;
-element_src_pos({Tag, TagPos, _Expr, _Args}) when Tag =:= image; Tag =:= image_url; Tag =:= image_data_url; Tag =:= media; Tag =:= url ->
-    tag_src_pos(TagPos);
-element_src_pos({LibTag, TagPos, _LibList, _Args}) when LibTag =:= lib; LibTag =:= lib_url ->
-    tag_src_pos(TagPos);
-element_src_pos({print, TagPos, _Expr}) ->
-    tag_src_pos(TagPos);
-element_src_pos({'if', {'as', Tag, _Expr, _AsVar}, _IfElts, _ElseElts}) ->
-    tag_src_pos(Tag);
-element_src_pos({'ifequal', {Tag, _Expr1, _Expr2}, _IfElts, _ElseElts}) ->
-    tag_src_pos(Tag);
-element_src_pos({'ifnotequal', {Tag, _Expr1, _Expr2}, _IfElts, _ElseElts}) ->
-    tag_src_pos(Tag);
-element_src_pos({for, {'in', Tag, _Idents, _ListExpr}, _LoopElts, _EmptyElts}) ->
-    tag_src_pos(Tag);
-element_src_pos({with, {Tag, _Exprs, _Idents}, _Elts}) ->
-    tag_src_pos(Tag);
-element_src_pos({cache, {_CacheTime, _Args, Tag}, _Elts}) ->
-    tag_src_pos(Tag);
-element_src_pos({javascript, TagPos, _Elts}) ->
-    tag_src_pos(TagPos);
-element_src_pos({filter, {Tag, _Filters}, _Elts}) ->
-    tag_src_pos(Tag);
-element_src_pos({spaceless, TagPos, _Elts}) ->
-    tag_src_pos(TagPos);
-element_src_pos({autoescape, {identifier, SrcPos, _OnOff}, _Elts}) ->
-    SrcPos;
-element_src_pos({cycle, TagPos, _Exprs}) ->
-    tag_src_pos(TagPos);
-element_src_pos(_) ->
-    undefined.
+locate_trans_literal_span(Bin, Cursor) ->
+    case find_next_codepoint(Bin, Cursor, $_) of
+        {ok, Start} ->
+            case quoted_span(Bin, Start + 1) of
+                {ok, Stop} when Stop > Start + 1 ->
+                    {Start, Stop};
+                _ ->
+                    locate_quoted_span(Bin, Cursor)
+            end;
+        error ->
+            locate_quoted_span(Bin, Cursor)
+    end.
 
-tag_src_pos({_Token, SrcPos, _Text}) when is_tuple(SrcPos), tuple_size(SrcPos) =:= 3 ->
-    SrcPos;
-tag_src_pos({_Token, SrcPos}) when is_tuple(SrcPos), tuple_size(SrcPos) =:= 3 ->
-    SrcPos;
-tag_src_pos(SrcPos) when is_tuple(SrcPos), tuple_size(SrcPos) =:= 3 ->
-    SrcPos;
-tag_src_pos(_) ->
-    undefined.
+find_next_codepoint(Bin, Cursor, Codepoint) when Cursor < byte_size(Bin) ->
+    find_next_codepoint_1(Bin, Cursor, Codepoint);
+find_next_codepoint(_Bin, _Cursor, _Codepoint) ->
+    error.
 
-escape_attr(Text) ->
-    z_html:escape(z_convert:to_binary(Text)).
+find_next_codepoint_1(Bin, Cursor, Codepoint) when Cursor < byte_size(Bin) ->
+    case utf8_at(Bin, Cursor) of
+        {Codepoint, _NextPos} ->
+            {ok, Cursor};
+        {_Char, NextPos} ->
+            find_next_codepoint_1(Bin, NextPos, Codepoint);
+        error ->
+            error
+    end;
+find_next_codepoint_1(_Bin, _Cursor, _Codepoint) ->
+    error.
+
+has_prefix(Bin, Offset, Prefix) ->
+    Size = byte_size(Prefix),
+    Offset + Size =< byte_size(Bin)
+        andalso binary:part(Bin, {Offset, Size}) =:= Prefix.
+
+next_utf8_offset(Bin, Offset) when Offset < byte_size(Bin) ->
+    case utf8_at(Bin, Offset) of
+        {_Char, NextPos} ->
+            NextPos;
+        error ->
+            byte_size(Bin)
+    end;
+next_utf8_offset(_Bin, Offset) ->
+    Offset.
+
+utf8_at(Bin, Offset) when Offset >= 0, Offset < byte_size(Bin) ->
+    case binary:part(Bin, {Offset, byte_size(Bin) - Offset}) of
+        <<Char/utf8, _/binary>> = Rest ->
+            CharBytes = byte_size(<<Char/utf8>>),
+            _ = Rest,
+            {Char, Offset + CharBytes};
+        _ ->
+            error
+    end;
+utf8_at(_Bin, _Offset) ->
+    error.
+
+token_text(open_map, _Text) ->
+    <<"#{">>;
+token_text(colons, _Text) ->
+    <<"::">>;
+token_text(_Token, Text) ->
+    Text.
+
+normalize_tokens(Tokens) ->
+    normalize_tokens(Tokens, []).
+
+normalize_tokens([], Acc) ->
+    lists:reverse(Acc);
+normalize_tokens([{trans_keyword, _, _} = Trans, {string_literal, SrcPos, Text} | Ts], Acc) ->
+    NormalizedText = unescape_trim(Text),
+    Acc1 = [{trans_literal, SrcPos, {trans, [{en, NormalizedText}]}}, Trans | Acc],
+    normalize_tokens(Ts, Acc1);
+normalize_tokens([{trans_text, SrcPos, Text} | Ts], Acc) ->
+    Acc1 = [{trans_text, SrcPos, unescape_trim(Text)} | Acc],
+    normalize_tokens(Ts, Acc1);
+normalize_tokens([{trans_literal, SrcPos, Text} | Ts], Acc) ->
+    NormalizedText = unescape_trim(Text),
+    Acc1 = [{trans_literal, SrcPos, {trans, [{en, NormalizedText}]}} | Acc],
+    normalize_tokens(Ts, Acc1);
+normalize_tokens([{string_literal, SrcPos, Text} | Ts], Acc) ->
+    Acc1 = [{string_literal, SrcPos, template_compiler_utils:unescape_string_literal(Text)} | Acc],
+    normalize_tokens(Ts, Acc1);
+normalize_tokens([T | Ts], Acc) ->
+    normalize_tokens(Ts, [T | Acc]).
+
+unescape_trim(Text) ->
+    Unescaped = template_compiler_utils:unescape_string_literal(Text),
+    z_string:trim(Unescaped).
+
+maybe_parse_trans_tag([
+    {open_tag, _OpenPos, _Open},
+    {trans_keyword, _TransPos, _Keyword},
+    {trans_literal, _LiteralPos, Text}
+    | Rest
+]) ->
+    case split_close_tag(Rest) of
+        {ok, ArgTokens, _CloseTag} ->
+            case parse_trans_args(ArgTokens) of
+                {ok, Args} ->
+                    {ok, {base, [{trans_ext, normalize_trans_text(Text), Args}]}};
+                error ->
+                    error
+            end;
+        error ->
+            error
+    end;
+maybe_parse_trans_tag(_) ->
+    error.
+
+normalize_trans_text({trans, _} = Tr) ->
+    Tr;
+normalize_trans_text(Text) when is_binary(Text) ->
+    {trans, [{en, Text}]}.
+
+split_close_tag(Tokens) ->
+    case lists:reverse(Tokens) of
+        [{close_tag, _ClosePos, _Close} = CloseTag | RevArgs] ->
+            {ok, lists:reverse(RevArgs), CloseTag};
+        _ ->
+            error
+    end.
+
+parse_trans_args([]) ->
+    {ok, []};
+parse_trans_args([{identifier, _Pos, _Name} = Ident | Rest]) ->
+    case Rest of
+        [] ->
+            {ok, [{Ident, true}]};
+        [{identifier, _NextPos, _NextName} | _] ->
+            case parse_trans_args(Rest) of
+                {ok, Args} -> {ok, [{Ident, true} | Args]};
+                error -> error
+            end;
+        [{equal, _EqPos, _Eq} | ExprTokens] ->
+            case split_trans_arg_expr(ExprTokens) of
+                {ok, Expr, Rest1} ->
+                    case parse_trans_args(Rest1) of
+                        {ok, Args} -> {ok, [{Ident, Expr} | Args]};
+                        error -> error
+                    end;
+                error ->
+                    error
+            end;
+        _ ->
+            error
+    end;
+parse_trans_args(_) ->
+    error.
+
+split_trans_arg_expr(Tokens) ->
+    split_trans_arg_expr(Tokens, length(Tokens)).
+
+split_trans_arg_expr(_Tokens, 0) ->
+    error;
+split_trans_arg_expr(Tokens, N) ->
+    Prefix = lists:sublist(Tokens, N),
+    Suffix = lists:nthtail(N, Tokens),
+    case is_valid_trans_arg_suffix(Suffix) of
+        false ->
+            split_trans_arg_expr(Tokens, N - 1);
+        true ->
+            case parse_expr_tokens(Prefix) of
+                {ok, Expr} ->
+                    {ok, Expr, Suffix};
+                error ->
+                    split_trans_arg_expr(Tokens, N - 1)
+            end
+    end.
+
+is_valid_trans_arg_suffix([]) ->
+    true;
+is_valid_trans_arg_suffix([{identifier, _Pos, _Name} | _]) ->
+    true;
+is_valid_trans_arg_suffix(_) ->
+    false.
+
+parse_expr_tokens(Tokens) ->
+    Open = {open_var, {<<"highlight-trans">>, 1, 1}, <<"{{">>},
+    Close = {close_var, {<<"highlight-trans">>, 1, 1}, <<"}}">>},
+    case template_compiler_parser:parse([Open | Tokens] ++ [Close]) of
+        {ok, {base, [{value, _OpenVar, Expr, []}]}} ->
+            {ok, Expr};
+        _ ->
+            error
+    end.

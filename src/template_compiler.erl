@@ -101,15 +101,22 @@
 
 %% @doc Render a template. This looks up the templates needed, ensures compilation and
 %%      returns the rendering result.
--spec render(Template :: template(), Vars :: map() | list(), Options :: options(), Context :: term()) ->
-        {ok, render_result()} | {error, term()}.
+-spec render(Template, Vars, Options, Context) -> {ok, render_result()} | {error, term()} when
+    Template :: template(),
+    Vars :: map() | list(),
+    Options :: options(),
+    Context :: term().
 render(Template0, Vars, Options, Context) ->
     render(Template0, #{}, Vars, Options, Context).
 
 %% @doc Render a template. This looks up the templates needed, ensures compilation and
 %%      returns the rendering result. Start with a block-map to find some predefined blocks.
--spec render(Template :: template(), BlockMap :: map(), Vars :: map() | list(), Options :: options(), Context :: term()) ->
-        {ok, render_result()} | {error, term()}.
+-spec render(Template, BlockMap, Vars, Options, Context) -> {ok, render_result()} | {error, term()} when
+    Template :: template(),
+    BlockMap :: map(),
+    Vars :: map() | list(),
+    Options :: options(),
+    Context :: term().
 render(Template0, BlockMap0, Vars, Options, Context) when is_list(Vars) ->
     render(Template0, BlockMap0, props_to_map(Vars, #{}), Options, Context);
 render(Template0, BlockMap0, Vars, Options, Context) when is_map(Vars) ->
@@ -139,9 +146,12 @@ render(Template0, BlockMap0, Vars, Options, Context) when is_map(Vars) ->
     end.
 
 %% @doc Render a named block, defined in a template
--spec render_block(Block :: atom(), Template :: template(), Vars :: map() | list(),
-                   Options :: options(), Context :: term()) ->
-        {ok, render_result()} | {error, term()}.
+-spec render_block(Block, Template, Vars, Options, Context) -> {ok, render_result()} | {error, term()} when
+    Block :: atom(),
+    Template :: template(),
+    Vars :: map() | list(),
+    Options :: options(),
+    Context :: term().
 render_block(Block, Template, Vars, Options, Context) when is_list(Vars) ->
     render_block(Block, Template, props_to_map(Vars, #{}), Options, Context);
 render_block(Block, Template0, Vars, Options, Context) when is_map(Vars) ->
@@ -247,7 +257,9 @@ props_to_map([K|Rest], Map) ->
     props_to_map(Rest, Map#{K => true}).
 
 %% @doc Map all string() template names to binary().
--spec normalize_template(template()) -> template().
+-spec normalize_template(TemplateName) -> NormalizedTemplateName when
+    TemplateName :: template(),
+    NormalizedTemplateName :: template().
 normalize_template(Template) when is_binary(Template) ->
     Template;
 normalize_template(#template_file{filename=Fn, template=Tpl} = T) when is_binary(Fn), is_binary(Tpl)  ->
@@ -262,8 +274,8 @@ normalize_template(Template) when is_list(Template) ->
     unicode:characters_to_binary(Template);
 normalize_template(#template_file{filename=Fn, template=Tpl}) ->
     #template_file{
-        filename=unicode:characters_to_binary(Fn),
-        template=unicode:characters_to_binary(Tpl)
+        filename = unicode:characters_to_binary(Fn),
+        template = unicode:characters_to_binary(Tpl)
     };
 normalize_template({cat, Template}) when is_list(Template) ->
     {cat, unicode:characters_to_binary(Template)};
@@ -339,7 +351,11 @@ get_option(debug_point_files, Options) ->
 
 %% @doc Find the module of a compiled template, if not yet compiled then
 %% compile the template.
--spec lookup(binary(), options(), term()) -> {ok, atom()} | {error, term()}.
+-spec lookup(Filename, Options, Context) -> {ok, Module} | {error, term()} when
+    Filename :: binary(),
+    Options :: options(),
+    Context :: term(),
+    Module :: module().
 lookup(Filename, Options, Context) ->
     template_compiler_admin:lookup(Filename, normalize_options(Options), Context).
 
@@ -367,7 +383,11 @@ flush_context_name(ContextName) ->
 
 %% @doc Compile a template to a module. The template is the path of the
 %% template to be compiled.
--spec compile_file(file:filename_all(), options(), term()) -> {ok, atom()} | {error, term()}.
+-spec compile_file(Filename, Options, Context) -> {ok, Module} | {error, term()} when
+    Filename :: file:filename_all(),
+    Options :: options(),
+    Context :: term(),
+    Module :: module().
 compile_file(Filename, Options, Context) ->
     Options1 = normalize_options(Options),
     case file:read_file(Filename) of
@@ -378,7 +398,12 @@ compile_file(Filename, Options, Context) ->
     end.
 
 %% @doc Compile a in-memory template to a module.
--spec compile_binary(binary(), file:filename_all(), options(), term()) -> {ok, atom()} | {error, term()}.
+-spec compile_binary(TemplateBin, Filename, Options, Context) -> {ok, Module} | {error, term()} when
+    TemplateBin :: binary(),
+    Filename :: file:filename_all(),
+    Options :: options(),
+    Context :: term(),
+    Module :: module().
 compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
     Options1 = normalize_options(Options),
     Mtime = template_compiler_utils:file_mtime(Filename),
@@ -416,7 +441,7 @@ is_template_module(X) when is_list(X) -> false;
 is_template_module(Name) -> is_template_module(z_convert:to_binary(Name)).
 
 
-%% @doc Fetch all translatable strings from a template.
+%% @doc Fetch all translatable strings from a template file.
 -spec translations(file:filename_all()) -> {ok, [translation_message()]} | {error, term()}.
 translations(Filename) ->
     case file:read_file(Filename) of
@@ -645,13 +670,15 @@ find_blocks({block, {identifier, _Pos, Name}, Elements} = Block, Acc, Stack) ->
 find_blocks(Element, Acc, Stack) ->
     find_blocks(block_elements(Element), Acc, Stack).
 
+block_elements({compose, _, Elts}) -> Elts;
+block_elements({catcompose, _, Elts}) -> Elts;
 block_elements({for, _, Loop, Empty}) -> [Loop,Empty];
 block_elements({'if', _, If, Else}) -> [If, Else];
-block_elements({spaceless, Elts}) -> Elts;
+block_elements({spaceless, _, Elts}) -> Elts;
 block_elements({autoescape, _, Elts}) -> Elts;
 block_elements({with, _, Elts}) -> Elts;
 block_elements({cache, _, Elts}) -> Elts;
-block_elements({javascript, Elts}) -> Elts;
+block_elements({javascript, _, Elts}) -> Elts;
 block_elements({filter, _, Elts}) -> Elts;
 block_elements(_) -> [].
 
@@ -717,10 +744,10 @@ expand_translation(Token, _Runtime, _Context) ->
 extract_translations(Tokens) ->
     lists:foldl(
         fun
-            ({trans_text, LineAndNumber, Text}, Acc) ->
-                [ {Text, [], LineAndNumber} | Acc ];
-            ({trans_literal, LineAndNumber, Text}, Acc) ->
-                [ {Text, [], LineAndNumber} | Acc ];
+            ({trans_text, SrcPos, Text}, Acc) ->
+                [ {Text, [], SrcPos} | Acc ];
+            ({trans_literal, SrcPos, Text}, Acc) ->
+                [ {Text, [], SrcPos} | Acc ];
             (_Token, Acc) ->
                 Acc
         end,
