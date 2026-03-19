@@ -305,8 +305,6 @@ build_events(Annotations, DebugPointMap, SourceIndex) ->
         checkbox => DebugEvents
     }.
 
-build_debug_events(all, _SourceIndex) ->
-    #{};
 build_debug_events(DebugPointMap, SourceIndex) when is_map(DebugPointMap) ->
     maps:fold(
         fun
@@ -321,9 +319,7 @@ build_debug_events(DebugPointMap, SourceIndex) when is_map(DebugPointMap) ->
                 Acc
         end,
         #{},
-        DebugPointMap);
-build_debug_events(_, _SourceIndex) ->
-    #{}.
+        DebugPointMap).
 
 span_open(text) ->
     span_open_style(?STYLE_TEXT);
@@ -388,9 +384,7 @@ render_segment(Line, Start, End, Cursor, [Pos | Rest], Events) ->
         escape_text(binary:part(Line, {Cursor - Start, Pos - Cursor})),
         emit_at(Pos, Events),
         render_segment(Line, Start, End, Pos, Rest, Events)
-    ];
-render_segment(Line, Start, End, Cursor, _Positions, _Events) when Cursor =:= End ->
-    escape_text(binary:part(Line, {Cursor - Start, 0})).
+    ].
 
 emit_at(Pos, #{open := OpenMap, close := CloseMap, checkbox := CheckboxMap}) ->
     [
@@ -455,11 +449,7 @@ byte_at(_Bin, _Offset) ->
     undefined.
 
 escape_text(Text) when is_binary(Text) ->
-    z_html:escape(Text);
-escape_text(Text) when is_list(Text) ->
-    z_html:escape(iolist_to_binary(Text));
-escape_text(Text) ->
-    z_html:escape(z_convert:to_binary(Text)).
+    z_html:escape(Text).
 
 escape_attr(Text) ->
     z_html:escape(z_convert:to_binary(Text)).
