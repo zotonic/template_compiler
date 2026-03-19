@@ -133,6 +133,9 @@ token_annotations(Bin, [Token | Rest], SourceIndex, Cursor, Acc) ->
     {Annotations, NextCursor} = token_annotation(Token, Bin, SourceIndex, Cursor),
     token_annotations(Bin, Rest, SourceIndex, NextCursor, lists:reverse(Annotations, Acc)).
 
+trans_literal_annotations(Start, Stop) ->
+    trans_literal_annnotations(Start, Stop).
+
 token_annotation({string_literal, _SrcPos, _Text}, Bin, _SourceIndex, Cursor) ->
     case locate_quoted_span(Bin, Cursor) of
         {Start, Stop} ->
@@ -143,7 +146,7 @@ token_annotation({string_literal, _SrcPos, _Text}, Bin, _SourceIndex, Cursor) ->
 token_annotation({trans_literal, _SrcPos, _Text}, Bin, _SourceIndex, Cursor) ->
     case locate_trans_literal_span(Bin, Cursor) of
         {Start, Stop} ->
-            {trans_literal_annnotations(Start, Stop), Stop};
+            {trans_literal_annotations(Start, Stop), Stop};
         error ->
             {[], Cursor}
     end;
