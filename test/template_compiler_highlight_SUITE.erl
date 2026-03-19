@@ -28,6 +28,7 @@ groups() ->
         ,highlight_trans_literal_test
         ,highlight_trans_tag_test
         ,highlight_unicode_trans_tag_test
+        ,highlight_single_quote_include_test
         ,highlight_escape_text_test
         ,highlight_escape_string_literal_test
         ,highlight_module_test
@@ -146,6 +147,15 @@ highlight_unicode_trans_tag_test(_Config) ->
         <<"<span style=\"color:#be123c;font-weight:600;\">=</span>">>,
         <<"<span style=\"color:#b45309;\">&quot;søren&quot;</span> %}"/utf8>>
     ]),
+    ok.
+
+highlight_single_quote_include_test(_Config) ->
+    Template = <<"{% include 'a.tpl' %}">>,
+    {ok, Html} = template_compiler:highlight_binary(Template, <<"single_quote_include.tpl">>),
+    {_, _} = binary:match(Html, <<"{%">>),
+    {_, _} = binary:match(Html, <<"include">>),
+    {_, _} = binary:match(Html, <<"&#39;a.tpl&#39;">>),
+    {_, _} = binary:match(Html, <<"%}">>),
     ok.
 
 highlight_escape_text_test(_Config) ->
