@@ -473,13 +473,15 @@ normalize_tokens(Tokens) ->
 normalize_tokens([], Acc) ->
     lists:reverse(Acc);
 normalize_tokens([{trans_keyword, _, _} = Trans, {string_literal, SrcPos, Text} | Ts], Acc) ->
-    Acc1 = [{trans_literal, SrcPos, unescape_trim(Text)}, Trans | Acc],
+    NormalizedText = unescape_trim(Text),
+    Acc1 = [{trans_literal, SrcPos, {trans, [{en, NormalizedText}]}} , Trans | Acc],
     normalize_tokens(Ts, Acc1);
 normalize_tokens([{trans_text, SrcPos, Text} | Ts], Acc) ->
     Acc1 = [{trans_text, SrcPos, unescape_trim(Text)} | Acc],
     normalize_tokens(Ts, Acc1);
 normalize_tokens([{trans_literal, SrcPos, Text} | Ts], Acc) ->
-    Acc1 = [{trans_literal, SrcPos, unescape_trim(Text)} | Acc],
+    NormalizedText = unescape_trim(Text),
+    Acc1 = [{trans_literal, SrcPos, {trans, [{en, NormalizedText}]}} | Acc],
     normalize_tokens(Ts, Acc1);
 normalize_tokens([{string_literal, SrcPos, Text} | Ts], Acc) ->
     Acc1 = [{string_literal, SrcPos, template_compiler_utils:unescape_string_literal(Text)} | Acc],
