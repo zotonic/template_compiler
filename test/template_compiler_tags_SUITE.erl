@@ -1,7 +1,7 @@
 -module(template_compiler_tags_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
-
+-include_lib("template_compiler/include/template_compiler.hrl").
 -compile(export_all).
 
 
