@@ -87,8 +87,7 @@ spaceless_test(_Config) ->
     ok.
 
 lib_tag_debug_points_test(_Config) ->
-    {ok, TplFile} = template_compiler_runtime:map_template(<<"lib_tag.tpl">>, [], undefined),
-    Filename = element(3, TplFile),
+    {ok, #template_file{filename = Filename}} = template_compiler_runtime:map_template(<<"lib_tag.tpl">>, [], undefined),
     {ok, Mod} = template_compiler:lookup(Filename, [], undefined),
     [_Point] = Mod:debug_points(),
     ok.
