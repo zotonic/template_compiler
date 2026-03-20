@@ -27,15 +27,15 @@
 -include_lib("syntax_tools/include/merl.hrl").
 
 compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, undefined) ->
-    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>), [], false);
-compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, {undefined, DebugPoints, IsDebugCompiled}) ->
-    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>), DebugPoints, IsDebugCompiled);
-compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, {TemplateAst, DebugPoints, IsDebugCompiled}) ->
-    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, DebugPoints, IsDebugCompiled);
+    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>), [], #{}, false);
+compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, {undefined, DebugPoints, EnabledDebugPoints, IsDebugCompiled}) ->
+    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, erl_syntax:abstract(<<>>), DebugPoints, EnabledDebugPoints, IsDebugCompiled);
+compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, {TemplateAst, DebugPoints, EnabledDebugPoints, IsDebugCompiled}) ->
+    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, DebugPoints, EnabledDebugPoints, IsDebugCompiled);
 compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst) ->
-    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, [], false).
+    compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, [], #{}, false).
 
-compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, DebugPoints, IsDebugCompiled) ->
+compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, Includes, BlockAsts, TemplateAst, DebugPoints, EnabledDebugPoints, IsDebugCompiled) ->
     Now = os:timestamp(),
     BlockNames = [ BN || {BN, _Tree, _Ws} <- BlockAsts ],
     Forms1 = lists:flatten(
@@ -49,6 +49,7 @@ compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, In
                 "extends/0,",
                 "includes/0,",
                 "debug_points/0,",
+                "enabled_debug_points/0,",
                 "content_checksum/0,",
                 "is_debug_compiled/0,",
                 "filename/0,",
@@ -74,6 +75,7 @@ compile(Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime, Extends, In
             ])),
     Forms = Forms1 ++ [
         function(debug_points, lists:usort(DebugPoints)),
+        function(enabled_debug_points, EnabledDebugPoints),
         function(is_debug_compiled, IsDebugCompiled)
     ],
     [

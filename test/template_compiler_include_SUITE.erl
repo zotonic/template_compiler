@@ -27,7 +27,9 @@ groups() ->
         ,compose_inherit_test
         ,debug_points_metadata_test
         ,debug_points_runtime_test
+        ,debug_points_compile_selection_test
         ,flush_debug_test
+        ,flush_debug_context_name_test
         ]}].
 
 init_per_suite(Config) ->
@@ -97,27 +99,33 @@ debug_points_metadata_test(_Config) ->
     {ok, #template_file{ filename = Filename }} = template_compiler_runtime:map_template(<<"debug_value.tpl">>, [], undefined),
     {ok, Mod1} = template_compiler:lookup(Filename, [], undefined),
     false = Mod1:is_debug_compiled(),
-    [Point|_] = Mod1:debug_points(),
+    [{_, Line, Column}|_] = Mod1:debug_points(),
+    EnabledPoint = {Line, Column},
 
-    {ok, Mod2} = template_compiler:lookup(Filename, [{debug_points, [Point]}], undefined),
+    {ok, Mod2} = template_compiler:compile_file(Filename, [{debug_points, [EnabledPoint]}], undefined),
     true = (Mod1 =:= Mod2),
     true = Mod2:is_debug_compiled(),
     true = (Mod1:debug_points() =:= Mod2:debug_points()),
+    #{ EnabledPoint := true } = Mod2:enabled_debug_points(),
     ok.
 
 debug_points_runtime_test(_Config) ->
     Context = #{ trace_pid => self() },
     {ok, #template_file{ filename = Filename }} = template_compiler_runtime:map_template(<<"debug_value.tpl">>, [], undefined),
     {ok, Mod0} = template_compiler:lookup(Filename, [], Context),
-    [Point|_] = Mod0:debug_points(),
-    Options0 = [
+    [Point = {_, Line, Column}|_] = Mod0:debug_points(),
+    EnabledPoint = {Line, Column},
+    CompileOptions = [
         {runtime, template_compiler_debug_runtime},
-        {debug_points, [Point]}
+        {debug_points, [EnabledPoint]}
     ],
-    {ok, Mod} = template_compiler:lookup(Filename, Options0, Context),
+    RenderOptions = [
+        {runtime, template_compiler_debug_runtime}
+    ],
+    {ok, Mod} = template_compiler:compile_file(Filename, CompileOptions, Context),
     [Point|_] = Mod:debug_points(),
 
-    {ok, Bin1} = template_compiler:render("debug_value.tpl", #{ a => 1 }, Options0, Context),
+    {ok, Bin1} = template_compiler:render("debug_value.tpl", #{ a => 1 }, RenderOptions, Context),
     <<"1">> = iolist_to_binary(Bin1),
     receive
         {trace_debug, _, Vars1} ->
@@ -126,7 +134,7 @@ debug_points_runtime_test(_Config) ->
         ok
     end,
 
-    {ok, Bin2} = template_compiler:render("debug_value.tpl", #{ a => 2 }, Options0, Context),
+    {ok, Bin2} = template_compiler:render("debug_value.tpl", #{ a => 2 }, RenderOptions, Context),
     <<"2">> = iolist_to_binary(Bin2),
     {TracePos, DebugVars} = receive_debug_trace(Filename, 1000),
     2 = maps:get(a, DebugVars),
@@ -136,16 +144,55 @@ debug_points_runtime_test(_Config) ->
     Point = TracePos,
     ok.
 
+debug_points_compile_selection_test(_Config) ->
+    {ok, #template_file{ filename = Filename }} = template_compiler_runtime:map_template(<<"debug_values.tpl">>, [], undefined),
+    {ok, Mod0} = template_compiler:lookup(Filename, [], undefined),
+    false = Mod0:is_debug_compiled(),
+    [{_, Line1, Column1}, {_, Line2, Column2}] = Mod0:debug_points(),
+    Point1 = {Line1, Column1},
+    Point2 = {Line2, Column2},
+
+    {ok, Mod1} = template_compiler:compile_file(Filename, [{debug_points, [Point1]}], undefined),
+    true = Mod1:is_debug_compiled(),
+    #{ Point1 := true } = Mod1:enabled_debug_points(),
+
+    {ok, Mod2} = template_compiler:compile_file(Filename, [{debug_points, [Point2]}], undefined),
+    true = (Mod1 =:= Mod2),
+    #{ Point2 := true } = Mod2:enabled_debug_points(),
+    ok.
+
 flush_debug_test(_Config) ->
     {ok, #template_file{ filename = Filename }} = template_compiler_runtime:map_template(<<"debug_value.tpl">>, [], undefined),
     {ok, Mod0} = template_compiler:lookup(Filename, [], undefined),
-    [Point|_] = Mod0:debug_points(),
-    {ok, Mod1} = template_compiler:lookup(Filename, [{debug_points, [Point]}], undefined),
+    [{_, Line, Column}|_] = Mod0:debug_points(),
+    {ok, Mod1} = template_compiler:compile_file(Filename, [{debug_points, [{Line, Column}]}], undefined),
     true = Mod1:is_debug_compiled(),
     ok = template_compiler:flush_debug(),
     {ok, Mod2} = template_compiler:lookup(Filename, [], undefined),
     false = Mod2:is_debug_compiled(),
     true = (Mod1 =:= Mod2),
+    ok.
+
+flush_debug_context_name_test(_Config) ->
+    ContextA = #{ context_name => ctx_a },
+    ContextB = #{ context_name => ctx_b },
+    {ok, #template_file{ filename = FilenameA }} = template_compiler_runtime:map_template(<<"debug_value.tpl">>, [], undefined),
+    {ok, #template_file{ filename = FilenameB }} = template_compiler_runtime:map_template(<<"debug_values.tpl">>, [], undefined),
+    {ok, ModA0} = template_compiler:lookup(FilenameA, [], ContextA),
+    {ok, ModB0} = template_compiler:lookup(FilenameB, [], ContextB),
+    [{_, LineA, ColumnA}|_] = ModA0:debug_points(),
+    [{_, LineB, ColumnB}|_] = ModB0:debug_points(),
+    {ok, ModA1} = template_compiler:compile_file(FilenameA, [{debug_points, [{LineA, ColumnA}]}], ContextA),
+    {ok, ModB1} = template_compiler:compile_file(FilenameB, [{debug_points, [{LineB, ColumnB}]}], ContextB),
+    true = ModA1:is_debug_compiled(),
+    true = ModB1:is_debug_compiled(),
+    ok = template_compiler:flush_debug(ctx_a),
+    {ok, ModA2} = template_compiler:lookup(FilenameA, [], ContextA),
+    {ok, ModB2} = template_compiler:lookup(FilenameB, [], ContextB),
+    false = ModA2:is_debug_compiled(),
+    true = ModB2:is_debug_compiled(),
+    true = (ModA1 =:= ModA2),
+    true = (ModB1 =:= ModB2),
     ok.
 
 receive_debug_trace(Filename, Timeout) ->

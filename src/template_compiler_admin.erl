@@ -24,8 +24,10 @@
 
 -export([
     lookup/3,
+    register/4,
     flush/0,
     flush_debug/0,
+    flush_debug/1,
     flush_file/1,
     flush_context_name/1
     ]).
@@ -68,15 +70,20 @@ lookup(Filename, Options, Context) ->
     TplKey = {ContextName, Runtime, Filename},
     case ets:lookup(?MODULE, TplKey) of
         [#tpl{module=Module}] ->
-            case Runtime:is_modified(Filename, Module:mtime(), Context)
-                orelse should_recompile_debug(Filename, Module, Options)
-            of
+            case Runtime:is_modified(Filename, Module:mtime(), Context) of
                 true -> compile_file(Filename, TplKey, Options, Context);
                 false -> {ok, Module}
             end;
         [] ->
             compile_file(Filename, TplKey, Options, Context)
     end.
+
+-spec register(file:filename_all(), template_compiler:options(), any(), atom()) -> ok.
+register(Filename, Options, Context, Module) when is_atom(Module) ->
+    Runtime = template_compiler:get_option(runtime, Options),
+    ContextName = Runtime:get_context_name(Context),
+    TplKey = {ContextName, Runtime, Filename},
+    gen_server:call(?MODULE, {register, Filename, TplKey, Module}, infinity).
 
 compile_file(Filename, TplKey, Options, Context) ->
     case gen_server:call(?MODULE, {compile_request, TplKey, Filename}, infinity) of
@@ -113,7 +120,12 @@ flush() ->
 %% @doc Flush all template mappings for modules compiled with debug points enabled
 -spec flush_debug() -> ok.
 flush_debug() ->
-    gen_server:call(?MODULE, flush_debug, infinity).
+    gen_server:call(?MODULE, {flush_debug, all}, infinity).
+
+%% @doc Flush all template mappings for modules compiled with debug points enabled for a context name
+-spec flush_debug(term()) -> ok.
+flush_debug(ContextName) ->
+    gen_server:call(?MODULE, {flush_debug, ContextName}, infinity).
 
 %% @doc Ping that a template has been changed
 -spec flush_file(file:filename_all()) -> ok.
@@ -178,8 +190,20 @@ handle_call({compile_done, Result, TplKey}, _From, State) ->
             end,
             Waiters),
     {reply, ok, State2};
-handle_call(flush_debug, _From, State) ->
-    {reply, ok, flush_debug_state(State)};
+handle_call({register, Filename, TplKey, Module}, _From, State) ->
+    ets:insert(?MODULE, #tpl{key=TplKey, module=Module}),
+    FTpl = {Filename, TplKey},
+    State1 = case lists:member(FTpl, State#state.filename_keys) of
+        false ->
+            State#state{
+                filename_keys=[ FTpl | State#state.filename_keys ]
+            };
+        true ->
+            State
+    end,
+    {reply, ok, State1};
+handle_call({flush_debug, ContextName}, _From, State) ->
+    {reply, ok, flush_debug_state(ContextName, State)};
 handle_call(Msg, _From, State) ->
     {stop, {unknown_call, Msg}, State}.
 
@@ -280,16 +304,19 @@ split_waiters(TplKey, State) ->
                                 State#state.waiting),
     {Ready, State#state{waiting=Waiting}}.
 
-flush_debug_state(State) ->
+flush_debug_state(ContextName, State) ->
     DebugCompiled = ets:foldl(
                         fun
-                            (#tpl{module=Module} = Tpl, Acc) ->
+                            (#tpl{key={Ctx, _, _}, module=Module} = Tpl, Acc)
+                                    when ContextName =:= all orelse Ctx =:= ContextName ->
                                 case Module:is_debug_compiled() of
                                     true ->
                                         [Tpl|Acc];
                                     false ->
                                         Acc
-                                end
+                                end;
+                            (_, Acc) ->
+                                Acc
                         end,
                         [],
                         ?MODULE),
@@ -305,18 +332,3 @@ flush_debug_state(State) ->
                         end,
                         State#state.filename_keys),
     State#state{filename_keys=FilenameKeys}.
-
-should_recompile_debug(Filename, Module, Options) ->
-    case Module:is_debug_compiled() of
-        false ->
-            has_debug_points(Filename, template_compiler:get_option(debug_point_files, Options));
-        true ->
-            false
-    end.
-
-has_debug_points(_Filename, all) ->
-    true;
-has_debug_points(Filename, DebugPointFiles) when is_map(DebugPointFiles) ->
-    maps:is_key(Filename, DebugPointFiles);
-has_debug_points(_Filename, _) ->
-    false.

@@ -31,12 +31,13 @@
     lookup/3,
     flush/0,
     flush_debug/0,
+    flush_debug/1,
     flush_file/1,
     flush_context_name/1,
     compile_file/3,
     compile_binary/4,
     get_option/2,
-    debug_point_files_map/1,
+    is_enabled_debug_points/1,
     is_template_module/1,
     translations/1,
     compile_blocks/2
@@ -50,11 +51,10 @@
 
 -type option() :: {runtime, atom()}
                 | {context_name, term()}
-                | {trace_position, {Filename::binary(), Line::integer(), Col::integer()}}
                 | {context_vars, list(binary())}
-                | {debug_points, all | [{binary(), integer(), integer()}] | map()}
+                | {debug_points, all | [{integer(), integer()}] | map()}
                 % Internal option, not part of the external API.
-                | {debug_point_files, all | map()}.
+                | {trace_position, {Filename::binary(), Line::integer(), Col::integer()}}.
 -type options() :: list(option()).
 -type template_file() :: #template_file{}.
 -type template() :: binary()
@@ -137,8 +137,7 @@ render(Template0, BlockMap0, Vars, Options, Context) when is_map(Vars) ->
                         false ->
                             Vars
                     end,
-            Vars2 = add_debug_points_option(Vars1, Options1),
-            {ok, maybe_wrap(BaseModule:render(Vars2, BlockMap, Context), OptDebugWrap)};
+            {ok, maybe_wrap(BaseModule:render(Vars1, BlockMap, Context), OptDebugWrap)};
         {error, {Loc, template_compiler_parser, S}} ->
             {error, {Loc, template_compiler_parser, iolist_to_binary(S)}};
         {error, _} = Error ->
@@ -171,9 +170,8 @@ render_block(Block, Template0, Vars, Options, Context) when is_map(Vars) ->
                         false ->
                             Vars
                     end,
-            Vars2 = add_debug_points_option(Vars1, Options1),
             % Render the specific block
-            {ok, template_compiler_runtime_internal:block_call({<<>>,1,1}, Block, Vars2, BlockMap, Runtime, Context)};
+            {ok, template_compiler_runtime_internal:block_call({<<>>,1,1}, Block, Vars1, BlockMap, Runtime, Context)};
         {error, {Loc, template_compiler_parser, S}} ->
             {error, {Loc, template_compiler_parser, iolist_to_binary(S)}};
         {error, _} = Error ->
@@ -209,11 +207,6 @@ maybe_wrap(RenderResult, [ok|Rest]) ->
 maybe_wrap(RenderResult, [{ok, Before, After}|Rest]) ->
     maybe_wrap([Before, RenderResult, After], Rest).
 
-add_debug_points_option(Vars, Options) ->
-    Vars#{
-        '$debug_points' => enabled_debug_points_map(get_option(debug_points, Options))
-    }.
-
 enabled_debug_points_map(all) ->
     all;
 enabled_debug_points_map(DebugPoints) when is_map(DebugPoints) ->
@@ -223,30 +216,11 @@ enabled_debug_points_map(DebugPoints) when is_list(DebugPoints) ->
 enabled_debug_points_map(_) ->
     #{}.
 
-debug_point_files_map(all) ->
-    all;
-debug_point_files_map(DebugPoints) when is_map(DebugPoints) ->
-    maps:fold(
-        fun
-            ({Filename, _Line, _Col}, _Value, Acc) ->
-                Acc#{ Filename => true };
-            (_Key, _Value, Acc) ->
-                Acc
-        end,
-        #{},
-        DebugPoints);
-debug_point_files_map(DebugPoints) when is_list(DebugPoints) ->
-    debug_point_files_map(enabled_debug_points_map(DebugPoints));
-debug_point_files_map(_) ->
-    #{}.
-
 normalize_options(Options) ->
     DebugPoints = enabled_debug_points_map(get_option(debug_points, Options)),
-    DebugPointFiles = debug_point_files_map(DebugPoints),
     [
-        {debug_points, DebugPoints},
-        {debug_point_files, DebugPointFiles}
-        | lists:keydelete(debug_point_files, 1, lists:keydelete(debug_points, 1, Options))
+        {debug_points, DebugPoints}
+        | lists:keydelete(debug_points, 1, Options)
     ].
 
 props_to_map([], Map) ->
@@ -345,9 +319,7 @@ get_option(runtime, Options) ->
 get_option(context_vars, Options) ->
     proplists:get_value(context_vars, Options, []);
 get_option(debug_points, Options) ->
-    proplists:get_value(debug_points, Options, []);
-get_option(debug_point_files, Options) ->
-    proplists:get_value(debug_point_files, Options, debug_point_files_map(get_option(debug_points, Options))).
+    proplists:get_value(debug_points, Options, []).
 
 %% @doc Find the module of a compiled template, if not yet compiled then
 %% compile the template.
@@ -369,6 +341,11 @@ flush() ->
 -spec flush_debug() -> ok.
 flush_debug() ->
     template_compiler_admin:flush_debug().
+
+%% @doc Force recheck of debug-compiled templates for a specific context name.
+-spec flush_debug(ContextName::term()) -> ok.
+flush_debug(ContextName) ->
+    template_compiler_admin:flush_debug(ContextName).
 
 %% @doc Ping that a template has been changed
 -spec flush_file(file:filename_all()) -> ok.
@@ -411,22 +388,24 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
         {ok, Tokens} ->
             Runtime = get_option(runtime, Options1),
             ContextVars = get_option(context_vars, Options1),
-            DebugPointFiles = get_option(debug_point_files, Options1),
-            IsDebugPoints = has_debug_points(Filename, DebugPointFiles),
+            DebugPoints = get_option(debug_points, Options1),
+            EnabledDebugPoints = enabled_debug_points_map(DebugPoints),
+            IsDebugPoints = is_enabled_debug_points(EnabledDebugPoints),
             Tokens1 = maybe_drop_text(Tokens, Tokens),
             Tokens2 = expand_translations(Tokens1, Runtime, Context),
             ContentChecksum = content_checksum(Tokens2),
             Module = module_name(Runtime, Filename, ContextVars),
             case erlang:module_loaded(Module) of
                 true ->
-                    case is_matching_module(Module, ContentChecksum, IsDebugPoints) of
+                    case is_matching_module(Module, ContentChecksum, EnabledDebugPoints, IsDebugPoints) of
                         true ->
+                            ok = template_compiler_admin:register(Filename, Options1, Context, Module),
                             {ok, Module};
                         false ->
-                            compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, IsDebugPoints, Tokens2, Options1, Context)
+                            compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, EnabledDebugPoints, IsDebugPoints, Tokens2, Options1, Context)
                     end;
                 false ->
-                    compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, IsDebugPoints, Tokens2, Options1, Context)
+                    compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, EnabledDebugPoints, IsDebugPoints, Tokens2, Options1, Context)
             end;
         {error, _} = Error ->
             Error
@@ -483,6 +462,13 @@ compiler_version() ->
 content_checksum(Tokens) ->
     crypto:hash(sha, term_to_binary(remove_srcpos(Tokens))).
 
+is_enabled_debug_points(all) ->
+    true;
+is_enabled_debug_points(DebugPoints) when is_map(DebugPoints) ->
+    map_size(DebugPoints) > 0;
+is_enabled_debug_points(_) ->
+    false.
+
 % Ensure that duplicate files have the same checksum by removing the filename.
 remove_srcpos(Tokens) ->
     [ {Token, V} || {Token, _SrcPos, V} <- Tokens ].
@@ -528,43 +514,44 @@ compile_forms(Filename, Forms) ->
             {error, {compile, Es, Ws}}
     end.
 
-is_matching_module(Module, ContentChecksum, IsDebugPoints) ->
+is_matching_module(Module, ContentChecksum, EnabledDebugPoints, IsDebugPoints) ->
     erlang:function_exported(Module, content_checksum, 0)
+        andalso erlang:function_exported(Module, enabled_debug_points, 0)
         andalso Module:is_debug_compiled() =:= IsDebugPoints
+        andalso Module:enabled_debug_points() =:= EnabledDebugPoints
         andalso Module:content_checksum() =:= ContentChecksum.
 
-compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, IsDebugPoints, Tokens, Options, Context) ->
+compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, EnabledDebugPoints, IsDebugPoints, Tokens, Options, Context) ->
     Runtime:trace_compile(Module, Filename, Options, Context),
     case compile_tokens(
             template_compiler_parser:parse(Tokens),
-            cs(Module, Filename, Options, Context, IsDebugPoints),
+            cs(Module, Filename, Options, Context, EnabledDebugPoints),
             Options)
     of
         {ok, {Extends, Includes, BlockAsts, TemplateAst, IsAutoid, DebugPoints}} ->
             Forms = template_compiler_module:compile(
                                 Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime,
-                                Extends, Includes, BlockAsts, {TemplateAst, DebugPoints, IsDebugPoints}),
-            compile_forms(Filename, Forms);
+                                Extends, Includes, BlockAsts, {TemplateAst, DebugPoints, EnabledDebugPoints, IsDebugPoints}),
+            case compile_forms(Filename, Forms) of
+                {ok, CompiledModule} = Ok ->
+                    ok = template_compiler_admin:register(Filename, Options, Context, CompiledModule),
+                    Ok;
+                {error, _} = Error ->
+                    Error
+            end;
         {error, _} = Error ->
             Error
     end.
 
-cs(Module, Filename, Options, Context, IsDebugPoints) ->
+cs(Module, Filename, Options, Context, EnabledDebugPoints) ->
     #cs{
         filename=Filename,
         module=Module,
         runtime=get_option(runtime, Options),
         context_vars=get_option(context_vars, Options),
-        is_debug_points=IsDebugPoints,
+        enabled_debug_points=EnabledDebugPoints,
         context=Context
     }.
-
-has_debug_points(_Filename, all) ->
-    true;
-has_debug_points(Filename, DebugPointFiles) when is_map(DebugPointFiles) ->
-    maps:is_key(Filename, DebugPointFiles);
-has_debug_points(_Filename, _) ->
-    false.
 
 compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState, _Options) ->
     case find_blocks(Elements) of

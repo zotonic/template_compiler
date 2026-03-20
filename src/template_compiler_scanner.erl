@@ -313,6 +313,30 @@ scan(<<$', T/binary>>, Scanned, {SourceRef, Row, Column}, {in_single_quote, Clos
 scan(<<$`, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_back_quote, Closer}) ->
     scan(T, Scanned, {SourceRef, Row, Column + 1}, {in_code, Closer});
 
+scan(<<"\r\n", T/binary>>, Scanned, {SourceRef, Row, _Column}, {in_double_quote, Closer}) ->
+    Scanned1 = append_char(Scanned, $\r),
+    Scanned2 = append_char(Scanned1, $\n),
+    scan(T, Scanned2, {SourceRef, Row + 1, 1}, {in_double_quote, Closer});
+
+scan(<<"\r\n", T/binary>>, Scanned, {SourceRef, Row, _Column}, {in_single_quote, Closer}) ->
+    Scanned1 = append_char(Scanned, $\r),
+    Scanned2 = append_char(Scanned1, $\n),
+    scan(T, Scanned2, {SourceRef, Row + 1, 1}, {in_single_quote, Closer});
+
+scan(<<"\r\n", T/binary>>, Scanned, {SourceRef, Row, _Column}, {in_back_quote, Closer}) ->
+    Scanned1 = append_char(Scanned, $\r),
+    Scanned2 = append_char(Scanned1, $\n),
+    scan(T, Scanned2, {SourceRef, Row + 1, 1}, {in_back_quote, Closer});
+
+scan(<<"\n", T/binary>>, Scanned, {SourceRef, Row, _Column}, {in_double_quote, Closer}) ->
+    scan(T, append_char(Scanned, $\n), {SourceRef, Row + 1, 1}, {in_double_quote, Closer});
+
+scan(<<"\n", T/binary>>, Scanned, {SourceRef, Row, _Column}, {in_single_quote, Closer}) ->
+    scan(T, append_char(Scanned, $\n), {SourceRef, Row + 1, 1}, {in_single_quote, Closer});
+
+scan(<<"\n", T/binary>>, Scanned, {SourceRef, Row, _Column}, {in_back_quote, Closer}) ->
+    scan(T, append_char(Scanned, $\n), {SourceRef, Row + 1, 1}, {in_back_quote, Closer});
+
 scan(<<H/utf8, T/binary>>, Scanned, {SourceRef, Row, Column}, {in_double_quote, Closer}) ->
     scan(T, append_char(Scanned, H), {SourceRef, Row, Column + 1}, {in_double_quote, Closer});
 
