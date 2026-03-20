@@ -23,6 +23,7 @@ groups() ->
         ,double_quote_slash_test
         ,back_quote_test
         ,back_quote_slash_test
+        ,multiline_string_token_position_test
         ]}].
 
 init_per_suite(Config) ->
@@ -67,6 +68,12 @@ back_quote_test(_Config) ->
 back_quote_slash_test(_Config) ->
     {ok, Bin} = template_compiler:render("quote_back_slash.tpl", #{}, [], undefined),
     <<"<pre>&#39;\\\\`foo\\\\`&#39;</pre>\\`bar\\`">> = iolist_to_binary(Bin),
+    ok.
+
+multiline_string_token_position_test(_Config) ->
+    Template = <<"{% print \"foo\nbar\" x %}">>,
+    {ok, Tokens} = template_compiler_scanner:scan(Template),
+    {identifier, {undefined, 2, 6}, <<"x">>} = lists:nth(4, Tokens),
     ok.
 
 test_data_dir(Config) ->

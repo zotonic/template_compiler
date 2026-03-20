@@ -58,5 +58,5 @@
         context_var = "Context" :: string(),
         context_vars = [] :: list(binary()),
         is_autoescape = false :: boolean(),
-        is_debug_points = false :: boolean()
+        enabled_debug_points = #{} :: all | map()
     }).

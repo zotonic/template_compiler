@@ -267,11 +267,8 @@ include_1(SrcPos, all, Template, Runtime, ContextVars, Vars, Context) ->
             Templates);
 include_1(SrcPos, Method, Template, Runtime, ContextVars, Vars, Context) ->
     {SrcFile, SrcLine, _SrcCol} = SrcPos,
-    DebugPoints = maps:get('$debug_points', Vars, #{}),
     Options = [
         {runtime, Runtime},
-        {debug_points, DebugPoints},
-        {debug_point_files, debug_point_files_map(DebugPoints)},
         {trace_position, SrcPos},
         {context_vars, ContextVars}
     ],
@@ -342,11 +339,8 @@ compose(SrcPos, Template, Args, Runtime, ContextVars, IsContextVars, Vars, Block
     end,
     BlockMap = lists:foldl(fun(Block, Acc) -> Acc#{ Block => [ {BlockModule, BlockFun} ] } end, #{}, BlockList),
     {SrcFile, SrcLine, _SrcCol} = SrcPos,
-    DebugPoints = maps:get('$debug_points', Vars1, #{}),
     Options = [
         {runtime, Runtime},
-        {debug_points, DebugPoints},
-        {debug_point_files, debug_point_files_map(DebugPoints)},
         {trace_position, SrcPos},
         {context_vars, ContextVars}
     ],
@@ -391,27 +385,12 @@ call(Module, Args, Vars, Context) ->
 
 -spec debug_checkpoint({binary(), integer(), integer()}, map(), atom(), term()) -> ok.
 debug_checkpoint(SrcPos, Vars, Runtime, Context) ->
-    case is_debug_enabled(SrcPos, Vars) of
-        true ->
-            Runtime:trace_debug(SrcPos, sanitize_debug_vars(Vars), Context);
-        false ->
-            ok
-    end.
+    Runtime:trace_debug(SrcPos, sanitize_debug_vars(Vars), Context).
 
 sanitize_debug_vars(Vars) when is_map(Vars) ->
-    maps:without(['$debug_points', '$autoid'], Vars);
+    maps:without(['$autoid'], Vars);
 sanitize_debug_vars(Vars) ->
     Vars.
-
-is_debug_enabled(_SrcPos, #{ '$debug_points' := all }) ->
-    true;
-is_debug_enabled(SrcPos, #{ '$debug_points' := DebugPoints }) when is_map(DebugPoints) ->
-    maps:is_key(SrcPos, DebugPoints);
-is_debug_enabled(_SrcPos, _Vars) ->
-    false.
-
-debug_point_files_map(DebugPoints) ->
-    template_compiler:debug_point_files_map(DebugPoints).
 
 
 

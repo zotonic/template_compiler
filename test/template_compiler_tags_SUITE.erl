@@ -23,6 +23,7 @@ groups() ->
         ,autoescape_test
         ,cycle_test
         ,spaceless_test
+        ,lib_tag_debug_points_test
         ]}].
 
 init_per_suite(Config) ->
@@ -83,6 +84,13 @@ cycle_test(_Config) ->
 spaceless_test(_Config) ->
     {ok, Bin1} = template_compiler:render("spaceless_tag.tpl", #{}, [], undefined),
     <<"a-<a> x<span>xxx </span></a>-b">> = iolist_to_binary(Bin1),
+    ok.
+
+lib_tag_debug_points_test(_Config) ->
+    {ok, TplFile} = template_compiler_runtime:map_template(<<"lib_tag.tpl">>, [], undefined),
+    Filename = element(3, TplFile),
+    {ok, Mod} = template_compiler:lookup(Filename, [], undefined),
+    [_Point] = Mod:debug_points(),
     ok.
 
 test_data_dir(Config) ->

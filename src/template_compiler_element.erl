@@ -731,9 +731,9 @@ maybe_add_include({string_literal, SrcPos, Text}, Method, IsCatinclude, Ws) ->
 maybe_add_include(_Token, _Method, _IsCatinclude, Ws) ->
     Ws.
 
-maybe_debug_element({Filename, Line, Column} = SrcPos, Ast, #cs{is_debug_points=IsDebugPoints, vars_var=VarsVar, runtime=Runtime, context_var=ContextVar}, Ws) ->
+maybe_debug_element({Filename, Line, Column} = SrcPos, Ast, #cs{enabled_debug_points=EnabledDebugPoints, vars_var=VarsVar, runtime=Runtime, context_var=ContextVar}, Ws) ->
     Ws1 = Ws#ws{debug_points = [ {Filename, Line, Column} | Ws#ws.debug_points ]},
-    case IsDebugPoints of
+    case is_enabled_debug_point(Line, Column, EnabledDebugPoints) of
         true ->
             DebugAst = merl:qquote(
                 template_compiler_utils:pos(SrcPos),
@@ -752,6 +752,11 @@ maybe_debug_element({Filename, Line, Column} = SrcPos, Ast, #cs{is_debug_points=
         false ->
             {Ws1, Ast}
     end.
+
+is_enabled_debug_point(_Line, _Column, all) ->
+    true;
+is_enabled_debug_point(Line, Column, DebugPoints) when is_map(DebugPoints) ->
+    maps:is_key({Line, Column}, DebugPoints).
 
 
 compose({_, SrcPos, _}, Template, ArgsList, IsContextVars, Blocks, #cs{runtime=Runtime, module=Module} = CState, Ws) ->
