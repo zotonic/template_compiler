@@ -220,6 +220,14 @@ scan(<<"_}-->", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_trans, <<"_}-
 scan(<<"_}", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_trans, <<"_}">>}) ->
     scan(T, [{close_trans, {SourceRef, Row, Column}, <<"_}">>} | Scanned], {SourceRef, Row, Column + 2}, in_text);
 
+scan(<<"\r\n", T/binary>>, Scanned, {SourceRef, Row, _Column}, {in_trans, Closer}) ->
+    Scanned1 = append_char(Scanned, $\r),
+    Scanned2 = append_char(Scanned1, $\n),
+    scan(T, Scanned2, {SourceRef, Row + 1, 1}, {in_trans, Closer});
+
+scan(<<"\n", T/binary>>, Scanned, {SourceRef, Row, _Column}, {in_trans, Closer}) ->
+    scan(T, append_char(Scanned, $\n), {SourceRef, Row + 1, 1}, {in_trans, Closer});
+
 scan(<<"<!--{#", T/binary>>, Scanned, {SourceRef, Row, Column}, in_text) ->
     scan(T, Scanned, {SourceRef, Row, Column + 6}, {in_comment, <<"#}-->">>});
 
