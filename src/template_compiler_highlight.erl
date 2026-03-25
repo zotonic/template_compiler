@@ -98,7 +98,12 @@ highlight_binary(Bin, Filename, DebugPoints) when is_binary(Bin) ->
         {ok, RawTokens} ->
             SourceIndex = source_index(Bin),
             Annotations = annotations(Bin, RawTokens, SourceIndex),
-            {ok, iolist_to_binary(render_document(Bin, SourceIndex, Annotations, debug_points_map(DebugPoints)))};
+            {ok, iolist_to_binary(render_document(
+                Bin,
+                SourceIndex,
+                Annotations,
+                debug_points_map(DebugPoints),
+                build_nav_events(RawTokens, SourceIndex)))};
         {error, _} = Error ->
             Error
     end.
@@ -262,15 +267,15 @@ split_annotation(#{start := Start, stop := Stop, kind := Kind}, #{lines := Lines
         [],
         lists:zip(Lines, Starts)).
 
-render_document(Bin, SourceIndex, Annotations, DebugPointMap) ->
-    Events = build_events(Annotations, DebugPointMap, SourceIndex),
+render_document(Bin, SourceIndex, Annotations, DebugPointMap, NavEvents) ->
+    Events = build_events(Annotations, DebugPointMap, NavEvents, SourceIndex),
     [
         <<"<pre class=\"template-compiler-highlight\" style=\"">>, ?STYLE_PRE, <<"\"><code>">>,
         render_lines(Bin, SourceIndex, Events, 1),
         <<"</code></pre>">>
     ].
 
-build_events(Annotations, DebugPointMap, SourceIndex) ->
+build_events(Annotations, DebugPointMap, NavEvents, SourceIndex) ->
     {OpenMap, CloseMap} = lists:foldl(
         fun(#{start := Start, stop := Stop, kind := Kind}, Acc) ->
             {OpenAcc, CloseAcc} = Acc,
@@ -282,10 +287,12 @@ build_events(Annotations, DebugPointMap, SourceIndex) ->
         {#{}, #{}},
         Annotations),
     DebugEvents = build_debug_events(DebugPointMap, SourceIndex),
+    NavEventMap = build_nav_event_map(NavEvents, SourceIndex),
     #{
         open => OpenMap,
         close => CloseMap,
-        checkbox => DebugEvents
+        checkbox => DebugEvents,
+        nav => NavEventMap
     }.
 
 build_debug_events(DebugPointMap, SourceIndex) when is_map(DebugPointMap) ->
@@ -303,6 +310,43 @@ build_debug_events(DebugPointMap, SourceIndex) when is_map(DebugPointMap) ->
         end,
         #{},
         DebugPointMap).
+
+build_nav_events(RawTokens, SourceIndex) ->
+    build_nav_events(RawTokens, SourceIndex, undefined, []).
+
+build_nav_events([], _SourceIndex, _TagPos, Acc) ->
+    lists:reverse(Acc);
+build_nav_events([{open_tag, SrcPos, _} | Rest], SourceIndex, _TagPos, Acc) ->
+    build_nav_events(Rest, SourceIndex, SrcPos, Acc);
+build_nav_events([{optional_keyword, _SrcPos, _} | Rest], SourceIndex, TagPos, Acc) ->
+    build_nav_events(Rest, SourceIndex, TagPos, Acc);
+build_nav_events([{all_keyword, _SrcPos, _} | Rest], SourceIndex, TagPos, Acc) ->
+    build_nav_events(Rest, SourceIndex, TagPos, Acc);
+build_nav_events([{include_keyword, _SrcPos, _} | Rest], SourceIndex, {_Filename, _Line, _Col} = TagPos, Acc) ->
+    build_nav_events(Rest, SourceIndex, undefined, [ {include, TagPos} | Acc ]);
+build_nav_events([{catinclude_keyword, _SrcPos, _} | Rest], SourceIndex, {_Filename, _Line, _Col} = TagPos, Acc) ->
+    build_nav_events(Rest, SourceIndex, undefined, [ {include, TagPos} | Acc ]);
+build_nav_events([{extends_keyword, _SrcPos, _} | Rest], SourceIndex, {_Filename, _Line, _Col} = TagPos, Acc) ->
+    build_nav_events(Rest, SourceIndex, undefined, [ {extends, TagPos} | Acc ]);
+build_nav_events([{overrules_keyword, _SrcPos, _} | Rest], SourceIndex, {_Filename, _Line, _Col} = TagPos, Acc) ->
+    build_nav_events(Rest, SourceIndex, undefined, [ {overrules, TagPos} | Acc ]);
+build_nav_events([{close_tag, _SrcPos, _} | Rest], SourceIndex, _TagPos, Acc) ->
+    build_nav_events(Rest, SourceIndex, undefined, Acc);
+build_nav_events([_ | Rest], SourceIndex, TagPos, Acc) ->
+    build_nav_events(Rest, SourceIndex, TagPos, Acc).
+
+build_nav_event_map(NavEvents, SourceIndex) ->
+    lists:foldl(
+        fun({Type, SrcPos}, Acc) ->
+            case safe_srcpos_to_offset(SourceIndex, SrcPos) of
+                {ok, Offset} ->
+                    map_prepend(Offset, nav_anchor(Type, SrcPos), Acc);
+                error ->
+                    Acc
+            end
+        end,
+        #{},
+        NavEvents).
 
 span_open(text) ->
     span_open_style(?STYLE_TEXT);
@@ -341,6 +385,15 @@ debug_checkbox({Filename, Line, Col}) ->
         <<"</label>">>
     ].
 
+nav_anchor(Type, {_Filename, Line, Col}) ->
+    [
+        <<"<span class=\"template-compiler-nav-anchor\" data-template-nav-enabled=\"1\" data-template-nav=\"">>,
+        atom_to_binary(Type, utf8),
+        <<"\" data-line=\"">>, integer_to_binary(Line),
+        <<"\" data-column=\"">>, integer_to_binary(Col),
+        <<"\"></span>">>
+    ].
+
 render_lines(_Bin, #{lines := [], starts := []}, _Events, _LineNo) ->
     [];
 render_lines(Bin, #{lines := [Line], starts := [Start]}, Events, LineNo) ->
@@ -370,18 +423,20 @@ render_segment(Line, Start, End, Cursor, [Pos | Rest], Events) ->
         render_segment(Line, Start, End, Pos, Rest, Events)
     ].
 
-emit_at(Pos, #{open := OpenMap, close := CloseMap, checkbox := CheckboxMap}) ->
+emit_at(Pos, #{open := OpenMap, close := CloseMap, checkbox := CheckboxMap, nav := NavMap}) ->
     [
         lists:reverse(maps:get(Pos, CloseMap, [])),
+        lists:reverse(maps:get(Pos, NavMap, [])),
         lists:reverse(maps:get(Pos, CheckboxMap, [])),
         lists:reverse(maps:get(Pos, OpenMap, []))
     ].
 
-relevant_positions(Start, End, #{open := OpenMap, close := CloseMap, checkbox := CheckboxMap}) ->
+relevant_positions(Start, End, #{open := OpenMap, close := CloseMap, checkbox := CheckboxMap, nav := NavMap}) ->
     lists:usort(
         [ Pos || Pos <- maps:keys(OpenMap), Start =< Pos, Pos =< End ] ++
         [ Pos || Pos <- maps:keys(CloseMap), Start =< Pos, Pos =< End ] ++
-        [ Pos || Pos <- maps:keys(CheckboxMap), Start =< Pos, Pos =< End ]).
+        [ Pos || Pos <- maps:keys(CheckboxMap), Start =< Pos, Pos =< End ] ++
+        [ Pos || Pos <- maps:keys(NavMap), Start =< Pos, Pos =< End ]).
 
 map_prepend(Key, Value, Map) ->
     Map#{ Key => [Value | maps:get(Key, Map, [])] }.
