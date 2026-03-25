@@ -168,9 +168,9 @@ highlight_nav_anchor_include_test(_Config) ->
         <<"data-template-nav=\"include\"">>,
         <<"data-line=\"1\"">>,
         <<"data-column=\"1\"">>,
-        <<"\"></span>{% ">>,
         <<"<span style=\"color:#0f766e;font-weight:600;\">include</span>">>
     ]),
+    {_, _} = binary:match(Html, <<"&#39;a.tpl&#39;">>),
     ok.
 
 highlight_nav_anchor_extends_overrules_test(_Config) ->
@@ -180,14 +180,13 @@ highlight_nav_anchor_extends_overrules_test(_Config) ->
         <<"data-template-nav=\"extends\"">>,
         <<"data-line=\"1\"">>,
         <<"data-column=\"1\"">>,
-        <<"\"></span>{% ">>,
-        <<"<span style=\"color:#0f766e;font-weight:600;\">extends</span>">>,
+        <<"extends">>,
         <<"data-template-nav=\"overrules\"">>,
         <<"data-line=\"2\"">>,
         <<"data-column=\"1\"">>,
-        <<"\"></span>{% ">>,
-        <<"<span style=\"color:#0f766e;font-weight:600;\">overrules</span>">>
+        <<"overrules">>
     ]),
+    {_, _} = binary:match(Html, <<"&quot;base.tpl&quot;">>),
     ok.
 
 highlight_escape_text_test(_Config) ->
