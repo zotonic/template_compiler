@@ -29,6 +29,8 @@ groups() ->
         ,highlight_trans_tag_test
         ,highlight_unicode_trans_tag_test
         ,highlight_single_quote_include_test
+        ,highlight_nav_anchor_include_test
+        ,highlight_nav_anchor_extends_overrules_test
         ,highlight_escape_text_test
         ,highlight_escape_string_literal_test
         ,highlight_module_test
@@ -156,6 +158,35 @@ highlight_single_quote_include_test(_Config) ->
     {_, _} = binary:match(Html, <<"include">>),
     {_, _} = binary:match(Html, <<"&#39;a.tpl&#39;">>),
     {_, _} = binary:match(Html, <<"%}">>),
+    ok.
+
+highlight_nav_anchor_include_test(_Config) ->
+    Template = <<"{% include 'a.tpl' %}">>,
+    {ok, Html} = template_compiler:highlight_binary(Template, <<"nav_include.tpl">>),
+    {_, _} = binary:match(Html, <<"template-compiler-nav-anchor">>),
+    assert_in_order(Html, [
+        <<"data-template-nav=\"include\"">>,
+        <<"data-line=\"1\"">>,
+        <<"data-column=\"1\"">>,
+        <<"<span style=\"color:#0f766e;font-weight:600;\">include</span>">>
+    ]),
+    {_, _} = binary:match(Html, <<"&#39;a.tpl&#39;">>),
+    ok.
+
+highlight_nav_anchor_extends_overrules_test(_Config) ->
+    Template = <<"{% extends \"base.tpl\" %}\n{% overrules %}">>,
+    {ok, Html} = template_compiler:highlight_binary(Template, <<"nav_extends_overrules.tpl">>),
+    assert_in_order(Html, [
+        <<"data-template-nav=\"extends\"">>,
+        <<"data-line=\"1\"">>,
+        <<"data-column=\"1\"">>,
+        <<"extends">>,
+        <<"data-template-nav=\"overrules\"">>,
+        <<"data-line=\"2\"">>,
+        <<"data-column=\"1\"">>,
+        <<"overrules">>
+    ]),
+    {_, _} = binary:match(Html, <<"&quot;base.tpl&quot;">>),
     ok.
 
 highlight_escape_text_test(_Config) ->
