@@ -103,7 +103,7 @@ highlight_binary(Bin, Filename, DebugPoints) when is_binary(Bin) ->
                 SourceIndex,
                 Annotations,
                 debug_points_map(DebugPoints),
-                build_nav_events(RawTokens, SourceIndex)))};
+                build_nav_events(RawTokens)))};
         {error, _} = Error ->
             Error
     end.
@@ -311,29 +311,29 @@ build_debug_events(DebugPointMap, SourceIndex) when is_map(DebugPointMap) ->
         #{},
         DebugPointMap).
 
-build_nav_events(RawTokens, SourceIndex) ->
-    build_nav_events(RawTokens, SourceIndex, undefined, []).
+build_nav_events(RawTokens) ->
+    build_nav_events(RawTokens, undefined, []).
 
-build_nav_events([], _SourceIndex, _TagPos, Acc) ->
+build_nav_events([], _TagPos, Acc) ->
     lists:reverse(Acc);
-build_nav_events([{open_tag, SrcPos, _} | Rest], SourceIndex, _TagPos, Acc) ->
-    build_nav_events(Rest, SourceIndex, SrcPos, Acc);
-build_nav_events([{optional_keyword, _SrcPos, _} | Rest], SourceIndex, TagPos, Acc) ->
-    build_nav_events(Rest, SourceIndex, TagPos, Acc);
-build_nav_events([{all_keyword, _SrcPos, _} | Rest], SourceIndex, TagPos, Acc) ->
-    build_nav_events(Rest, SourceIndex, TagPos, Acc);
-build_nav_events([{include_keyword, _SrcPos, _} | Rest], SourceIndex, {_Filename, _Line, _Col} = TagPos, Acc) ->
-    build_nav_events(Rest, SourceIndex, undefined, [ {include, TagPos} | Acc ]);
-build_nav_events([{catinclude_keyword, _SrcPos, _} | Rest], SourceIndex, {_Filename, _Line, _Col} = TagPos, Acc) ->
-    build_nav_events(Rest, SourceIndex, undefined, [ {include, TagPos} | Acc ]);
-build_nav_events([{extends_keyword, _SrcPos, _} | Rest], SourceIndex, {_Filename, _Line, _Col} = TagPos, Acc) ->
-    build_nav_events(Rest, SourceIndex, undefined, [ {extends, TagPos} | Acc ]);
-build_nav_events([{overrules_keyword, _SrcPos, _} | Rest], SourceIndex, {_Filename, _Line, _Col} = TagPos, Acc) ->
-    build_nav_events(Rest, SourceIndex, undefined, [ {overrules, TagPos} | Acc ]);
-build_nav_events([{close_tag, _SrcPos, _} | Rest], SourceIndex, _TagPos, Acc) ->
-    build_nav_events(Rest, SourceIndex, undefined, Acc);
-build_nav_events([_ | Rest], SourceIndex, TagPos, Acc) ->
-    build_nav_events(Rest, SourceIndex, TagPos, Acc).
+build_nav_events([{open_tag, SrcPos, _} | Rest], _TagPos, Acc) ->
+    build_nav_events(Rest, SrcPos, Acc);
+build_nav_events([{optional_keyword, _SrcPos, _} | Rest], TagPos, Acc) ->
+    build_nav_events(Rest, TagPos, Acc);
+build_nav_events([{all_keyword, _SrcPos, _} | Rest], TagPos, Acc) ->
+    build_nav_events(Rest, TagPos, Acc);
+build_nav_events([{include_keyword, _SrcPos, _} | Rest], {_Filename, _Line, _Col} = TagPos, Acc) ->
+    build_nav_events(Rest, undefined, [ {include, TagPos} | Acc ]);
+build_nav_events([{catinclude_keyword, _SrcPos, _} | Rest], {_Filename, _Line, _Col} = TagPos, Acc) ->
+    build_nav_events(Rest, undefined, [ {include, TagPos} | Acc ]);
+build_nav_events([{extends_keyword, _SrcPos, _} | Rest], {_Filename, _Line, _Col} = TagPos, Acc) ->
+    build_nav_events(Rest, undefined, [ {extends, TagPos} | Acc ]);
+build_nav_events([{overrules_keyword, _SrcPos, _} | Rest], {_Filename, _Line, _Col} = TagPos, Acc) ->
+    build_nav_events(Rest, undefined, [ {overrules, TagPos} | Acc ]);
+build_nav_events([{close_tag, _SrcPos, _} | Rest], _TagPos, Acc) ->
+    build_nav_events(Rest, undefined, Acc);
+build_nav_events([_ | Rest], TagPos, Acc) ->
+    build_nav_events(Rest, TagPos, Acc).
 
 build_nav_event_map(NavEvents, SourceIndex) ->
     lists:foldl(
@@ -388,7 +388,7 @@ debug_checkbox({Filename, Line, Col}) ->
 nav_anchor(Type, {_Filename, Line, Col}) ->
     [
         <<"<span class=\"template-compiler-nav-anchor\" data-template-nav-enabled=\"1\" data-template-nav=\"">>,
-        atom_to_binary(Type, utf8),
+        escape_attr(atom_to_binary(Type, utf8)),
         <<"\" data-line=\"">>, integer_to_binary(Line),
         <<"\" data-column=\"">>, integer_to_binary(Col),
         <<"\"></span>">>
