@@ -24,6 +24,8 @@ groups() ->
         ,back_quote_test
         ,back_quote_slash_test
         ,multiline_string_token_position_test
+        ,multiline_trans_literal_token_position_test
+        ,multiline_comment_token_position_test
         ]}].
 
 init_per_suite(Config) ->
@@ -74,6 +76,18 @@ multiline_string_token_position_test(_Config) ->
     Template = <<"{% print \"foo\nbar\" x %}">>,
     {ok, Tokens} = template_compiler_scanner:scan(Template),
     {identifier, {undefined, 2, 6}, <<"x">>} = lists:nth(4, Tokens),
+    ok.
+
+multiline_trans_literal_token_position_test(_Config) ->
+    Template = <<"{% print _\"foo\nbar\" x %}">>,
+    {ok, Tokens} = template_compiler_scanner:scan(Template),
+    {identifier, {undefined, 2, 6}, <<"x">>} = lists:nth(4, Tokens),
+    ok.
+
+multiline_comment_token_position_test(_Config) ->
+    Template = <<"{# foo\n#}{% print x %}">>,
+    {ok, Tokens} = template_compiler_scanner:scan(Template),
+    {identifier, {undefined, 2, 12}, <<"x">>} = lists:nth(3, Tokens),
     ok.
 
 test_data_dir(Config) ->

@@ -20,6 +20,7 @@ groups() ->
         [trans_test
         ,trans_escape_test
         ,trans_string_test
+        ,multiline_trans_text_token_position_test
         ]}].
 
 init_per_suite(Config) ->
@@ -52,6 +53,12 @@ trans_escape_test(_Config) ->
 trans_string_test(_Config) ->
     {ok, Bin1} = template_compiler:render("trans_string.tpl", #{}, [], undefined),
     <<"Hello">> = iolist_to_binary(Bin1),
+    ok.
+
+multiline_trans_text_token_position_test(_Config) ->
+    Template = <<"{_ foo\nbar _}{% print x %}">>,
+    {ok, Tokens} = template_compiler_scanner:scan(Template),
+    {identifier, {undefined, 2, 16}, <<"x">>} = lists:nth(6, Tokens),
     ok.
 
 test_data_dir(Config) ->
