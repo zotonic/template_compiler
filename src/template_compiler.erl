@@ -548,6 +548,7 @@ cs(Module, Filename, Options, Context, EnabledDebugPoints) ->
     #cs{
         filename=Filename,
         module=Module,
+        block_owner=Module,
         runtime=get_option(runtime, Options),
         context_vars=get_option(context_vars, Options),
         enabled_debug_points=EnabledDebugPoints,

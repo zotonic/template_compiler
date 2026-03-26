@@ -51,7 +51,8 @@
 %% @doc State for the compiler. Also records the current block's arguments variable, and context variable.
 -record(cs, {
         filename = <<>> :: binary(),
-        module = undefined :: undefined | block_owner(),
+        module = undefined :: atom(),
+        block_owner = undefined :: undefined | block_owner(),
         block = undefined :: atom(),
         blocks = [] :: list( {atom(), erl_syntax:syntaxTree(), #ws{}} ),
         runtime = template_compiler_runtime :: atom(),

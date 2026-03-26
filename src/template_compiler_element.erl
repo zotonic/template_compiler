@@ -157,7 +157,7 @@ compile({fragment, _Ident, _Elts}, _CState, Ws) ->
     {Ws, erl_syntax:abstract(<<>>)};
 compile({inherit, {_, _SrcPos, _}, _Args}, #cs{block=undefined}, Ws) ->
     {Ws, erl_syntax:abstract(<<>>)};
-compile({inherit, {_, SrcPos, _}, Args}, #cs{block=Block, module=Module} = CState, Ws) ->
+compile({inherit, {_, SrcPos, _}, Args}, #cs{block=Block, block_owner=BlockOwner} = CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
     IsContextVar = is_context_vars_arg(Args, CState),
     {Ws2, _CState1, PrefixAst, VarsVarName, ContextVarName} =
@@ -167,7 +167,7 @@ compile({inherit, {_, SrcPos, _}, Args}, #cs{block=Block, module=Module} = CStat
         erl_syntax:atom(block_inherit),
         [
             erl_syntax:abstract(SrcPos),
-            erl_syntax:abstract(Module),
+            erl_syntax:abstract(BlockOwner),
             erl_syntax:atom(Block),
             erl_syntax:variable(VarsVarName),
             erl_syntax:variable("Blocks"),
@@ -877,8 +877,8 @@ compile_use(SrcPos, Name, Args, BodyElts, CState, Ws) ->
             CallerBlocks = template_compiler:namespace_fragment_blocks(
                 Name,
                 [ Block || {block, _, _} = Block <- Elts ]),
-            CallerModule = {useblock, Name, SrcPos},
-            {_BlocksWs, BlocksAsts} = template_compiler:compile_blocks(CallerBlocks, CState#cs{module=CallerModule}),
+            CallerOwner = {useblock, Name, SrcPos},
+            {_BlocksWs, BlocksAsts} = template_compiler:compile_blocks(CallerBlocks, CState#cs{block_owner=CallerOwner}),
             BlockClauses = [
                 ?Q("(_@BlockName@, Vars, Blocks, Context) -> _@BlockAst")
                 || {BlockName, BlockAst, _BlockWs} <- BlocksAsts
@@ -890,12 +890,12 @@ compile_use(SrcPos, Name, Args, BodyElts, CState, Ws) ->
             BlockMapAst = ?Q(
                 "template_compiler_runtime_internal:merge_blocks("
                     "_@block_list,"
-                    "_@module,"
+                    "_@owner,"
                     "_@block_fun,"
                     "_@blocks)",
                 [
                     {block_list, BlockListAst},
-                    {module, erl_syntax:abstract(CallerModule)},
+                    {owner, erl_syntax:abstract(CallerOwner)},
                     {block_fun, BlockFunAst},
                     {blocks, erl_syntax:variable("Blocks")}
                 ]),
