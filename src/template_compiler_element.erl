@@ -153,22 +153,29 @@ compile({block, {identifier, SrcPos, Name}, _Elts}, CState, Ws) ->
     {value, {BlockName, _Tree, BlockWs}} = lists:keysearch(BlockName, 1, CState#cs.blocks),
     Ws1 = Ws#ws{is_forloop_var = Ws#ws.is_forloop_var or BlockWs#ws.is_forloop_var},
     maybe_debug_element(SrcPos, template_compiler_utils:set_pos(SrcPos, Ast), CState, Ws1);
-compile({inherit, {_, _SrcPos, _}}, #cs{block=undefined}, Ws) ->
+compile({fragment, _Ident, _Elts}, _CState, Ws) ->
     {Ws, erl_syntax:abstract(<<>>)};
-compile({inherit, {_, SrcPos, _}}, #cs{block=Block, module=Module} = CState, Ws) ->
-    Ast = erl_syntax:application(
-            erl_syntax:atom(template_compiler_runtime_internal),
-            erl_syntax:atom(block_inherit),
-            [
-                erl_syntax:abstract(SrcPos),
-                erl_syntax:atom(Module),
-                erl_syntax:atom(Block),
-                erl_syntax:variable(CState#cs.vars_var),
-                erl_syntax:variable("Blocks"),
-                erl_syntax:atom(CState#cs.runtime),
-                erl_syntax:variable(CState#cs.context_var)
-            ]),
-    maybe_debug_element(SrcPos, template_compiler_utils:set_pos(SrcPos, Ast), CState, Ws#ws{is_forloop_var=true});
+compile({inherit, {_, _SrcPos, _}, _Args}, #cs{block=undefined}, Ws) ->
+    {Ws, erl_syntax:abstract(<<>>)};
+compile({inherit, {_, SrcPos, _}, Args}, #cs{block=Block, module=Module} = CState, Ws) ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
+    IsContextVar = is_context_vars_arg(Args, CState),
+    {Ws2, _CState1, PrefixAst, VarsVarName, ContextVarName} =
+        use_setup_ast(SrcPos, ArgsList, IsContextVar, CState, Ws1),
+    Ast0 = erl_syntax:application(
+        erl_syntax:atom(template_compiler_runtime_internal),
+        erl_syntax:atom(block_inherit),
+        [
+            erl_syntax:abstract(SrcPos),
+            erl_syntax:abstract(Module),
+            erl_syntax:atom(Block),
+            erl_syntax:variable(VarsVarName),
+            erl_syntax:variable("Blocks"),
+            erl_syntax:atom(CState#cs.runtime),
+            erl_syntax:variable(ContextVarName)
+        ]),
+    Ast = maybe_wrap_use_ast(SrcPos, PrefixAst, template_compiler_utils:set_pos(SrcPos, Ast0)),
+    maybe_debug_element(SrcPos, Ast, CState, Ws2#ws{is_forloop_var=true});
 compile({'include', TagPos, Method, Template, Args}, CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
     IsContextVar = is_context_vars_arg(Args, CState),
@@ -213,6 +220,10 @@ compile({'call_with', {identifier, SrcPos, Name}, Expr}, CState, Ws) ->
             {context, erl_syntax:variable(CState#cs.context_var)}
         ]),
     maybe_debug_element(SrcPos, Ast, CState, Ws1);
+compile({use, {identifier, SrcPos, Name}, Args}, CState, Ws) ->
+    compile_use(SrcPos, Name, Args, undefined, CState, Ws);
+compile({useblock, {identifier, SrcPos, Name}, Args, Elts}, CState, Ws) ->
+    compile_use(SrcPos, Name, Args, Elts, CState, Ws);
 compile({'compose', {TagPos, Template, Args}, Blocks}, CState, Ws) ->
     {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
     IsContextVar = is_context_vars_arg(Args, CState),
@@ -843,6 +854,143 @@ catcompose({_, SrcPos, _}, Template, IdAst, ArgsList, IsContextVars, Blocks, #cs
         ]),
     Ws2 = maybe_add_include(Template, undefined, false, Ws1),
     maybe_debug_element(SrcPos, Ast, CState, Ws2).
+
+
+compile_use(SrcPos, Name, Args, BodyElts, CState, Ws) ->
+    {Ws1, ArgsList} = with_args(Args, CState, Ws, false),
+    IsContextVar = is_context_vars_arg(Args, CState),
+    FragmentName = template_compiler_utils:to_atom(Name),
+    {Ws2, CState1, PrefixAst, VarsVarName, ContextVarName} =
+        use_setup_ast(SrcPos, ArgsList, IsContextVar, CState, Ws1),
+    case BodyElts of
+        undefined ->
+            CallAst = use_block_call_ast(
+                SrcPos,
+                FragmentName,
+                erl_syntax:variable(VarsVarName),
+                erl_syntax:variable("Blocks"),
+                ContextVarName,
+                CState),
+            Ast = maybe_wrap_use_ast(SrcPos, PrefixAst, CallAst),
+            maybe_debug_element(SrcPos, Ast, CState, merge_fragment_ws(FragmentName, Ws2, CState));
+        Elts ->
+            CallerBlocks = template_compiler:namespace_fragment_blocks(
+                Name,
+                [ Block || {block, _, _} = Block <- Elts ]),
+            CallerModule = {useblock, Name, SrcPos},
+            {_BlocksWs, BlocksAsts} = template_compiler:compile_blocks(CallerBlocks, CState#cs{module=CallerModule}),
+            BlockClauses = [
+                ?Q("(_@BlockName@, Vars, Blocks, Context) -> _@BlockAst")
+                || {BlockName, BlockAst, _BlockWs} <- BlocksAsts
+            ] ++ [
+                ?Q("(_BlockName, _Vars, _Blocks, _Context) -> <<>>")
+            ],
+            BlockFunAst = erl_syntax:fun_expr(BlockClauses),
+            BlockListAst = erl_syntax:abstract([ BlockName || {BlockName, _, _} <- BlocksAsts ]),
+            BlockMapAst = ?Q(
+                "template_compiler_runtime_internal:merge_blocks("
+                    "_@block_list,"
+                    "_@module,"
+                    "_@block_fun,"
+                    "_@blocks)",
+                [
+                    {block_list, BlockListAst},
+                    {module, erl_syntax:abstract(CallerModule)},
+                    {block_fun, BlockFunAst},
+                    {blocks, erl_syntax:variable("Blocks")}
+                ]),
+            {Ws3, BodyAst} = compile(
+                useblock_body_elements(Elts),
+                CState1#cs{vars_var = VarsVarName, context_var = ContextVarName},
+                Ws2),
+            VarsWithBodyAst = erl_syntax:map_expr(
+                erl_syntax:variable(VarsVarName),
+                [ erl_syntax:map_field_assoc(erl_syntax:atom('_body'), BodyAst) ]),
+            CallAst = use_block_call_ast(
+                SrcPos,
+                FragmentName,
+                VarsWithBodyAst,
+                BlockMapAst,
+                ContextVarName,
+                CState),
+            Ast = maybe_wrap_use_ast(SrcPos, PrefixAst, CallAst),
+            maybe_debug_element(SrcPos, Ast, CState, merge_fragment_ws(FragmentName, Ws3, CState))
+    end.
+
+useblock_body_elements(Elts) ->
+    [ E || E <- Elts, not is_useblock_block(E) ].
+
+is_useblock_block({block, _, _}) ->
+    true;
+is_useblock_block(_) ->
+    false.
+
+use_setup_ast(_SrcPos, [], false, CState, Ws) ->
+    {Ws, CState, undefined, CState#cs.vars_var, CState#cs.context_var};
+use_setup_ast(SrcPos, ArgsList, IsContextVar, CState, Ws) ->
+    {CState1, Ws1} = template_compiler_utils:next_vars_var(CState, Ws),
+    VarsAst = template_compiler_utils:set_pos(
+        SrcPos,
+        erl_syntax:map_expr(
+            erl_syntax:variable(CState#cs.vars_var),
+            [ erl_syntax:map_field_assoc(WName, WExpr) || {WName, WExpr} <- ArgsList ])),
+    case IsContextVar of
+        true ->
+            {CState2, Ws2} = template_compiler_utils:next_context_var(CState1, Ws1),
+            ContextAst = erl_syntax:application(
+                erl_syntax:atom(CState#cs.runtime),
+                erl_syntax:atom(set_context_vars),
+                [
+                    erl_syntax:variable(CState1#cs.vars_var),
+                    erl_syntax:variable(CState#cs.context_var)
+                ]),
+            PrefixAsts = [
+                erl_syntax:match_expr(
+                    erl_syntax:variable(CState1#cs.vars_var),
+                    VarsAst),
+                erl_syntax:match_expr(
+                    erl_syntax:variable(CState2#cs.context_var),
+                    ContextAst)
+            ],
+            {Ws2, CState2, PrefixAsts, CState1#cs.vars_var, CState2#cs.context_var};
+        false ->
+            PrefixAsts = [
+                erl_syntax:match_expr(
+                    erl_syntax:variable(CState1#cs.vars_var),
+                    VarsAst)
+            ],
+            {Ws1, CState1, PrefixAsts, CState1#cs.vars_var, CState#cs.context_var}
+    end.
+
+use_block_call_ast(SrcPos, FragmentName, VarsAst, BlockMapAst, ContextVarName, CState) ->
+    template_compiler_utils:set_pos(
+        SrcPos,
+        erl_syntax:application(
+            erl_syntax:atom(template_compiler_runtime_internal),
+            erl_syntax:atom(block_call),
+            [
+                erl_syntax:abstract(SrcPos),
+                erl_syntax:atom(FragmentName),
+                VarsAst,
+                BlockMapAst,
+                erl_syntax:atom(CState#cs.runtime),
+                erl_syntax:variable(ContextVarName)
+            ])).
+
+maybe_wrap_use_ast(_SrcPos, undefined, CallAst) ->
+    CallAst;
+maybe_wrap_use_ast(SrcPos, PrefixAst, CallAst) ->
+    template_compiler_utils:set_pos(
+        SrcPos,
+        erl_syntax:block_expr(PrefixAst ++ [CallAst])).
+
+merge_fragment_ws(FragmentName, Ws, CState) ->
+    case lists:keysearch(FragmentName, 1, CState#cs.blocks) of
+        {value, {_BlockName, _Tree, BlockWs}} ->
+            Ws#ws{is_forloop_var = Ws#ws.is_forloop_var or BlockWs#ws.is_forloop_var};
+        false ->
+            Ws
+    end.
 
 
 expr_list(ExprList, CState, Ws) ->

@@ -29,6 +29,9 @@ groups() ->
         ,block_nested_filter_error_test
         ,compile_binary_stable_module_name_test
         ,block_render_test
+        ,extends_args_test
+        ,inherit_args_test
+        ,overrules_args_test
         ,raw_test
         ]}].
 
@@ -115,6 +118,24 @@ block_render_test(_Config) ->
     <<"A">> = iolist_to_binary(BinA),
     {ok, BinB} = template_compiler:render_block(b, "block_render.tpl", #{}, [], undefined),
     <<"B">> = iolist_to_binary(BinB),
+    ok.
+
+extends_args_test(_Config) ->
+    {ok, Bin} = template_compiler:render("extends_args_child.tpl", #{}, [], undefined),
+    <<"Hello World">> = iolist_to_binary(Bin),
+    ok.
+
+inherit_args_test(_Config) ->
+    {ok, Bin} = template_compiler:render("inherit_args_child.tpl", #{}, [], undefined),
+    <<"Bye Hello World">> = iolist_to_binary(Bin),
+    ok.
+
+overrules_args_test(Config) ->
+    Filename = filename:join([test_data_dir(Config), "overrules_args.tpl"]),
+    {ok, Mod} = template_compiler:lookup(Filename, [], undefined),
+    overrules = Mod:extends(),
+    {overrules, Vars, undefined} = Mod:extends_runtime(#{}, undefined),
+    <<"World">> = maps:get(who, Vars),
     ok.
 
 raw_test(_Config) ->

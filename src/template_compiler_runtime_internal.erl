@@ -25,6 +25,7 @@
     with_vars/3,
     block_call/6,
     block_inherit/7,
+    merge_blocks/4,
     include/9,
     compose/11,
     call/4,
@@ -171,17 +172,23 @@ block_call(SrcPos, Block, Vars, BlockMap, Runtime, Context) ->
     end.
 
 %% @doc Call the block function of the template the current module extends.
--spec block_inherit({binary(), integer(), integer()}, atom(), atom(), map(), map(), atom(), term()) -> term().
+-spec block_inherit({binary(), integer(), integer()}, term(), atom(), map(), map(), atom(), term()) -> term().
 block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
     case maps:find(Block, BlockMap) of
         {ok, Modules} ->
             case lists:dropwhile(
                     fun
-                        ({M, _F}) -> M =/= Module;
-                        (M) -> M =/= Module
-                    end, Modules)
+                        ({M, _F}) -> M =:= Module;
+                        (M) -> M =:= Module
+                    end,
+                    lists:dropwhile(
+                        fun
+                            ({M, _F}) -> M =/= Module;
+                            (M) -> M =/= Module
+                        end,
+                        Modules))
             of
-                [ _Module, Next | _ ] when is_atom(Next) ->
+                [ Next | _ ] when is_atom(Next) ->
                     case Runtime:trace_block(SrcPos, Block, Next, Context) of
                         ok ->
                             Next:render_block(Block, Vars, BlockMap, Context);
@@ -199,6 +206,15 @@ block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
             % No such block, return empty data.
             <<>>
     end.
+
+merge_blocks(BlockList, BlockModule, BlockFun, BlockMap) ->
+    lists:foldl(
+        fun(Block, Acc) ->
+            Existing = maps:get(Block, Acc, []),
+            Acc#{ Block => [ {BlockModule, BlockFun} | Existing ] }
+        end,
+        BlockMap,
+        BlockList).
 
 
 %% @doc Include a template.

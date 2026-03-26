@@ -64,6 +64,9 @@ Nonterminals
     BlockBlock
     BlockBraced
     EndBlockBraced
+    FragmentBlock
+    FragmentBraced
+    EndFragmentBraced
 
     CommentBlock
     CommentBraced
@@ -139,6 +142,8 @@ Nonterminals
 
     CallTag
     CallWithTag
+    UseTag
+    UseBlock
 
     CacheBlock
     CacheBraced
@@ -197,6 +202,7 @@ Terminals
     endcache_keyword
     endcomment_keyword
     endcompose_keyword
+    endfragment_keyword
     endfilter_keyword
     endfor_keyword
     endif_keyword
@@ -204,11 +210,13 @@ Terminals
     endifnotequal_keyword
     endjavascript_keyword
     endspaceless_keyword
+    enduseblock_keyword
     endwith_keyword
     equal
     extends_keyword
     filter_keyword
     for_keyword
+    fragment_keyword
     identifier
     if_keyword
     ifequal_keyword
@@ -238,6 +246,8 @@ Terminals
     spaceless_keyword
     string_literal
     text
+    use_keyword
+    useblock_keyword
     url_keyword
     with_keyword
     open_curly
@@ -277,11 +287,12 @@ Nonassoc 800 dot.
 Expect 7.
 
 Template -> ExtendsTag BlockElements : {extends, '$1', '$2'}.
-Template -> OverrulesTag BlockElements : {overrules, '$2'}.
+Template -> OverrulesTag BlockElements : {overrules, '$1', '$2'}.
 Template -> Elements : {base, '$1'}.
 
 BlockElements -> '$empty' : [].
 BlockElements -> BlockElements BlockBlock : '$1' ++ ['$2'].
+BlockElements -> BlockElements FragmentBlock : '$1' ++ ['$2'].
 BlockElements -> BlockElements text : '$1'.
 BlockElements -> BlockElements CommentBlock : '$1'.
 
@@ -290,6 +301,7 @@ Elements -> Elements text : '$1' ++ ['$2'].
 Elements -> Elements ValueBraced : '$1' ++ ['$2'].
 % Block elements containing other elements
 Elements -> Elements BlockBlock : '$1' ++ ['$2'].
+Elements -> Elements FragmentBlock : '$1' ++ ['$2'].
 Elements -> Elements FilterBlock : '$1' ++ ['$2'].
 Elements -> Elements ForBlock : '$1' ++ ['$2'].
 Elements -> Elements IfBlock : '$1' ++ ['$2'].
@@ -317,6 +329,8 @@ Elements -> Elements CycleTag : '$1' ++ ['$2'].
 Elements -> Elements CustomTag : '$1' ++ ['$2'].
 Elements -> Elements CallTag : '$1' ++ ['$2'].
 Elements -> Elements CallWithTag : '$1' ++ ['$2'].
+Elements -> Elements UseTag : '$1' ++ ['$2'].
+Elements -> Elements UseBlock : '$1' ++ ['$2'].
 Elements -> Elements UrlTag : '$1' ++ ['$2'].
 Elements -> Elements PrintTag : '$1' ++ ['$2'].
 Elements -> Elements ImageTag : '$1' ++ ['$2'].
@@ -330,9 +344,12 @@ ValueBraced -> open_var E OptWith close_var : {value, '$1', '$2', '$3'}.
 OptWith -> '$empty' : [].
 OptWith -> with_keyword Args : '$2'.
 
-ExtendsTag -> open_tag extends_keyword string_literal close_tag : '$3'.
-OverrulesTag -> open_tag overrules_keyword close_tag : overrules.
-InheritTag -> open_tag inherit_keyword close_tag : {inherit, '$1'}.
+ExtendsTag -> open_tag extends_keyword string_literal Args close_tag : {'$1', '$3', '$4'}.
+ExtendsTag -> open_tag extends_keyword string_literal with_keyword Args close_tag : {'$1', '$3', '$5'}.
+OverrulesTag -> open_tag overrules_keyword Args close_tag : {'$1', '$3'}.
+OverrulesTag -> open_tag overrules_keyword with_keyword Args close_tag : {'$1', '$4'}.
+InheritTag -> open_tag inherit_keyword Args close_tag : {inherit, '$1', '$3'}.
+InheritTag -> open_tag inherit_keyword with_keyword Args close_tag : {inherit, '$1', '$4'}.
 
 TransTag -> open_trans trans_text close_trans : '$2'.
 TransTag -> open_trans text close_trans : '$2'.
@@ -367,6 +384,10 @@ CatComposeBraced -> open_tag catcompose_keyword E E OptWith WithArgs close_tag :
 BlockBlock -> BlockBraced Elements EndBlockBraced : {block, '$1', '$2'}.
 BlockBraced -> open_tag block_keyword identifier close_tag : '$3'.
 EndBlockBraced -> open_tag endblock_keyword close_tag.
+
+FragmentBlock -> FragmentBraced Elements EndFragmentBraced : {fragment, '$1', '$2'}.
+FragmentBraced -> open_tag fragment_keyword identifier close_tag : '$3'.
+EndFragmentBraced -> open_tag endfragment_keyword close_tag.
 
 CommentBlock -> CommentBraced Elements EndCommentBraced.
 CommentBraced -> open_tag comment_keyword close_tag.
@@ -460,6 +481,10 @@ CustomTag -> open_tag identifier Args close_tag : {custom_tag, '$2', '$3'}.
 
 CallTag -> open_tag call_keyword identifier Args close_tag : {call, '$3', '$4'}.
 CallWithTag -> open_tag call_keyword identifier with_keyword E close_tag : {call_with, '$3', '$5'}.
+UseTag -> open_tag use_keyword identifier Args close_tag : {use, '$3', '$4'}.
+UseTag -> open_tag use_keyword identifier with_keyword Args close_tag : {use, '$3', '$5'}.
+UseBlock -> open_tag useblock_keyword identifier Args close_tag Elements open_tag enduseblock_keyword close_tag : {useblock, '$3', '$4', '$6'}.
+UseBlock -> open_tag useblock_keyword identifier with_keyword Args close_tag Elements open_tag enduseblock_keyword close_tag : {useblock, '$3', '$5', '$7'}.
 
 ImageTag -> open_tag image_keyword E Args close_tag : {image, '$2', '$3', '$4' }.
 ImageUrlTag -> open_tag image_url_keyword E Args close_tag : {image_url, '$2', '$3', '$4' }.
@@ -552,4 +577,3 @@ E -> Value : '$1'.
 
 Uminus -> '-' E : {expr, {'negate', '$1'}, '$2'}.
 Unot -> not_keyword E : {expr, {'not', '$1'}, '$2'}.
-

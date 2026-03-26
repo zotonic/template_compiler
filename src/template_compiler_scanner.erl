@@ -10,7 +10,7 @@
 %%% The MIT License
 %%%
 %%% Copyright (c) 2007 Roberto Saccon, Evan Miller
-%%% Copyright (c) 2009-2020 Marc Worrell
+%%% Copyright (c) 2009-2026 Marc Worrell
 %%%
 %%% Permission is hereby granted, free of charge, to any person obtaining a copy
 %%% of this software and associated documentation files (the "Software"), to deal
@@ -84,6 +84,7 @@ identifier_to_keyword({identifier, Pos, String}, {PrevToken, Acc})
         <<"for">>, <<"empty">>, <<"endfor">>, <<"in">>, <<"include">>,
         <<"catinclude">>, <<"block">>, <<"endblock">>, <<"extends">>, <<"overrules">>,
         <<"compose">>, <<"catcompose">>, <<"endcompose">>,
+        <<"fragment">>, <<"endfragment">>, <<"use">>, <<"useblock">>, <<"enduseblock">>,
         <<"inherit">>, <<"autoescape">>, <<"endautoescape">>, <<"if">>, <<"else">>,
         <<"elif">>, <<"elseif">>, <<"endif">>, <<"not">>, <<"or">>, <<"and">>, <<"xor">>,
         <<"comment">>, <<"endcomment">>, <<"cycle">>, <<"firstof">>, <<"ifchanged">>,
