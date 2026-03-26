@@ -212,6 +212,17 @@ block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
                                 After
                             ]
                     end;
+                [ {TraceModule, RenderFun} | _ ] when is_atom(TraceModule), is_function(RenderFun) ->
+                    case Runtime:trace_block(SrcPos, Block, TraceModule, Context) of
+                        ok ->
+                            RenderFun(Block, Vars, BlockMap, Context);
+                        {ok, Before, After} ->
+                            [
+                                Before,
+                                RenderFun(Block, Vars, BlockMap, Context),
+                                After
+                            ]
+                    end;
                 [ {_Owner, TraceModule, RenderFun} | _ ] when is_atom(TraceModule), is_function(RenderFun) ->
                     case Runtime:trace_block(SrcPos, Block, TraceModule, Context) of
                         ok ->
