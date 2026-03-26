@@ -31,6 +31,7 @@ groups() ->
         ,highlight_single_quote_include_test
         ,highlight_nav_anchor_include_test
         ,highlight_nav_anchor_extends_overrules_test
+        ,highlight_fragment_use_keywords_test
         ,highlight_escape_text_test
         ,highlight_escape_string_literal_test
         ,highlight_module_test
@@ -187,6 +188,18 @@ highlight_nav_anchor_extends_overrules_test(_Config) ->
         <<"overrules">>
     ]),
     {_, _} = binary:match(Html, <<"&quot;base.tpl&quot;">>),
+    ok.
+
+highlight_fragment_use_keywords_test(_Config) ->
+    Template = <<"{% fragment panel %}{% block title %}Base{% endblock %}{% endfragment %}{% use panel %}{% useblock panel %}{% block title %}X{% endblock %}Body{% enduseblock %}">>,
+    {ok, Html} = template_compiler:highlight_binary(Template, <<"fragment_keywords.tpl">>),
+    assert_in_order(Html, [
+        <<"<span style=\"color:#0f766e;font-weight:600;\">fragment</span>">>,
+        <<"<span style=\"color:#0f766e;font-weight:600;\">endfragment</span>">>,
+        <<"<span style=\"color:#0f766e;font-weight:600;\">use</span>">>,
+        <<"<span style=\"color:#0f766e;font-weight:600;\">useblock</span>">>,
+        <<"<span style=\"color:#0f766e;font-weight:600;\">enduseblock</span>">>
+    ]),
     ok.
 
 highlight_escape_text_test(_Config) ->
