@@ -820,7 +820,6 @@ block_elements({with, _, Elts}) -> Elts;
 block_elements({cache, _, Elts}) -> Elts;
 block_elements({javascript, _, Elts}) -> Elts;
 block_elements({filter, _, Elts}) -> Elts;
-block_elements({useblock, _, _, Elts}) -> Elts;
 block_elements(_) -> [].
 
 

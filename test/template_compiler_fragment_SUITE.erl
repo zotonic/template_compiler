@@ -21,6 +21,7 @@ groups() ->
         [fragment_use_test
         ,fragment_useblock_test
         ,fragment_useblock_blocks_test
+        ,fragment_useblock_compose_test
         ,fragment_useblock_multiple_fragments_test
         ,fragment_debug_points_test
         ,fragment_extends_same_name_blocks_test
@@ -55,6 +56,11 @@ fragment_useblock_test(_Config) ->
 fragment_useblock_blocks_test(_Config) ->
     {ok, Bin} = template_compiler:render("fragment_useblock_blocks.tpl", #{}, [], undefined),
     <<"<section>Caller Base<div>Body</div></section>">> = iolist_to_binary(Bin),
+    ok.
+
+fragment_useblock_compose_test(_Config) ->
+    {ok, Bin} = template_compiler:render("fragment_useblock_compose.tpl", #{}, [], undefined),
+    <<"<section>xB1y<div>Body</div></section>">> = iolist_to_binary(Bin),
     ok.
 
 fragment_useblock_multiple_fragments_test(_Config) ->

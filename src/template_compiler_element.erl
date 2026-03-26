@@ -891,11 +891,13 @@ compile_use(SrcPos, Name, Args, BodyElts, CState, Ws) ->
                 "template_compiler_runtime_internal:merge_blocks("
                     "_@block_list,"
                     "_@owner,"
+                    "_@trace_module,"
                     "_@block_fun,"
                     "_@blocks)",
                 [
                     {block_list, BlockListAst},
                     {owner, erl_syntax:abstract(CallerOwner)},
+                    {trace_module, erl_syntax:atom(CState#cs.module)},
                     {block_fun, BlockFunAst},
                     {blocks, erl_syntax:variable("Blocks")}
                 ]),

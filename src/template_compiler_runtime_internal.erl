@@ -25,7 +25,7 @@
     with_vars/3,
     block_call/6,
     block_inherit/7,
-    merge_blocks/4,
+    merge_blocks/5,
     include/9,
     compose/11,
     call/4,
@@ -155,8 +155,19 @@ block_call(SrcPos, Block, Vars, BlockMap, Runtime, Context) ->
                         After
                     ]
             end;
-        {ok, [{Module, RenderFun}|_]} when is_function(RenderFun) ->
-            case Runtime:trace_block(SrcPos, Block, Module, Context) of
+        {ok, [{TraceModule, RenderFun}|_]} when is_atom(TraceModule), is_function(RenderFun) ->
+            case Runtime:trace_block(SrcPos, Block, TraceModule, Context) of
+                ok ->
+                    RenderFun(Block, Vars, BlockMap, Context);
+                {ok, Before, After} ->
+                    [
+                        Before,
+                        RenderFun(Block, Vars, BlockMap, Context),
+                        After
+                    ]
+            end;
+        {ok, [{_Owner, TraceModule, RenderFun}|_]} when is_atom(TraceModule), is_function(RenderFun) ->
+            case Runtime:trace_block(SrcPos, Block, TraceModule, Context) of
                 ok ->
                     RenderFun(Block, Vars, BlockMap, Context);
                 {ok, Before, After} ->
@@ -178,11 +189,13 @@ block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
         {ok, Modules} ->
             case lists:dropwhile(
                     fun
+                        ({M, _TraceModule, _F}) -> M =:= Module;
                         ({M, _F}) -> M =:= Module;
                         (M) -> M =:= Module
                     end,
                     lists:dropwhile(
                         fun
+                            ({M, _TraceModule, _F}) -> M =/= Module;
                             ({M, _F}) -> M =/= Module;
                             (M) -> M =/= Module
                         end,
@@ -199,6 +212,17 @@ block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
                                 After
                             ]
                     end;
+                [ {_Owner, TraceModule, RenderFun} | _ ] when is_atom(TraceModule), is_function(RenderFun) ->
+                    case Runtime:trace_block(SrcPos, Block, TraceModule, Context) of
+                        ok ->
+                            RenderFun(Block, Vars, BlockMap, Context);
+                        {ok, Before, After} ->
+                            [
+                                Before,
+                                RenderFun(Block, Vars, BlockMap, Context),
+                                After
+                            ]
+                    end;
                 [] ->
                     <<>>
             end;
@@ -207,11 +231,11 @@ block_inherit(SrcPos, Module, Block, Vars, BlockMap, Runtime, Context) ->
             <<>>
     end.
 
-merge_blocks(BlockList, BlockModule, BlockFun, BlockMap) ->
+merge_blocks(BlockList, BlockOwner, TraceModule, BlockFun, BlockMap) ->
     lists:foldl(
         fun(Block, Acc) ->
             Existing = maps:get(Block, Acc, []),
-            Acc#{ Block => [ {BlockModule, BlockFun} | Existing ] }
+            Acc#{ Block => [ {BlockOwner, TraceModule, BlockFun} | Existing ] }
         end,
         BlockMap,
         BlockList).
