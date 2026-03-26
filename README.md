@@ -174,48 +174,6 @@ Context = your_request_context,     % Context passed to the runtime module and f
 The `template_compiler:render/4` function looks up the template, ensures it is compiled, and then
 calls the compiled render function of the template or the templates it extends (which are also compiled etc.).
 
-#### Debug options
-
-Templates can optionally be compiled with specific debug checkpoints enabled:
-
-```erlang
-Options = [
-    {debug_points, [
-        {3, 5}
-    ]}
-].
-```
-
-The supported debug-related options are:
-
- * `{debug_points, all | [{Line, Column}] | map()}` selects which checkpoints are compiled into the current template module.
-   Lists are internally converted to a map for quick lookup.
-   This option is meant for explicit compilation via `compile_file/3` or `compile_binary/4`.
-   Rendering does not automatically recompile a template when this option changes.
-   When the option is empty (the default), templates are compiled without debug checkpoints.
-
-All possible checkpoints are always still available through the compiled module metadata, even when no
-debug checkpoints are enabled in the generated code.
-
-When a compiled debug checkpoint is hit, the runtime callback `trace_debug(SrcPos, Vars, Context)` is called.
-`Vars` contains the current template variables at that point, and `SrcPos` contains the source filename,
-line and column of the checkpoint.
-
-Compiled template modules expose these debug-related callbacks:
-
- * `debug_points/0` returns all possible `{Filename, Line, Column}` checkpoints in the module.
- * `enabled_debug_points/0` returns the enabled checkpoint subset used when compiling the module as `{Line, Column}` keys.
- * `is_debug_compiled/0` returns `true` if the template was compiled with one or more debug checkpoints enabled.
-
-To enable or disable checkpoints for a specific template, recompile that template explicitly with the
-desired `debug_points` option. This is a per-template operation. Included or composed templates keep
-their own compile-time debug configuration and must be recompiled separately if you want debug checkpoints
-inside those templates as well.
-
-After a debugging session, `template_compiler:flush_debug/0` can be used to clear all cached
-modules that are compiled with debug checkpoints enabled. The next render of those templates
-recompiles them without debug checkpoints.
-
 
 #### Compile a template to a module
 
@@ -284,10 +242,53 @@ The template_compiler parses the templates till their _Form_ format and then cal
 is not changed from the previous compilation then the _Form_ is not compiled, sparing valuable processing time.
 
 
+#### Debug options
+
+Templates can optionally be compiled with specific debug checkpoints enabled:
+
+```erlang
+Options = [
+    {debug_points, [
+        {3, 5}
+    ]}
+].
+```
+
+The supported debug-related options are:
+
+ * `{debug_points, all | [{Line, Column}] | map()}` selects which checkpoints are compiled into the current template module.
+   Lists are internally converted to a map for quick lookup.
+   This option is meant for explicit compilation via `compile_file/3` or `compile_binary/4`.
+   Rendering does not automatically recompile a template when this option changes.
+   When the option is empty (the default), templates are compiled without debug checkpoints.
+
+All possible checkpoints are always still available through the compiled module metadata, even when no
+debug checkpoints are enabled in the generated code.
+
+When a compiled debug checkpoint is hit, the runtime callback `trace_debug(SrcPos, Vars, Context)` is called.
+`Vars` contains the current template variables at that point, and `SrcPos` contains the source filename,
+line and column of the checkpoint.
+
+Compiled template modules expose these debug-related callbacks:
+
+ * `debug_points/0` returns all possible `{Filename, Line, Column}` checkpoints in the module.
+ * `enabled_debug_points/0` returns the enabled checkpoint subset used when compiling the module as `{Line, Column}` keys.
+ * `is_debug_compiled/0` returns `true` if the template was compiled with one or more debug checkpoints enabled.
+
+To enable or disable checkpoints for a specific template, recompile that template explicitly with the
+desired `debug_points` option. This is a per-template operation. Included or composed templates keep
+their own compile-time debug configuration and must be recompiled separately if you want debug checkpoints
+inside those templates as well.
+
+After a debugging session, `template_compiler:flush_debug/0` can be used to clear all cached
+modules that are compiled with debug checkpoints enabled. The next render of those templates
+recompiles them without debug checkpoints.
+
+
 Template language and Tags
 ==========================
 
-**For more complete documentation see Zotonic: http://docs.zotonic.com/en/latest/developer-guide/templates.html**
+**For more complete documentation see Zotonic: https://docs.zotonic.com/en/latest/developer-guide/templates.html**
 
 Below is a short list of tags and explanation of template include / extend.
 
