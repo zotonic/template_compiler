@@ -40,7 +40,8 @@
     is_enabled_debug_points/1,
     is_template_module/1,
     translations/1,
-    compile_blocks/2
+    compile_blocks/2,
+    namespace_fragment_blocks/2
     ]).
 
 -include_lib("syntax_tools/include/merl.hrl").
@@ -124,20 +125,20 @@ render(Template0, BlockMap0, Vars, Options, Context) when is_map(Vars) ->
     Template = normalize_template(Template0),
     Runtime = proplists:get_value(runtime, Options1, template_compiler_runtime),
     case block_lookup(Runtime:map_template(Template, Vars, Context), BlockMap0, [], [], Options1, Vars, Runtime, Context) of
-        {ok, BaseModule, ExtendsStack, BlockMap, OptDebugWrap} ->
+        {ok, BaseModule, ExtendsStack, BlockMap, OptDebugWrap, VarsResolved, ContextResolved} ->
             % Start with the render function of the "base" template
             % Optionally add the unique prefix for this rendering.
             Vars1 = case BaseModule:is_autoid()
                         orelse lists:any(fun(M) -> M:is_autoid() end, ExtendsStack)
                     of
                         true ->
-                            Vars#{
+                            VarsResolved#{
                                 '$autoid' => template_compiler_runtime_internal:unique()
                             };
                         false ->
-                            Vars
+                            VarsResolved
                     end,
-            {ok, maybe_wrap(BaseModule:render(Vars1, BlockMap, Context), OptDebugWrap)};
+            {ok, maybe_wrap(BaseModule:render(Vars1, BlockMap, ContextResolved), OptDebugWrap)};
         {error, {Loc, template_compiler_parser, S}} ->
             {error, {Loc, template_compiler_parser, iolist_to_binary(S)}};
         {error, _} = Error ->
@@ -158,20 +159,20 @@ render_block(Block, Template0, Vars, Options, Context) when is_map(Vars) ->
     Template = normalize_template(Template0),
     Runtime = proplists:get_value(runtime, Options1, template_compiler_runtime),
     case block_lookup(Runtime:map_template(Template, Vars, Context), #{}, [], [], Options1, Vars, Runtime, Context) of
-        {ok, BaseModule, ExtendsStack, BlockMap, _OptDebugWrap} ->
+        {ok, BaseModule, ExtendsStack, BlockMap, _OptDebugWrap, VarsResolved, ContextResolved} ->
             % Optionally add the unique prefix for this rendering.
             Vars1 = case BaseModule:is_autoid()
                         orelse lists:any(fun(M) -> M:is_autoid() end, ExtendsStack)
                     of
                         true ->
-                            Vars#{
+                            VarsResolved#{
                                 '$autoid' => template_compiler_runtime_internal:unique()
                             };
                         false ->
-                            Vars
+                            VarsResolved
                     end,
             % Render the specific block
-            {ok, template_compiler_runtime_internal:block_call({<<>>,1,1}, Block, Vars1, BlockMap, Runtime, Context)};
+            {ok, template_compiler_runtime_internal:block_call({<<>>,1,1}, Block, Vars1, BlockMap, Runtime, ContextResolved)};
         {error, {Loc, template_compiler_parser, S}} ->
             {error, {Loc, template_compiler_parser, iolist_to_binary(S)}};
         {error, _} = Error ->
@@ -277,24 +278,24 @@ block_lookup({ok, TplFile}, BlockMap, ExtendsStack, DebugTrace, Options, Vars, R
                 false ->
                     % Check extended/overruled templates (build block map)
                     BlockMap1 = add_blocks(Module:blocks(), Module, BlockMap),
-                    case Module:extends() of
-                        undefined ->
-                            {ok, Module, ExtendsStack, BlockMap1, [Trace|DebugTrace]};
-                        overrules ->
+                    case Module:extends_runtime(Vars, Context) of
+                        {undefined, Vars1, Context1} ->
+                            {ok, Module, ExtendsStack, BlockMap1, [Trace|DebugTrace], Vars1, Context1};
+                        {overrules, Vars1, Context1} ->
                             Options1 = [
                                 {trace_position, {TplFilename, 0, 0}}
                                 | lists:keydelete(trace_position, 1, Options)
                             ],
                             Template = TplFile#template_file.template,
-                            Next = Runtime:map_template({overrules, Template, Module:filename()}, Vars, Context),
-                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options1, Vars, Runtime, Context);
-                        Extends when is_binary(Extends) ->
+                            Next = Runtime:map_template({overrules, Template, Module:filename()}, Vars1, Context1),
+                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options1, Vars1, Runtime, Context1);
+                        {Extends, Vars1, Context1} when is_binary(Extends) ->
                             Options1 = [
                                 {trace_position, {TplFilename, 0, 0}}
                                 | lists:keydelete(trace_position, 1, Options)
                             ],
-                            Next = Runtime:map_template(Extends, Vars, Context),
-                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options1, Vars, Runtime, Context)
+                            Next = Runtime:map_template(Extends, Vars1, Context1),
+                            block_lookup(Next, BlockMap1, [Module|ExtendsStack], [Trace|DebugTrace], Options1, Vars1, Runtime, Context1)
                     end
             end;
         {error, _} = Error ->
@@ -528,10 +529,10 @@ compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, EnabledDebug
             cs(Module, Filename, Options, Context, EnabledDebugPoints),
             Options)
     of
-        {ok, {Extends, Includes, BlockAsts, TemplateAst, IsAutoid, DebugPoints}} ->
+        {ok, {Extends, ExtendsRuntimeAst, Includes, BlockAsts, TemplateAst, IsAutoid, DebugPoints}} ->
             Forms = template_compiler_module:compile(
                                 Module, Filename, Mtime, ContentChecksum, IsAutoid, Runtime,
-                                Extends, Includes, BlockAsts, {TemplateAst, DebugPoints, EnabledDebugPoints, IsDebugPoints}),
+                                {Extends, ExtendsRuntimeAst}, Includes, BlockAsts, {TemplateAst, DebugPoints, EnabledDebugPoints, IsDebugPoints}),
             case compile_forms(Filename, Forms) of
                 {ok, CompiledModule} = Ok ->
                     ok = template_compiler_admin:register(Filename, Options, Context, CompiledModule),
@@ -547,25 +548,30 @@ cs(Module, Filename, Options, Context, EnabledDebugPoints) ->
     #cs{
         filename=Filename,
         module=Module,
+        block_owner=Module,
         runtime=get_option(runtime, Options),
         context_vars=get_option(context_vars, Options),
         enabled_debug_points=EnabledDebugPoints,
         context=Context
     }.
 
-compile_tokens({ok, {extends, {string_literal, _, Extend}, Elements}}, CState, _Options) ->
+compile_tokens({ok, {extends, {_TagPos, {string_literal, _, Extend}, ExtendsArgs}, Elements}}, CState, _Options) ->
     case find_blocks(Elements) of
         {ok, Blocks} ->
             {Ws, BlockAsts} = compile_blocks(Blocks, CState),
-            {ok, {Extend, Ws#ws.includes, BlockAsts, undefined, Ws#ws.is_autoid_var, collect_debug_points(undefined, BlockAsts)}};
+            {Ws1, ExtendsRuntimeAst} = compile_extends_runtime_ast(Extend, ExtendsArgs, CState),
+            Ws2 = merge_ws(Ws, Ws1),
+            {ok, {Extend, ExtendsRuntimeAst, Ws2#ws.includes, BlockAsts, undefined, Ws2#ws.is_autoid_var, collect_debug_points(undefined, BlockAsts)}};
         {error, _} = Error ->
             Error
     end;
-compile_tokens({ok, {overrules, Elements}}, CState, _Options) ->
+compile_tokens({ok, {overrules, {_TagPos, OverrulesArgs}, Elements}}, CState, _Options) ->
     case find_blocks(Elements) of
         {ok, Blocks} ->
             {Ws, BlockAsts} = compile_blocks(Blocks, CState),
-            {ok, {overrules, Ws#ws.includes, BlockAsts, undefined, Ws#ws.is_autoid_var, collect_debug_points(undefined, BlockAsts)}};
+            {Ws1, ExtendsRuntimeAst} = compile_extends_runtime_ast(overrules, OverrulesArgs, CState),
+            Ws2 = merge_ws(Ws, Ws1),
+            {ok, {overrules, ExtendsRuntimeAst, Ws2#ws.includes, BlockAsts, undefined, Ws2#ws.is_autoid_var, collect_debug_points(undefined, BlockAsts)}};
         {error, _} = Error ->
             Error
     end;
@@ -575,7 +581,7 @@ compile_tokens({ok, {base, Elements}}, CState, _Options) ->
             {Ws, BlockAsts} = compile_blocks(Blocks, CState),
             CStateElts = CState#cs{blocks = BlockAsts},
             {Ws1, TemplateAsts} = template_compiler_element:compile(Elements, CStateElts, Ws),
-            {ok, {undefined, Ws1#ws.includes, BlockAsts, TemplateAsts, Ws1#ws.is_autoid_var, collect_debug_points(Ws1, BlockAsts)}};
+            {ok, {undefined, default_extends_runtime_ast(undefined, CState), Ws1#ws.includes, BlockAsts, TemplateAsts, Ws1#ws.is_autoid_var, collect_debug_points(Ws1, BlockAsts)}};
         {error, _} = Error ->
             Error
     end;
@@ -609,6 +615,124 @@ compile_tokens({error, {Loc, template_compiler_parser, Msg}}, #cs{ filename = Fi
 compile_tokens({error, _} = Error, _CState, _Options) ->
     Error.
 
+default_extends_runtime_ast(Extends, CState) ->
+    erl_syntax:tuple([
+        erl_syntax:abstract(Extends),
+        erl_syntax:variable(CState#cs.vars_var),
+        erl_syntax:variable(CState#cs.context_var)
+    ]).
+
+compile_extends_runtime_ast(Extends, [], CState) ->
+    {#ws{}, default_extends_runtime_ast(Extends, CState)};
+compile_extends_runtime_ast(Extends, Args, CState) ->
+    {Ws1, ArgsList} = compile_with_args(Args, CState, #ws{}),
+    VarsVarName = "VarsExtends",
+    VarsAst = erl_syntax:map_expr(
+        erl_syntax:variable(CState#cs.vars_var),
+        [ erl_syntax:map_field_assoc(WName, WExpr) || {WName, WExpr} <- ArgsList ]),
+    PrefixAsts = [
+        erl_syntax:match_expr(
+            erl_syntax:variable(VarsVarName),
+            VarsAst)
+    ],
+    case is_context_vars_arg(Args, CState) of
+        true ->
+            ContextVarName = "ContextExtends",
+            ContextAst = erl_syntax:application(
+                erl_syntax:atom(CState#cs.runtime),
+                erl_syntax:atom(set_context_vars),
+                [
+                    erl_syntax:variable(VarsVarName),
+                    erl_syntax:variable(CState#cs.context_var)
+                ]),
+            Ast = erl_syntax:block_expr(
+                PrefixAsts ++
+                [
+                    erl_syntax:match_expr(
+                        erl_syntax:variable(ContextVarName),
+                        ContextAst),
+                    erl_syntax:tuple([
+                        erl_syntax:abstract(Extends),
+                        erl_syntax:variable(VarsVarName),
+                        erl_syntax:variable(ContextVarName)
+                    ])
+                ]),
+            {Ws1, Ast};
+        false ->
+            Ast = erl_syntax:block_expr(
+                PrefixAsts ++
+                [
+                    erl_syntax:tuple([
+                        erl_syntax:abstract(Extends),
+                        erl_syntax:variable(VarsVarName),
+                        erl_syntax:variable(CState#cs.context_var)
+                    ])
+                ]),
+            {Ws1, Ast}
+    end.
+
+compile_with_args(With, CState, Ws) ->
+    lists:foldl(
+        fun
+            ({Ident, true}, {WsAcc, Acc}) ->
+                VarAst = erl_syntax:atom(ident_as_atom(Ident)),
+                {WsAcc, [{VarAst, erl_syntax:atom(true)}|Acc]};
+            ({Ident, Expr}, {WsAcc, Acc}) ->
+                {Ws1, ExprAst} = template_compiler_expr:compile(Expr, CState, WsAcc),
+                VarAst = erl_syntax:atom(ident_as_atom(Ident)),
+                {Ws1, [{VarAst, ExprAst}|Acc]}
+        end,
+        {Ws, []},
+        With).
+
+is_context_vars_arg(Args, CState) when is_list(Args) ->
+    lists:any(
+        fun
+            ({{identifier, _, Ident}, _Val}) ->
+                lists:member(Ident, CState#cs.context_vars)
+        end,
+        Args).
+
+ident_as_atom({identifier, _SrcPos, Ident}) ->
+    template_compiler_utils:to_atom(Ident).
+
+merge_ws(WsA, WsB) ->
+    WsA#ws{
+        nr = erlang:max(WsA#ws.nr, WsB#ws.nr),
+        custom_tags = WsA#ws.custom_tags ++ WsB#ws.custom_tags,
+        is_forloop_var = WsA#ws.is_forloop_var orelse WsB#ws.is_forloop_var,
+        is_autoid_var = WsA#ws.is_autoid_var orelse WsB#ws.is_autoid_var,
+        includes = WsA#ws.includes ++ WsB#ws.includes,
+        debug_points = WsA#ws.debug_points ++ WsB#ws.debug_points
+    }.
+
+namespace_fragment_blocks(FragmentName, Elements) ->
+    [ namespace_fragment_element(FragmentName, E) || E <- Elements ].
+
+namespace_fragment_element(FragmentName, {block, {identifier, Pos, Name}, Elts}) ->
+    {block, {identifier, Pos, namespaced_fragment_block_name(FragmentName, Name)}, namespace_fragment_blocks(FragmentName, Elts)};
+namespace_fragment_element(FragmentName, {for, Expr, Loop, Empty}) ->
+    {for, Expr, namespace_fragment_blocks(FragmentName, Loop), namespace_fragment_blocks(FragmentName, Empty)};
+namespace_fragment_element(FragmentName, {'if', Expr, If, Else}) ->
+    {'if', Expr, namespace_fragment_blocks(FragmentName, If), namespace_fragment_blocks(FragmentName, Else)};
+namespace_fragment_element(FragmentName, {spaceless, Expr, Elts}) ->
+    {spaceless, Expr, namespace_fragment_blocks(FragmentName, Elts)};
+namespace_fragment_element(FragmentName, {autoescape, Expr, Elts}) ->
+    {autoescape, Expr, namespace_fragment_blocks(FragmentName, Elts)};
+namespace_fragment_element(FragmentName, {with, Expr, Elts}) ->
+    {with, Expr, namespace_fragment_blocks(FragmentName, Elts)};
+namespace_fragment_element(FragmentName, {cache, Expr, Elts}) ->
+    {cache, Expr, namespace_fragment_blocks(FragmentName, Elts)};
+namespace_fragment_element(FragmentName, {javascript, Expr, Elts}) ->
+    {javascript, Expr, namespace_fragment_blocks(FragmentName, Elts)};
+namespace_fragment_element(FragmentName, {filter, Expr, Elts}) ->
+    {filter, Expr, namespace_fragment_blocks(FragmentName, Elts)};
+namespace_fragment_element(_FragmentName, Element) ->
+    Element.
+
+namespaced_fragment_block_name(FragmentName, Name) ->
+    <<FragmentName/binary, "$", Name/binary>>.
+
 split_loc({Filename, Line, Col}) ->
     #{
         at => Filename,
@@ -641,6 +765,11 @@ compile_blocks(Blocks, CState) ->
 %% @doc Compile a block definition to a function name and its body elements.
 -spec compile_block(block_element(), #cs{}, #ws{}) -> {#ws{}, {atom(), erl_syntax:syntaxTree(), #ws{}}}.
 compile_block({block, {identifier, _Pos, Name}, Elts}, CState, Ws) ->
+    compile_named_block(Name, Elts, CState, Ws);
+compile_block({fragment, {identifier, _Pos, Name}, Elts}, CState, Ws) ->
+    compile_named_block(Name, Elts, CState, Ws).
+
+compile_named_block(Name, Elts, CState, Ws) ->
     BlockName = template_compiler_utils:to_atom(Name),
     {Ws1, Body} = template_compiler_element:compile(Elts, CState#cs{block=BlockName}, reset_block_ws(Ws)),
     {Ws1, {BlockName, Body, Ws1}}.
@@ -663,19 +792,26 @@ find_blocks([B|Bs], Acc, Stack) ->
             Error
     end;
 find_blocks({block, {identifier, _Pos, Name}, Elements} = Block, Acc, Stack) ->
+    find_named_block(Name, Elements, Block, Acc, Stack);
+find_blocks({fragment, {identifier, _Pos, Name}, Elements} = Fragment, Acc, Stack) ->
+    Elements1 = namespace_fragment_blocks(Name, Elements),
+    find_named_block(Name, Elements1, setelement(3, Fragment, Elements1), Acc, Stack);
+find_blocks(Element, Acc, Stack) ->
+    find_blocks(block_elements(Element), Acc, Stack).
+
+find_named_block(Name, Elements, NamedBlock, Acc, Stack) ->
     case lists:member(Name, Stack) of
         true ->
             {error, {duplicate_nested_block, Name}};
         false ->
-            Acc1 = [ Block | Acc ],
+            Acc1 = [ NamedBlock | Acc ],
             Stack1 = [ Name | Stack ],
             find_blocks(Elements, Acc1, Stack1)
-    end;
-find_blocks(Element, Acc, Stack) ->
-    find_blocks(block_elements(Element), Acc, Stack).
+    end.
 
 block_elements({compose, _, Elts}) -> Elts;
 block_elements({catcompose, _, Elts}) -> Elts;
+block_elements({fragment, _, Elts}) -> Elts;
 block_elements({for, _, Loop, Empty}) -> [Loop,Empty];
 block_elements({'if', _, If, Else}) -> [If, Else];
 block_elements({spaceless, _, Elts}) -> Elts;

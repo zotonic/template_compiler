@@ -1,0 +1,1 @@
+{% extends "fragment_extends_same_name_parent.tpl" %}{% fragment panel %}<section>{% block title %}Child {% inherit %}{% endblock %}<div>{{ _body }}</div></section>{% endfragment %}{% block main %}{% useblock panel %}{% block title %}Caller {% inherit %}{% endblock %}Body{% enduseblock %}{% endblock %}

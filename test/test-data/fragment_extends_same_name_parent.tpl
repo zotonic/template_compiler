@@ -1,0 +1,1 @@
+{% fragment panel %}<section>{% block title %}Base{% endblock %}<div>{{ _body }}</div></section>{% endfragment %}{% block main %}{% useblock panel %}{% block title %}Caller {% inherit %}{% endblock %}Body{% enduseblock %}{% endblock %}

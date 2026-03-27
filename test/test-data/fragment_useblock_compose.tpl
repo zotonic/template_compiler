@@ -1,0 +1,1 @@
+{% fragment panel %}<section>{% block title %}Base{% endblock %}<div>{{ _body }}</div></section>{% endfragment %}{% useblock panel %}{% block title %}{% compose "compose_b.tpl" v=1 %}{% block a %}B{{ v }}{% endblock %}{% endcompose %}{% endblock %}Body{% enduseblock %}

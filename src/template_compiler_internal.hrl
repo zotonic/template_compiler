@@ -23,8 +23,10 @@
                | identifier_token().
 
 -type identifier_token() :: {identifier, linecol(), binary()}.
+-type block_owner() :: atom() | {useblock, atom() | binary(), {binary(), integer(), integer()}}.
 
--type block_element() :: {block, identifier_token(), elements()}.
+-type block_element() :: {block, identifier_token(), elements()}
+                       | {fragment, identifier_token(), elements()}.
 
 -type elements() :: list( element() ).
 
@@ -50,6 +52,7 @@
 -record(cs, {
         filename = <<>> :: binary(),
         module = undefined :: atom(),
+        block_owner = undefined :: undefined | block_owner(),
         block = undefined :: atom(),
         blocks = [] :: list( {atom(), erl_syntax:syntaxTree(), #ws{}} ),
         runtime = template_compiler_runtime :: atom(),
