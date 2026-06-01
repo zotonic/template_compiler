@@ -1,22 +1,22 @@
 {"1.2.0",
-[{<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.16.0">>},1},
+[{<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.16.1">>},1},
  {<<"qdate_localtime">>,{pkg,<<"qdate_localtime">>,<<"1.2.2">>},0},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.7">>},2},
  {<<"tls_certificate_check">>,
-  {pkg,<<"tls_certificate_check">>,<<"1.29.0">>},
+  {pkg,<<"tls_certificate_check">>,<<"1.33.0">>},
   1},
- {<<"zotonic_stdlib">>,{pkg,<<"zotonic_stdlib">>,<<"1.26.1">>},0}]}.
+ {<<"zotonic_stdlib">>,{pkg,<<"zotonic_stdlib">>,<<"1.29.0">>},0}]}.
 [
 {pkg_hash,[
- {<<"cowlib">>, <<"54592074EBBBB92EE4746C8A8846E5605052F29309D3A873468D76CDF932076F">>},
+ {<<"cowlib">>, <<"318D385D55F657E9A5005838C4E426E13DCD724A691438384B6165A69687E531">>},
  {<<"qdate_localtime">>, <<"43E1B20102F50A8B2A2BE7042C2F6BE989AD96CA2CC319DB5DF56E122E8873F6">>},
  {<<"ssl_verify_fun">>, <<"354C321CF377240C7B8716899E182CE4890C5938111A1296ADD3EC74CF1715DF">>},
- {<<"tls_certificate_check">>, <<"4473005EB0BBDAD215D7083A230E2E076F538D9EA472C8009FD22006A4CFC5F6">>},
- {<<"zotonic_stdlib">>, <<"C801A63EC5070528F58B65D7C863393312FF6AC6E72094120D6F4D3FB2403F1C">>}]},
+ {<<"tls_certificate_check">>, <<"01E0822A2EBB0B207C4964E8D32AD8B1B8CE1CAF58F446E53F816D06DB953DE4">>},
+ {<<"zotonic_stdlib">>, <<"5D07F41B599184A46E84853E01B5D1F04310129E13382C9DC3410004BDE52233">>}]},
 {pkg_hash_ext,[
- {<<"cowlib">>, <<"7F478D80D66B747344F0EA7708C187645CFCC08B11AA424632F78E25BF05DB51">>},
+ {<<"cowlib">>, <<"58F1E425A9E04176F1D30E20116F57C4E90EF0E187552E9741C465BDF4044F70">>},
  {<<"qdate_localtime">>, <<"A38D5F1C5AE14B22F471E442B262AECCAFB915B664C7C364443DC73179C50FDA">>},
  {<<"ssl_verify_fun">>, <<"FE4C190E8F37401D30167C8C405EDA19469F34577987C76DDE613E838BBC67F8">>},
- {<<"tls_certificate_check">>, <<"5B0D0E5CB0F928BC4F210DF667304ED91C5BFF2A391CE6BDEDFBFE70A8F096C5">>},
- {<<"zotonic_stdlib">>, <<"8258023EC90D439C5A1BCA4A4D4ADF673FDB483E038EE1D5EA171228343B4E41">>}]}
+ {<<"tls_certificate_check">>, <<"CAB9A7439E2DBFE91B38104F2D8A4B6D61DBC4D3A5AD59AC364713A88C6CFD9B">>},
+ {<<"zotonic_stdlib">>, <<"235A11F8F5AEEB867B2ABDB34A137481339280F00BB613198526DF61467DDC96">>}]}
 ].

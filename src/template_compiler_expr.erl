@@ -59,6 +59,25 @@ compile({atom_literal, _SrcPos, Atom}, _CState, Ws) ->
     {Ws, erl_syntax:abstract(template_compiler_utils:to_atom(Atom))};
 compile({find_value, LookupList}, CState, Ws) ->
     find_value_lookup(LookupList, CState, Ws);
+compile({auto_id, {{identifier, SrcPos, Name}, {identifier, _, <<"forloop">>}}},
+        #cs{runtime=Runtime, vars_var=Vars} = CState,
+        Ws) ->
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "iolist_to_binary([ "
+                "maps:get('$autoid', _@vars),"
+                "$-, _@name,"
+                "$-, z_convert:to_binary("
+                    "_@runtime:find_nested_value([ forloop, counter ], _@vars, _@context)"
+                ")"
+            "])",
+            [
+                {runtime, erl_syntax:atom(Runtime)},
+                {name, erl_syntax:abstract(Name)},
+                {context, erl_syntax:variable(CState#cs.context_var)},
+                {vars, erl_syntax:variable(Vars)}
+            ]),
+    {Ws#ws{is_autoid_var=true, is_forloop_var=true}, Ast};
 compile({auto_id, {{identifier, SrcPos, Name}, {identifier, _, Var}}}, #cs{runtime=Runtime} = CState, Ws) ->
     Ast = merl:qquote(
             template_compiler_utils:pos(SrcPos),
