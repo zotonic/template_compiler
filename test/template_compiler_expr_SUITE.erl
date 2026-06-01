@@ -124,7 +124,9 @@ expr_autoid(_Config) ->
     {ok, Bin1} = template_compiler:render("expr_autoid.tpl", #{}, [], undefined),
     {match, _} = re:run(iolist_to_binary(Bin1), "x:[a-zA-Z0-9]+-id:y"),
     {ok, Bin2} = template_compiler:render("expr_autoid_2.tpl", #{ foo => 20 }, [], undefined),
-    {match, _} = re:run(iolist_to_binary(Bin2), "x:[a-zA-Z0-9]+-id-20:y").
+    {match, _} = re:run(iolist_to_binary(Bin2), "x:[a-zA-Z0-9]+-id-20:y"),
+    {ok, Bin3} = template_compiler:render("expr_autoid_forloop.tpl", #{ v => [a,b,c] }, [], undefined),
+    {match, _} = re:run(iolist_to_binary(Bin3), "x:[a-zA-Z0-9]+-id-1,[a-zA-Z0-9]+-id-2,[a-zA-Z0-9]+-id-3,:y").
 
 
 expr_map(_Config) ->
