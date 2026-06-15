@@ -19,6 +19,8 @@ all() ->
 groups() ->
     [{basic, [],
         [fragment_use_test
+        ,fragment_use_if_test
+        ,fragment_use_if_blocks_test
         ,fragment_useblock_test
         ,fragment_useblock_blocks_test
         ,fragment_useblock_compose_test
@@ -46,6 +48,16 @@ end_per_group(basic, _Config) ->
 fragment_use_test(_Config) ->
     {ok, Bin} = template_compiler:render("fragment.tpl", #{}, [], undefined),
     <<"AB[x][y]C">> = iolist_to_binary(Bin),
+    ok.
+
+fragment_use_if_test(_Config) ->
+    {ok, Bin} = template_compiler:render("fragment_if.tpl", #{}, [], undefined),
+    <<"true,false">> = z_string:trim(iolist_to_binary(Bin)),
+    ok.
+
+fragment_use_if_blocks_test(_Config) ->
+    {ok, Bin} = template_compiler:render("fragment_if_blocks.tpl", #{}, [], undefined),
+    <<"if,ifequal,ifnotequal">> = z_string:trim(iolist_to_binary(Bin)),
     ok.
 
 fragment_useblock_test(_Config) ->
