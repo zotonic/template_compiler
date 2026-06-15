@@ -706,15 +706,21 @@ merge_ws(WsA, WsB) ->
         debug_points = WsA#ws.debug_points ++ WsB#ws.debug_points
     }.
 
-namespace_fragment_blocks(FragmentName, Elements) ->
+namespace_fragment_blocks(FragmentName, Elements) when is_list(Elements) ->
     [ namespace_fragment_element(FragmentName, E) || E <- Elements ].
 
+namespace_fragment_element(FragmentName, Elements) when is_list(Elements) ->
+    namespace_fragment_blocks(FragmentName, Elements);
 namespace_fragment_element(FragmentName, {block, {identifier, Pos, Name}, Elts}) ->
     {block, {identifier, Pos, namespaced_fragment_block_name(FragmentName, Name)}, namespace_fragment_blocks(FragmentName, Elts)};
 namespace_fragment_element(FragmentName, {for, Expr, Loop, Empty}) ->
     {for, Expr, namespace_fragment_blocks(FragmentName, Loop), namespace_fragment_blocks(FragmentName, Empty)};
 namespace_fragment_element(FragmentName, {'if', Expr, If, Else}) ->
-    {'if', Expr, namespace_fragment_blocks(FragmentName, If), namespace_fragment_blocks(FragmentName, Else)};
+    {'if', Expr, namespace_fragment_blocks(FragmentName, If), namespace_fragment_element(FragmentName, Else)};
+namespace_fragment_element(FragmentName, {'ifequal', Expr, If, Else}) ->
+    {'ifequal', Expr, namespace_fragment_blocks(FragmentName, If), namespace_fragment_blocks(FragmentName, Else)};
+namespace_fragment_element(FragmentName, {'ifnotequal', Expr, If, Else}) ->
+    {'ifnotequal', Expr, namespace_fragment_blocks(FragmentName, If), namespace_fragment_blocks(FragmentName, Else)};
 namespace_fragment_element(FragmentName, {spaceless, Expr, Elts}) ->
     {spaceless, Expr, namespace_fragment_blocks(FragmentName, Elts)};
 namespace_fragment_element(FragmentName, {autoescape, Expr, Elts}) ->
@@ -814,6 +820,8 @@ block_elements({catcompose, _, Elts}) -> Elts;
 block_elements({fragment, _, Elts}) -> Elts;
 block_elements({for, _, Loop, Empty}) -> [Loop,Empty];
 block_elements({'if', _, If, Else}) -> [If, Else];
+block_elements({'ifequal', _, If, Else}) -> [If, Else];
+block_elements({'ifnotequal', _, If, Else}) -> [If, Else];
 block_elements({spaceless, _, Elts}) -> Elts;
 block_elements({autoescape, _, Elts}) -> Elts;
 block_elements({with, _, Elts}) -> Elts;
