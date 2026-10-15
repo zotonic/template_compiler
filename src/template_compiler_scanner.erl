@@ -282,7 +282,7 @@ scan(<<$", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_code, Closer}) ->
     scan(T, [{string_literal, {SourceRef, Row, Column}, <<>>} | Scanned], {SourceRef, Row, Column + 1}, {in_double_quote, Closer});
 
 scan(<<"_\"", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_code, Closer}) ->
-    scan(T, [{trans_literal, {SourceRef, Row, Column}, <<>>} | Scanned], {SourceRef, Row, Column + 1}, {in_double_quote, Closer});
+    scan(T, [{trans_literal, {SourceRef, Row, Column}, <<>>} | Scanned], {SourceRef, Row, Column + 2}, {in_double_quote, Closer});
 
 scan(<<$", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_identifier, Closer}) ->
     scan(T, [{string_literal, {SourceRef, Row, Column}, <<>>} | Scanned], {SourceRef, Row, Column + 1}, {in_double_quote, Closer});
@@ -291,7 +291,7 @@ scan(<<$', T/binary>>, Scanned, {SourceRef, Row, Column}, {in_code, Closer}) ->
     scan(T, [{string_literal, {SourceRef, Row, Column}, <<>>} | Scanned], {SourceRef, Row, Column + 1}, {in_single_quote, Closer});
 
 scan(<<"_\'", T/binary>>, Scanned, {SourceRef, Row, Column}, {in_code, Closer}) ->
-    scan(T, [{trans_literal, {SourceRef, Row, Column}, <<>>} | Scanned], {SourceRef, Row, Column + 1}, {in_single_quote, Closer});
+    scan(T, [{trans_literal, {SourceRef, Row, Column}, <<>>} | Scanned], {SourceRef, Row, Column + 2}, {in_single_quote, Closer});
 
 scan(<<$', T/binary>>, Scanned, {SourceRef, Row, Column}, {in_identifier, Closer}) ->
     scan(T, [{string_literal, {SourceRef, Row, Column}, <<>>} | Scanned], {SourceRef, Row, Column + 1}, {in_single_quote, Closer});
@@ -415,10 +415,10 @@ scan(<<">", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
     scan(T, [{'>', {SourceRef, Row, Column}, <<">">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
 
 scan(<<"--", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
-    scan(T, [{'--', {SourceRef, Row, Column}, <<"--">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
+    scan(T, [{'--', {SourceRef, Row, Column}, <<"--">>} | Scanned], {SourceRef, Row, Column + 2}, {in_code, Closer});
 
 scan(<<"++", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
-    scan(T, [{'++', {SourceRef, Row, Column}, <<"++">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
+    scan(T, [{'++', {SourceRef, Row, Column}, <<"++">>} | Scanned], {SourceRef, Row, Column + 2}, {in_code, Closer});
 
 scan(<<"-", T/binary>>, Scanned, {SourceRef, Row, Column}, {_, Closer}) ->
     scan(T, [{'-', {SourceRef, Row, Column}, <<"-">>} | Scanned], {SourceRef, Row, Column + 1}, {in_code, Closer});
