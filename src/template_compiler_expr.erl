@@ -187,6 +187,8 @@ compile({expr, {Op, {_, SrcPos, _}}, Arg1, Arg2}, #cs{runtime=Runtime} = CState,
                 {runtime, erl_syntax:atom(Runtime)}
             ]),
     {Ws2, Ast};
+compile({apply_filter, Expr, {filter, {identifier, SrcPos, <<"if">>}, [Then, Else]}}, CState, Ws) ->
+    filter_if(Expr, Then, Else, SrcPos, CState, Ws);
 compile({apply_filter, Expr, {filter, {identifier, SrcPos, <<"default">>}, [Arg]}}, CState, Ws) ->
     filter_default(Expr, Arg, SrcPos, CState, Ws);
 compile({apply_filter, Expr, {filter, {identifier, SrcPos, <<"default_if_none">>}, [Arg]}}, CState, Ws) ->
@@ -366,6 +368,27 @@ value_lookup_asts([{ast, Ast}|Vs], CState, Ws, Acc) ->
 value_lookup_asts([{expr, Expr}|Vs], CState, Ws, Acc) ->
     {Ws1, ExprAst} = compile(Expr, CState, Ws),
     value_lookup_asts(Vs, CState, Ws1, [ExprAst|Acc]).
+
+
+%% Evaluate the condition once and only evaluate the selected branch.
+filter_if(Expr, Then, Else, SrcPos, #cs{runtime=Runtime} = CState, Ws) ->
+    {Ws1, ExprAst} = compile(Expr, CState, Ws),
+    {Ws2, ThenAst} = compile(Then, CState, Ws1),
+    {Ws3, ElseAst} = compile(Else, CState, Ws2),
+    Ast = merl:qquote(
+            template_compiler_utils:pos(SrcPos),
+            "case _@runtime:to_bool(_@expr, _@context) of "
+                "true -> _@then;"
+                "false -> _@else_expr "
+            "end",
+            [
+                {expr, ExprAst},
+                {then, ThenAst},
+                {else_expr, ElseAst},
+                {runtime, erl_syntax:atom(Runtime)},
+                {context, erl_syntax:variable(CState#cs.context_var)}
+            ]),
+    {Ws3, Ast}.
 
 
 filter_default(Expr, Arg, SrcPos, #cs{runtime=Runtime} = CState, Ws) ->
