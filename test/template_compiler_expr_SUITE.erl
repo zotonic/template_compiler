@@ -22,6 +22,7 @@ groups() ->
         ,expr_op_eq_neq_test
         ,expr_dot
         ,expr_filter
+        ,expr_filter_if
         ,expr_literals
         ,expr_nested
         ,expr_autoid
@@ -83,6 +84,30 @@ expr_filter(_Config) ->
     <<"a20b">> = iolist_to_binary(Bin1),
     {ok, Bin2} = template_compiler:render("expr_filter_2.tpl", #{ a => 1, b => 2, c => 3 }, [], undefined),
     <<"*1:2*1:3:2*">> = iolist_to_binary(Bin2),
+    ok.
+
+expr_filter_if(_Config) ->
+    lists:foreach(
+        fun({Value, Expected, Selected}) ->
+            erlang:erase(if_then),
+            erlang:erase(if_else),
+            {ok, Result} = template_compiler:render(
+                "expr_filter_if.tpl", #{ value => Value }, [], undefined),
+            Expected = iolist_to_binary(Result),
+            Selected = {erlang:get(if_then), erlang:get(if_else)}
+        end,
+        [
+            {true, <<"yes">>, {true, undefined}},
+            {1, <<"yes">>, {true, undefined}},
+            {<<"value">>, <<"yes">>, {true, undefined}},
+            {false, <<"no">>, {undefined, true}},
+            {0, <<"no">>, {undefined, true}},
+            {undefined, <<"no">>, {undefined, true}},
+            {<<>>, <<"no">>, {undefined, true}},
+            {[], <<"no">>, {undefined, true}}
+        ]),
+    erlang:erase(if_then),
+    erlang:erase(if_else),
     ok.
 
 expr_literals(_Config) ->

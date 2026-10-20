@@ -292,7 +292,10 @@ Template language and Tags
 
 Below is a short list of tags and explanation of template include / extend.
 
-The `template_compiler` package doesn't include filters.
+The `template_compiler` package compiles `default`, `default_if_none`,
+`default_if_undefined`, and `if` directly. Other filters are supplied by the host application.
+The `if` filter, `{{ value|if:then_value:else_value }}`, uses the runtime's boolean
+conversion and only evaluates the selected branch.
 
 Variables
 ---------

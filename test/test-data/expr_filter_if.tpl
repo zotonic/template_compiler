@@ -1,0 +1,1 @@
+{{ value|if:("yes"|template_compiler_test_set:`if_then`:true):("no"|template_compiler_test_set:`if_else`:true) }}
