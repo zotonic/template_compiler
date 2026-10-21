@@ -23,6 +23,9 @@ groups() ->
         ,autoescape_test
         ,cycle_test
         ,spaceless_test
+        ,lib_flush_test
+        ,leading_tag_test
+        ,lib_url_requires_filename_test
         ,lib_tag_debug_points_test
         ]}].
 
@@ -90,6 +93,58 @@ lib_tag_debug_points_test(_Config) ->
     {ok, #template_file{filename = Filename}} = template_compiler_runtime:map_template(<<"lib_tag.tpl">>, [], undefined),
     {ok, Mod} = template_compiler:lookup(Filename, [], undefined),
     [_Point] = Mod:debug_points(),
+    ok.
+
+%% Parse and compile at column one as well as after ordinary template text.
+lib_flush_test(Config) ->
+    lists:foreach(
+        fun({Source, ExpectedValue}) ->
+            lists:foreach(
+                fun(Prefix) ->
+                    Template = <<Prefix/binary, Source/binary>>,
+                    {ok, Tokens} = template_compiler_scanner:scan(<<"lib_flush.tpl">>, Template),
+                    {ok, {base, Elements}} = template_compiler_parser:parse(Tokens),
+                    {lib, _, [], [{{identifier, _, <<"flush">>}, Value}]} = lists:last(Elements),
+                    case ExpectedValue of
+                        true -> true = Value;
+                        _ -> {string_literal, _, ExpectedValue} = Value
+                    end,
+                    Filename = filename:join(test_data_dir(Config), "lib_flush_generated.tpl"),
+                    {ok, Mod} = template_compiler:compile_binary(Template, Filename, [], undefined),
+                    Prefix = iolist_to_binary(Mod:render(#{}, #{}, undefined))
+                end,
+                [<<>>, <<"prefix\n">>])
+        end,
+        [{<<"{% lib flush %}">>, true},
+         {<<"{% lib flush=\"css\" %}">>, <<"css">>},
+         {<<"{% lib flush=\"javascript\" %}">>, <<"javascript">>},
+         {<<"{% lib flush=\"js\" %}">>, <<"js">>}]),
+    ok.
+
+%% The root ambiguity affected ordinary tags too, not only lib tags.
+leading_tag_test(Config) ->
+    lists:foreach(
+        fun({Source, Expected}) ->
+            Filename = filename:join(test_data_dir(Config), "leading_tag_generated.tpl"),
+            {ok, Mod} = template_compiler:compile_binary(Source, Filename, [], undefined),
+            Expected = iolist_to_binary(Mod:render(#{}, #{}, undefined))
+        end,
+        [{<<"{% lib \"a.js\" collect %}tail">>, <<"tail">>},
+         {<<"{% lib_url \"a.js\" %}tail">>, <<"tail">>},
+         {<<"{% if true %}{% lib flush %}inside{% endif %}tail">>, <<"insidetail">>},
+         {<<"{% spaceless %} <b>x</b> <i>y</i> {% endspaceless %}">>, <<"<b>x</b><i>y</i>">>},
+         {<<"{% comment %}hidden{% endcomment %}tail">>, <<"tail">>},
+         {<<"{{ 1 }}tail">>, <<"1tail">>},
+         {<<>>, <<>>}]),
+    ok.
+
+lib_url_requires_filename_test(_Config) ->
+    lists:foreach(
+        fun(Source) ->
+            {ok, Tokens} = template_compiler_scanner:scan(<<"lib_url.tpl">>, Source),
+            {error, _} = template_compiler_parser:parse(Tokens)
+        end,
+        [<<"{% lib_url flush %}">>, <<"{% lib_url %}">>]),
     ok.
 
 test_data_dir(Config) ->

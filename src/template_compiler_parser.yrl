@@ -41,6 +41,8 @@
 Nonterminals
     Template
     Elements
+    NonEmptyElements
+    Element
     BlockElements
     Literal
 
@@ -284,11 +286,15 @@ Unary 600 Uminus Unot.
 Nonassoc 800 dot.
 
 %% Expected shift/reduce conflicts
-Expect 7.
+Expect 6.
 
 Template -> ExtendsTag BlockElements : {extends, '$1', '$2'}.
 Template -> OverrulesTag BlockElements : {overrules, '$1', '$2'}.
-Template -> Elements : {base, '$1'}.
+%% A base template must not reduce an empty Elements prefix before its first
+%% tag: that competes with shifting the open_tag of extends/overrules. Keep
+%% the root non-empty path separate from nullable nested block contents.
+Template -> '$empty' : {base, []}.
+Template -> NonEmptyElements : {base, '$1'}.
 
 BlockElements -> '$empty' : [].
 BlockElements -> BlockElements BlockBlock : '$1' ++ ['$2'].
@@ -297,46 +303,49 @@ BlockElements -> BlockElements text : '$1'.
 BlockElements -> BlockElements CommentBlock : '$1'.
 
 Elements -> '$empty' : [].
-Elements -> Elements text : '$1' ++ ['$2'].
-Elements -> Elements ValueBraced : '$1' ++ ['$2'].
+Elements -> Elements Element : '$1' ++ '$2'.
+NonEmptyElements -> Element : '$1'.
+NonEmptyElements -> NonEmptyElements Element : '$1' ++ '$2'.
+Element -> text : ['$1'].
+Element -> ValueBraced : ['$1'].
 % Block elements containing other elements
-Elements -> Elements BlockBlock : '$1' ++ ['$2'].
-Elements -> Elements FragmentBlock : '$1' ++ ['$2'].
-Elements -> Elements FilterBlock : '$1' ++ ['$2'].
-Elements -> Elements ForBlock : '$1' ++ ['$2'].
-Elements -> Elements IfBlock : '$1' ++ ['$2'].
-Elements -> Elements IfEqualBlock : '$1' ++ ['$2'].
-Elements -> Elements IfNotEqualBlock : '$1' ++ ['$2'].
-Elements -> Elements SpacelessBlock : '$1' ++ ['$2'].
-Elements -> Elements AutoEscapeBlock : '$1' ++ ['$2'].
-Elements -> Elements WithBlock : '$1' ++ ['$2'].
-Elements -> Elements CacheBlock : '$1' ++ ['$2'].
-Elements -> Elements ScriptBlock : '$1' ++ ['$2'].
-Elements -> Elements CommentBlock : '$1'.
-Elements -> Elements ComposeBlock : '$1' ++ ['$2'].
-Elements -> Elements CatComposeBlock : '$1' ++ ['$2'].
+Element -> BlockBlock : ['$1'].
+Element -> FragmentBlock : ['$1'].
+Element -> FilterBlock : ['$1'].
+Element -> ForBlock : ['$1'].
+Element -> IfBlock : ['$1'].
+Element -> IfEqualBlock : ['$1'].
+Element -> IfNotEqualBlock : ['$1'].
+Element -> SpacelessBlock : ['$1'].
+Element -> AutoEscapeBlock : ['$1'].
+Element -> WithBlock : ['$1'].
+Element -> CacheBlock : ['$1'].
+Element -> ScriptBlock : ['$1'].
+Element -> CommentBlock : [].
+Element -> ComposeBlock : ['$1'].
+Element -> CatComposeBlock : ['$1'].
 % Tags
-Elements -> Elements TransTag : '$1' ++ ['$2'].
-Elements -> Elements TransExtTag : '$1' ++ ['$2'].
-Elements -> Elements InheritTag : '$1' ++ ['$2'].
-Elements -> Elements IncludeTag : '$1' ++ ['$2'].
-Elements -> Elements CatIncludeTag : '$1' ++ ['$2'].
-Elements -> Elements NowTag : '$1' ++ ['$2'].
-Elements -> Elements LibTag : '$1' ++ ['$2'].
-Elements -> Elements LibUrlTag : '$1' ++ ['$2'].
-Elements -> Elements LoadTag : '$1' ++ ['$2'].
-Elements -> Elements CycleTag : '$1' ++ ['$2'].
-Elements -> Elements CustomTag : '$1' ++ ['$2'].
-Elements -> Elements CallTag : '$1' ++ ['$2'].
-Elements -> Elements CallWithTag : '$1' ++ ['$2'].
-Elements -> Elements UseTag : '$1' ++ ['$2'].
-Elements -> Elements UseBlock : '$1' ++ ['$2'].
-Elements -> Elements UrlTag : '$1' ++ ['$2'].
-Elements -> Elements PrintTag : '$1' ++ ['$2'].
-Elements -> Elements ImageTag : '$1' ++ ['$2'].
-Elements -> Elements ImageUrlTag : '$1' ++ ['$2'].
-Elements -> Elements ImageDataUrlTag : '$1' ++ ['$2'].
-Elements -> Elements MediaTag : '$1' ++ ['$2'].
+Element -> TransTag : ['$1'].
+Element -> TransExtTag : ['$1'].
+Element -> InheritTag : ['$1'].
+Element -> IncludeTag : ['$1'].
+Element -> CatIncludeTag : ['$1'].
+Element -> NowTag : ['$1'].
+Element -> LibTag : ['$1'].
+Element -> LibUrlTag : ['$1'].
+Element -> LoadTag : ['$1'].
+Element -> CycleTag : ['$1'].
+Element -> CustomTag : ['$1'].
+Element -> CallTag : ['$1'].
+Element -> CallWithTag : ['$1'].
+Element -> UseTag : ['$1'].
+Element -> UseBlock : ['$1'].
+Element -> UrlTag : ['$1'].
+Element -> PrintTag : ['$1'].
+Element -> ImageTag : ['$1'].
+Element -> ImageUrlTag : ['$1'].
+Element -> ImageDataUrlTag : ['$1'].
+Element -> MediaTag : ['$1'].
 
 
 ValueBraced -> open_var E OptWith close_var : {value, '$1', '$2', '$3'}.
@@ -366,6 +375,9 @@ OptionalAll -> all_keyword : all.
 OptionalAll -> '$empty' : normal.
 
 LibTag -> open_tag lib_keyword LibList Args close_tag : {lib, '$2', '$3', '$4'}.
+%% Argument-only lib tags support runtime operations such as flush.
+%% Keep LibList non-empty for lib_url.
+LibTag -> open_tag lib_keyword Args close_tag : {lib, '$2', [], '$3'}.
 LibUrlTag -> open_tag lib_url_keyword LibList Args close_tag : {lib_url, '$2', '$3', '$4'}.
 LibList -> string_literal : ['$1'].
 LibList -> LibList string_literal : '$1' ++ ['$2'].
