@@ -78,7 +78,7 @@
                      | lib.
 
 -type translation_message() :: {
-    Text :: binary(),
+    Text :: binary() | {plural, binary(), binary()},
     Args :: proplists:proplist(),
     {
         Filename :: file:filename(),
@@ -524,7 +524,7 @@ is_matching_module(Module, ContentChecksum, EnabledDebugPoints, IsDebugPoints) -
 
 compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, EnabledDebugPoints, IsDebugPoints, Tokens, Options, Context) ->
     Runtime:trace_compile(Module, Filename, Options, Context),
-    case compile_tokens(
+    case compile_tokens_checked(
             template_compiler_parser:parse(Tokens),
             cs(Module, Filename, Options, Context, EnabledDebugPoints),
             Options)
@@ -542,6 +542,12 @@ compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, EnabledDebug
             end;
         {error, _} = Error ->
             Error
+    end.
+
+compile_tokens_checked(Tokens, CState, Options) ->
+    try compile_tokens(Tokens, CState, Options)
+    catch
+        throw:{error, _} = Error -> Error
     end.
 
 cs(Module, Filename, Options, Context, EnabledDebugPoints) ->
@@ -854,6 +860,10 @@ expand_translations(Tokens, Runtime, Context) ->
 
 map_text_tokens([], Acc) ->
     lists:reverse(Acc);
+map_text_tokens([{trans_keyword, _, _}=Trans,
+        {string_literal, SrcPos, Singular}, {string_literal, _, Plural}|Ts], Acc) ->
+    Pair = {plural, unescape_trim(Singular), unescape_trim(Plural)},
+    map_text_tokens(Ts, [{trans_literal, SrcPos, Pair}, Trans|Acc]);
 map_text_tokens([{trans_keyword, _, _}=Trans, {string_literal, SrcPos, Text}|Ts], Acc) ->
     Acc1 = [{trans_literal, SrcPos, unescape_trim(Text)},Trans|Acc],
     map_text_tokens(Ts, Acc1);
@@ -879,6 +889,9 @@ expand_translation({trans_text, SrcPos, Text}, Runtime, Context) ->
         {trans, _} = Tr -> {trans_text, SrcPos, Tr};
         B when is_binary(B) -> {text, SrcPos, B}
     end;
+expand_translation({trans_literal, SrcPos, {plural, Singular, Plural}}, Runtime, Context) ->
+    Tr = template_compiler_plural:translations(Runtime, Singular, Plural, Context),
+    {trans_literal, SrcPos, {plural, {Singular, Plural}, Tr}};
 expand_translation({trans_literal, SrcPos, Text}, Runtime, Context) ->
     case Runtime:get_translations(Text, Context) of
         {trans, _} = Tr -> {trans_literal, SrcPos, Tr};
