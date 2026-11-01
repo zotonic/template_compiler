@@ -36,40 +36,8 @@ The template language is largely the same as Django Template Language with some 
 
  * Runtime includes, all templates are compiled to separate BEAM modules
  * `overrules` to override same-named templates
- * translation tags `{_ my translatable text _}` and `{% include "a.tpl" arg=_"my translatable text" %}`
-
-Plural translations
--------------------
-
-The `trans` tag accepts an optional second English source string:
-
-```django
-{% trans "{n} hour ago" "{n} hours ago" n=hours %}
-```
-
-Two strings require `n`, a non-negative integer. Its expression is evaluated once
-and reused for selection and `{n}` interpolation. Translations may contain any number
-of plural forms.
-
-Runtimes can implement the optional `get_plural_translations/3` callback, returning
-`{trans, [{Language, {Rule, FormsTuple}}]}`. The runtime's catalog loader parses
-and validates plural rules; the compiler only evaluates the supplied AST.
-For Zotonic, `z_gettext_plural:parse/1` parses a `Plural-Forms` header value.
-`Rule` is `{NumberOfForms, Expression}`, where `Expression` follows the exported
-`template_compiler_plural:expression()` type. For example, English uses
-`{2, {'!=', n, 1}}` and Japanese uses `{1, 0}`. Forms are indexed
-from zero in gettext and stored from element one in the tuple. Use `undefined`
-or an empty binary for a missing translation.
-
-Every form is compiled at template compilation time. The existing
-`lookup_translation/3` callback selects the language, preserving its `{Rule, Forms}`
-value; only then is the plural rule evaluated. Missing forms or invalid rule
-results fall back to the English source pair with the English rule. Runtimes
-without the optional callback render the English sources.
-
-`translations/1` returns plural messages as
-`{{plural, Singular, Plural}, Args, SourcePosition}`. Singular messages are unchanged.
-
+ * translation tags `{_ my translatable text _}`, `{% include "a.tpl" arg=_"my translatable text" %}`,
+   and {% trans "Hello {name}" name=author.name %} with optional plural translations
 
 Runtime Just in Time compilation
 ---------------------------------
@@ -410,6 +378,38 @@ As a text with arguments:
 Note: to show a `{` or `}` in a `trans` tag text then double it to `{{`.
 
 The `trans` tag is compiled to code so very efficient.
+
+Plural translations
+-------------------
+
+The `trans` tag also accepts two English source strings:
+
+```django
+{% trans "{n} hour ago" "{n} hours ago" n=hours %}
+```
+
+The two string form requires `n`, a non-negative integer. Its expression is evaluated once
+and reused for selection and `{n}` interpolation. Translations may contain any number
+of plural forms.
+
+Runtimes can implement the optional `get_plural_translations/3` callback, returning
+`{trans, [{Language, {Rule, FormsTuple}}]}`. The runtime's catalog loader parses
+and validates plural rules; the compiler only evaluates the supplied AST.
+For Zotonic, `z_gettext_plural:parse/1` parses a `Plural-Forms` header value.
+`Rule` is `{NumberOfForms, Expression}`, where `Expression` follows the exported
+`template_compiler_plural:expression()` type. For example, English uses
+`{2, {'!=', n, 1}}` and Japanese uses `{1, 0}`. Forms are indexed
+from zero in gettext and stored from element one in the tuple. Use `undefined`
+or an empty binary for a missing translation.
+
+Every form is compiled at template compilation time. The existing
+`lookup_translation/3` callback selects the language, preserving its `{Rule, Forms}`
+value; only then is the plural rule evaluated. Missing forms or invalid rule
+results fall back to the English source pair with the English rule. Runtimes
+without the optional callback render the English sources.
+
+`translations/1` returns plural messages as
+`{{plural, Singular, Plural}, Args, SourcePosition}`. Singular messages are unchanged.
 
 
 #### List translatable strings
