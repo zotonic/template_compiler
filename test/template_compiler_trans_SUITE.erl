@@ -112,8 +112,9 @@ plural_scope_test(Config) ->
 
 %% Minimal test runtime: make a count lookup observable and provide catalogs.
 get_plural_translations(_, _, _) ->
-    {ok, Czech} = template_compiler_plural:parse(<<"nplurals=3; plural=n==1 ? 0 : n>=2 && n<=4 ? 1 : 2;">>),
-    {ok, Japanese} = template_compiler_plural:parse(<<"nplurals=1; plural=0;">>),
+    Czech = {3, {conditional, {'==', n, 1}, 0,
+        {conditional, {'&&', {'>=', n, 2}, {'<=', n, 4}}, 1, 2}}},
+    Japanese = {1, 0},
     {trans, [
         {cs, {Czech, {<<"{n} hodina {who}">>, <<"{n} hodiny {who}">>, <<"{n} hodin {who}">>}}},
         {ja, {Japanese, {<<"{n} jikan {who}">>}}}

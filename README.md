@@ -52,8 +52,12 @@ and reused for selection and `{n}` interpolation. One-string tags keep their
 existing behavior. Translations may contain any number of plural forms.
 
 Runtimes can implement the optional `get_plural_translations/3` callback, returning
-`{trans, [{Language, {Rule, FormsTuple}}]}`. Parse a catalog's `Plural-Forms` header
-value with `template_compiler_plural:parse/1` to obtain `Rule`. Forms are indexed
+`{trans, [{Language, {Rule, FormsTuple}}]}`. The runtime's catalog loader parses
+and validates plural rules; the compiler only evaluates the supplied AST.
+For Zotonic, `z_gettext_plural:parse/1` parses a `Plural-Forms` header value.
+`Rule` is `{NumberOfForms, Expression}`, where `Expression` follows the exported
+`template_compiler_plural:expression()` type. For example, English uses
+`{2, {'!=', n, 1}}` and Japanese uses `{1, 0}`. Forms are indexed
 from zero in gettext and stored from element one in the tuple. Use `undefined`
 or an empty binary for a missing translation.
 
