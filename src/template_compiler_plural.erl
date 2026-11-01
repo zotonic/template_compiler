@@ -15,7 +15,7 @@
 %% limitations under the License.
 -module(template_compiler_plural).
 
--export([index/2, english/0, select/3, translations/4]).
+-export([index/2, english/0, select/3, resolve/3, translations/4, translations/5]).
 
 %% Catalog loaders construct this restricted, context-free expression tree.
 %% Boolean results are integers (0 or 1); division is integer division.
@@ -55,6 +55,11 @@ index(_, _) ->
     Fallback :: {rule(), tuple()}.
 select(_, N, _) when not is_integer(N); N < 0 ->
     error({invalid_plural_count, N});
+select({plural_candidates, Candidates}, N, Fallback) ->
+    case choose(Candidates, N) of
+        {ok, Form} -> Form;
+        error -> fallback(N, Fallback)
+    end;
 select({Rule, Forms}, N, Fallback) when is_tuple(Forms) ->
     case index(Rule, N) of
         {ok, I} when I < tuple_size(Forms) ->
@@ -72,6 +77,37 @@ fallback(N, {Rule, Forms}) ->
     {ok, I} = index(Rule, N),
     element(I + 1, Forms).
 
+%% @doc Resolve each language's contextual/contextless candidates independently.
+%% Untranslated forms are excluded before the runtime chooses a language, so
+%% a missing form still permits the next fallback language to be selected.
+-spec resolve({trans, list()}, non_neg_integer(), {rule(), tuple()}) -> {trans, list()}.
+resolve(_, N, _) when not is_integer(N); N < 0 ->
+    error({invalid_plural_count, N});
+resolve({trans, Tr}, N, Fallback) ->
+    Forms = [{Lang, Form} || {Lang, Value} <- Tr, {ok, Form} <- [choose([Value], N)]],
+    case proplists:is_defined(en, Forms) of
+        true -> {trans, Forms};
+        false -> {trans, [{en, fallback(N, Fallback)}|Forms]}
+    end.
+
+choose([], _) -> error;
+choose([{plural_candidates, Candidates}|Rest], N) ->
+    case choose(Candidates, N) of
+        error -> choose(Rest, N);
+        Found -> Found
+    end;
+choose([{Rule, Forms}|Rest], N) when is_tuple(Forms) ->
+    case index(Rule, N) of
+        {ok, I} when I < tuple_size(Forms) ->
+            case element(I + 1, Forms) of
+                undefined -> choose(Rest, N);
+                <<>> -> choose(Rest, N);
+                Form -> {ok, Form}
+            end;
+        _ -> choose(Rest, N)
+    end;
+choose([_|Rest], N) -> choose(Rest, N).
+
 %% @doc Optional runtime callback; old runtimes can render the English sources.
 -spec translations(Runtime, Singular, Plural, Context) -> {trans, list()} when
     Runtime :: module(),
@@ -87,6 +123,20 @@ translations(Runtime, Singular, Plural, Context) ->
     case proplists:is_defined(en, Tr) of
         true -> {trans, Tr};
         false -> {trans, [{en, {english(), {Singular, Plural}}}|Tr]}
+    end.
+
+%% @doc Optional contextual runtime lookup, falling back for older runtimes.
+-spec translations(module(), binary(), binary(), binary(), term()) -> {trans, list()}.
+translations(Runtime, Singular, Plural, MsgCtxt, Context) ->
+    {module, Runtime} = code:ensure_loaded(Runtime),
+    case erlang:function_exported(Runtime, get_plural_translations, 4) of
+        true ->
+            {trans, Tr} = Runtime:get_plural_translations(Singular, Plural, MsgCtxt, Context),
+            case proplists:is_defined(en, Tr) of
+                true -> {trans, Tr};
+                false -> {trans, [{en, {english(), {Singular, Plural}}}|Tr]}
+            end;
+        false -> translations(Runtime, Singular, Plural, Context)
     end.
 
 eval(n, N) -> N;

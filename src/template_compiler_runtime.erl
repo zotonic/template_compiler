@@ -74,6 +74,16 @@
     {trans, [{atom(), {template_compiler_plural:rule(), tuple()}}]}.
 -optional_callbacks([get_plural_translations/3]).
 
+%% Context-aware callbacks return contextual then contextless candidates per
+%% language. Old runtimes automatically use their contextless callbacks.
+-callback get_translations(binary(), binary(), term()) -> binary() | {trans, list()}.
+-callback get_plural_translations(binary(), binary(), binary(), term()) -> {trans, list()}.
+-optional_callbacks([get_translations/3, get_plural_translations/4]).
+
+%% Compile-time default supplied by the owner of the selected template file.
+-callback get_template_msgctxt(file:filename_all(), term()) -> binary() | undefined.
+-optional_callbacks([get_template_msgctxt/2]).
+
 -callback model_call(Model::atom(), Path::list(), Payload::term(), Context::term()) -> template_compiler:model_return().
 -callback custom_tag(Module::atom(), Args::list(), TplVars::map(), Context::term()) -> template_compiler:render_result().
 -callback builtin_tag(template_compiler:builtin_tag(), term(), Args::list(), TplVars::map(), Context::term()) -> template_compiler:render_result().

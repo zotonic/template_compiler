@@ -1108,9 +1108,9 @@ trans_plural(Sources, Tr, Args, SrcPos, #cs{runtime=Runtime} = CState, Ws) ->
                 end,
                 {Ws3, []}, Tr),
             Ast = ?Q("(fun(_@n) -> "
-                "(template_compiler_plural:select("
-                    "_@runtime:lookup_translation({trans, _@languages}, _@vars, _@context),"
-                    "_@n, _@fallback))()"
+                "(_@runtime:lookup_translation("
+                    "template_compiler_plural:resolve({trans, _@languages}, _@n, _@fallback),"
+                    "_@vars, _@context))()"
                 "end)(_@count)", [
                     {n, N}, {count, CountAst},
                     {runtime, erl_syntax:atom(Runtime)},
@@ -1124,6 +1124,13 @@ trans_plural(Sources, Tr, Args, SrcPos, #cs{runtime=Runtime} = CState, Ws) ->
             throw({error, {plural_translation_requires_n, SrcPos}})
     end.
 
+plural_forms_ast({plural_candidates, Candidates}, Args, CState, Ws) ->
+    {Ws1, Asts} = lists:foldl(fun(Candidate, {WsAcc, Acc}) ->
+        {WsNext, Ast} = plural_forms_ast(Candidate, Args, CState, WsAcc),
+        {WsNext, [Ast|Acc]}
+    end, {Ws, []}, Candidates),
+    {Ws1, erl_syntax:tuple([
+        erl_syntax:atom(plural_candidates), erl_syntax:list(lists:reverse(Asts))])};
 plural_forms_ast({Rule, Forms}, Args, CState, Ws) ->
     plural_forms_ast({Rule, Forms}, Args, CState, Ws, false).
 

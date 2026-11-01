@@ -402,14 +402,55 @@ For Zotonic, `z_gettext_plural:parse/1` parses a `Plural-Forms` header value.
 from zero in gettext and stored from element one in the tuple. Use `undefined`
 or an empty binary for a missing translation.
 
-Every form is compiled at template compilation time. The existing
-`lookup_translation/3` callback selects the language, preserving its `{Rule, Forms}`
-value; only then is the plural rule evaluated. Missing forms or invalid rule
-results fall back to the English source pair with the English rule. Runtimes
+Every form is compiled at template compilation time. At render time the count
+selects a form using each candidate's own rule. Missing forms and invalid rule
+results are skipped before `lookup_translation/3` selects the language.
+The final fallback is the English source pair with the English rule. Runtimes
 without the optional callback render the English sources.
 
 `translations/1` returns plural messages as
 `{{plural, Singular, Plural}, Args, SourcePosition}`. Singular messages are unchanged.
+
+Message contexts
+----------------
+
+Runtimes can optionally implement `get_template_msgctxt(Filename, Context)` to
+return a default context (`binary()`) for the selected file, or `undefined`.
+An explicit template declaration overrides this default. Extraction tools can
+pass the same default to `template_compiler:translations(Filename, DefaultMsgCtxt)`.
+
+A literal `msgctxt` distinguishes messages with the same source text. Declare
+one default at the start of a template, before output or blocks (an `extends`
+or `overrules` tag may come before it):
+
+```django
+{% msgctxt "shop: checkout" %}
+{_ Order _}
+{{ _"Continue" }}
+{% with_msgctxt "order: sorting" %}
+    {_ Order _}
+{% endwith_msgctxt %}
+{% trans "Open" msgctxt="action" %}
+{% trans "{n} item" "{n} items" n=count msgctxt="basket" %}
+```
+
+Defaults and nested scopes apply to `{_ ... _}`, `_"..."`, and `trans` messages.
+An explicit `msgctxt` overrides the message's scope. It is a reserved tag argument,
+not an interpolation value. Contexts must be literal strings. An empty string is
+a valid gettext context, distinct from having no context. Included and inherited
+templates use their own declarations; a caller's context is never propagated.
+
+Optional runtime callbacks `get_translations(Text, MsgCtxt, Context)` and
+`get_plural_translations(Singular, Plural, MsgCtxt, Context)` return contextual then
+contextless translations per language. The language-selection callback retains
+control of fallback languages. Older runtimes use their contextless callbacks.
+Plural values can be `{plural_candidates, [{Rule, FormsTuple}, ...]}` to retain
+different rules for contextual and contextless catalogs. The first usable form
+in each language wins; the compiler precompiles every candidate.
+
+Extraction represents contextual keys as `{context, MsgCtxt, Source}`, where
+`Source` is a binary or `{plural, Singular, Plural}`. These keys map to gettext
+`msgctxt` entries; no contextless duplicate is emitted for the same occurrence.
 
 
 #### List translatable strings

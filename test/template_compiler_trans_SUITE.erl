@@ -1,6 +1,7 @@
 -module(template_compiler_trans_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -compile(export_all).
 
@@ -26,6 +27,11 @@ groups() ->
         ,plural_requires_n_test
         ,plural_extraction_test
         ,plural_scope_test
+        ,msgctxt_scope_test
+        ,msgctxt_extraction_test
+        ,msgctxt_invalid_test
+        ,msgctxt_templates_test
+        ,msgctxt_old_runtime_test
         ]}].
 
 init_per_suite(Config) ->
@@ -111,6 +117,83 @@ plural_scope_test(Config) ->
     ok.
 
 %% Minimal test runtime: make a count lookup observable and provide catalogs.
+msgctxt_scope_test(Config) ->
+    Template = <<"{% msgctxt \"file\" %}{_ Open _}|{{ _\"Open\" }}|"
+        "{% with_msgctxt \"outer\" %}{_ Open _}|"
+        "{% with_msgctxt \"inner\" %}{_ Open _}{% endwith_msgctxt %}|"
+        "{_ Open _}{% endwith_msgctxt %}|"
+        "{% trans \"Open\" msgctxt=\"explicit\" %}|{_ Open _}">>,
+    ?assertEqual(<<"file:Open|file:Open|outer:Open|inner:Open|outer:Open|explicit:Open|file:Open">>,
+        render_context(Template, "scope.tpl", Config)).
+
+msgctxt_extraction_test(Config) ->
+    File = filename:join(?config(priv_dir, Config), "contexts_extract.tpl"),
+    ok = file:write_file(File, <<"{% comment %}{% msgctxt \"ignored\" %}{_ Ignore _}{% endcomment %}"
+        "{% msgctxt \"file\" %}{_ Open _}{{ _\"Close\" }}"
+        "{% with_msgctxt \"block\" %}{% trans \"{n} hour\" \"{n} hours\" n=n msgctxt=\"explicit\" %}"
+        "{_ Block _}{% endwith_msgctxt %}{_ End _}">>),
+    {ok, Messages} = template_compiler:translations(File),
+    ?assertEqual(lists:sort([
+        {context, <<"file">>, <<"Open">>}, {context, <<"file">>, <<"Close">>},
+        {context, <<"explicit">>, {plural, <<"{n} hour">>, <<"{n} hours">>}},
+        {context, <<"block">>, <<"Block">>}, {context, <<"file">>, <<"End">>}
+    ]), lists:sort([Key || {Key, _, _} <- Messages])).
+
+msgctxt_invalid_test(Config) ->
+    File = filename:join(?config(priv_dir, Config), "invalid_context.tpl"),
+    lists:foreach(fun(Source) ->
+        ?assertMatch({error, _}, template_compiler:compile_binary(Source, File, [], undefined)),
+        ok = file:write_file(File, Source),
+        ?assertMatch({error, _}, template_compiler:translations(File))
+    end, [<<"{% msgctxt variable %}{_ Open _}">>,
+        <<"{% msgctxt \"a\" %}{% msgctxt \"b\" %}">>,
+        <<"output{% msgctxt \"a\" %}">>,
+        <<"{% with_msgctxt variable %}{_ Open _}{% endwith_msgctxt %}">>,
+        <<"{% with_msgctxt \"a\" %}{_ Open _}">>,
+        <<"{% endwith_msgctxt %}">>,
+        <<"{% trans \"Open\" msgctxt=variable %}">>,
+        <<"{% trans \"Open\" msgctxt=\"a\"|default:\"b\" %}">>,
+        <<"{% trans \"Open\" msgctxt=\"a\" msgctxt=\"b\" %}">>]).
+
+msgctxt_templates_test(Config) ->
+    Dir = ?config(priv_dir, Config),
+    Included = filename:join(Dir, "included_context.tpl"),
+    Parent = filename:join(Dir, "parent_context.tpl"),
+    ok = file:write_file(Included, <<"{% msgctxt \"included\" %}{_ Open _}">>),
+    Source = iolist_to_binary(["{% msgctxt \"caller\" %}{_ Open _}|{% include \"", Included, "\" %}"]),
+    ?assertEqual(<<"caller:Open|included:Open">>, render_context(Source, "caller.tpl", Config)),
+    ok = file:write_file(Parent, <<"{% msgctxt \"parent\" %}{_ Open _}|{% block body %}{_ Open _}{% endblock %}">>),
+    Child = iolist_to_binary(["{% msgctxt \"child\" %}\n{% extends \"", Parent,
+        "\" %}{% block body %}{_ Open _}{% endblock %}"]),
+    ?assertEqual(<<"parent:Open|child:Open">>, render_context(Child, "child.tpl", Config)),
+    AfterExtends = iolist_to_binary(["{% extends \"", Parent,
+        "\" %}{% msgctxt \"child2\" %}{% block body %}{_ Open _}{% endblock %}"]),
+    ?assertEqual(<<"parent:Open|child2:Open">>, render_context(AfterExtends, "child2.tpl", Config)).
+
+msgctxt_old_runtime_test(Config) ->
+    Source = <<"{% msgctxt \"unknown\" %}{_ Open _}|{% trans \"{n} hour\" \"{n} hours\" n=2 %}">>,
+    File = filename:join(?config(priv_dir, Config), "old_runtime_context.tpl"),
+    {ok, Mod} = template_compiler:compile_binary(Source, File, [], undefined),
+    ?assertEqual(<<"Open|2 hours">>, iolist_to_binary(Mod:render(#{}, #{}, undefined))),
+    Variables = <<"{% trans \"{value}\" value=msgctxt %}|{% trans \"{value}\" value=object.msgctxt %}">>,
+    {ok, Mod2} = template_compiler:compile_binary(Variables, File ++ "vars", [], undefined),
+    ?assertEqual(<<"variable|property">>, iolist_to_binary(Mod2:render(
+        #{msgctxt => <<"variable">>, object => #{msgctxt => <<"property">>}}, #{}, undefined))).
+
+render_context(Source, Name, Config) ->
+    File = filename:join(?config(priv_dir, Config), Name),
+    ok = file:write_file(File, Source),
+    {ok, Output} = template_compiler:render(File, #{}, [{runtime, ?MODULE}], undefined),
+    iolist_to_binary(Output).
+
+get_translations(Text, _) -> {trans, [{en, Text}]}.
+get_translations(Text, MsgCtxt, _) -> {trans, [{en, <<MsgCtxt/binary, ":", Text/binary>>}]}.
+map_template(Template, Vars, Context) -> template_compiler_runtime:map_template(Template, Vars, Context).
+is_modified(File, Time, Context) -> template_compiler_runtime:is_modified(File, Time, Context).
+trace_render(_, _, _) -> ok.
+trace_block(_, _, _, _) -> ok.
+set_context_vars(Vars, Context) -> template_compiler_runtime:set_context_vars(Vars, Context).
+
 get_plural_translations(_, _, _) ->
     Czech = {3, {conditional, {'==', n, 1}, 0,
         {conditional, {'&&', {'>=', n, 2}, {'<=', n, 4}}, 1, 2}}},
