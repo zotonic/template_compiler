@@ -48,8 +48,8 @@ The `trans` tag accepts an optional second English source string:
 ```
 
 Two strings require `n`, a non-negative integer. Its expression is evaluated once
-and reused for selection and `{n}` interpolation. One-string tags keep their
-existing behavior. Translations may contain any number of plural forms.
+and reused for selection and `{n}` interpolation. Translations may contain any number
+of plural forms.
 
 Runtimes can implement the optional `get_plural_translations/3` callback, returning
 `{trans, [{Language, {Rule, FormsTuple}}]}`. The runtime's catalog loader parses
