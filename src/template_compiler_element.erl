@@ -1050,6 +1050,8 @@ idents_as_atoms(Idents) ->
 ident_as_atom({identifier, _SrcPos, Ident}) ->
     template_compiler_utils:to_atom(Ident).
 
+trans_ext({trans_literal, SrcPos, {plural, Sources, {trans, Tr}}}, Args, CState, Ws) ->
+    trans_plural(Sources, Tr, Args, SrcPos, CState, Ws);
 trans_ext({string_literal, SrcPos, Text}, Args, CState, Ws) ->
     Unescaped = template_compiler_utils:unescape_string_literal(Text),
     trans_ext_1({trans, [{en, Unescaped}]}, Args, SrcPos, CState, Ws);
@@ -1084,6 +1086,65 @@ trans_ext_1({trans, Tr}, Args, SrcPos, #cs{runtime=Runtime} = CState, Ws) ->
                 {vars, erl_syntax:variable(CState#cs.vars_var)}
             ]),
     {Ws1, Ast}.
+
+%% Compile every form, capturing n once for both selection and interpolation.
+%% Language fallback remains the runtime's responsibility, before rule evaluation.
+trans_plural(Sources, Tr, Args, SrcPos, #cs{runtime=Runtime} = CState, Ws) ->
+    case [ E || {{identifier, _, <<"n">>}, E} <- Args ] of
+        [CountExpr] ->
+            {Ws1, CountAst} = template_compiler_expr:compile(CountExpr, CState, Ws),
+            {Ws2, CountVar} = template_compiler_utils:var(Ws1),
+            N = erl_syntax:variable(CountVar),
+            Args1 = [ case Arg of
+                {{identifier, _, <<"n">>} = Ident, _} -> {Ident, {ast, N}};
+                _ -> Arg
+            end || Arg <- Args ],
+            {Ws3, FallbackAst} = plural_forms_ast(
+                {template_compiler_plural:english(), Sources}, Args1, CState, Ws2, true),
+            {Ws4, Languages} = lists:foldl(
+                fun({Lang, Forms}, {WsAcc, Acc}) ->
+                    {WsNext, FormsAst} = plural_forms_ast(Forms, Args1, CState, WsAcc),
+                    {WsNext, [erl_syntax:tuple([erl_syntax:atom(Lang), FormsAst])|Acc]}
+                end,
+                {Ws3, []}, Tr),
+            Ast = ?Q("(fun(_@n) -> "
+                "(_@runtime:lookup_translation("
+                    "template_compiler_plural:resolve({trans, _@languages}, _@n, _@fallback),"
+                    "_@vars, _@context))()"
+                "end)(_@count)", [
+                    {n, N}, {count, CountAst},
+                    {runtime, erl_syntax:atom(Runtime)},
+                    {languages, erl_syntax:list(Languages)},
+                    {fallback, FallbackAst},
+                    {vars, erl_syntax:variable(CState#cs.vars_var)},
+                    {context, erl_syntax:variable(CState#cs.context_var)}
+                ]),
+            {Ws4, template_compiler_utils:set_pos(SrcPos, Ast)};
+        _ ->
+            throw({error, {plural_translation_requires_n, SrcPos}})
+    end.
+
+plural_forms_ast({plural_candidates, Candidates}, Args, CState, Ws) ->
+    {Ws1, Asts} = lists:foldl(fun(Candidate, {WsAcc, Acc}) ->
+        {WsNext, Ast} = plural_forms_ast(Candidate, Args, CState, WsAcc),
+        {WsNext, [Ast|Acc]}
+    end, {Ws, []}, Candidates),
+    {Ws1, erl_syntax:tuple([
+        erl_syntax:atom(plural_candidates), erl_syntax:list(lists:reverse(Asts))])};
+plural_forms_ast({Rule, Forms}, Args, CState, Ws) ->
+    plural_forms_ast({Rule, Forms}, Args, CState, Ws, false).
+
+plural_forms_ast({Rule, Forms}, Args, CState, Ws, IsSource) ->
+    {Ws1, Asts} = lists:foldl(
+        fun
+            (Empty, {WsAcc, Acc}) when Empty =:= undefined; Empty =:= <<>>, not IsSource ->
+                {WsAcc, [erl_syntax:atom(undefined)|Acc]};
+            (Text, {WsAcc, Acc}) ->
+                {WsNext, Fun} = trans_ext_fun(split_string(Text, <<>>, []), Args, CState, WsAcc),
+                {WsNext, [Fun|Acc]}
+        end,
+        {Ws, []}, tuple_to_list(Forms)),
+    {Ws1, erl_syntax:tuple([erl_syntax:abstract(Rule), erl_syntax:tuple(lists:reverse(Asts))])}.
 
 trans_ext_fun(Parts, Args, CState, Ws) ->
     Parts1 = [ P || P <- Parts, P =/= <<>> ],

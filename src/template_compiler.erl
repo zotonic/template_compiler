@@ -40,6 +40,7 @@
     is_enabled_debug_points/1,
     is_template_module/1,
     translations/1,
+    translations/2,
     compile_blocks/2,
     namespace_fragment_blocks/2
     ]).
@@ -78,7 +79,8 @@
                      | lib.
 
 -type translation_message() :: {
-    Text :: binary(),
+    Text :: binary() | {plural, binary(), binary()}
+        | {context, binary(), binary() | {plural, binary(), binary()}},
     Args :: proplists:proplist(),
     {
         Filename :: file:filename(),
@@ -383,6 +385,11 @@ compile_file(Filename, Options, Context) ->
     Context :: term(),
     Module :: module().
 compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
+    try compile_source(Tpl, Filename, Options, Context)
+    catch throw:{error, _}=Error -> Error
+    end.
+
+compile_source(Tpl, Filename, Options, Context) ->
     Options1 = normalize_options(Options),
     Mtime = template_compiler_utils:file_mtime(Filename),
     case template_compiler_scanner:scan(Filename, Tpl) of
@@ -392,7 +399,9 @@ compile_binary(Tpl, Filename, Options, Context) when is_binary(Tpl) ->
             DebugPoints = get_option(debug_points, Options1),
             EnabledDebugPoints = enabled_debug_points_map(DebugPoints),
             IsDebugPoints = is_enabled_debug_points(EnabledDebugPoints),
-            Tokens1 = maybe_drop_text(Tokens, Tokens),
+            DefaultMsgCtxt = template_compiler_msgctxt:default(Runtime, Filename, Context),
+            Prepared = prepare_translation_tokens(Tokens, DefaultMsgCtxt),
+            Tokens1 = maybe_drop_text(Prepared, Prepared),
             Tokens2 = expand_translations(Tokens1, Runtime, Context),
             ContentChecksum = content_checksum(Tokens2),
             Module = module_name(Runtime, Filename, ContextVars),
@@ -425,12 +434,21 @@ is_template_module(Name) -> is_template_module(z_convert:to_binary(Name)).
 %% @doc Fetch all translatable strings from a template file.
 -spec translations(file:filename_all()) -> {ok, [translation_message()]} | {error, term()}.
 translations(Filename) ->
+    translations(Filename, undefined).
+
+%% @doc Extract messages using the same owner default as template compilation.
+-spec translations(file:filename_all(), binary() | undefined) ->
+    {ok, [translation_message()]} | {error, term()}.
+translations(Filename, DefaultMsgCtxt) ->
     case file:read_file(Filename) of
         {ok, Bin} ->
             case template_compiler_scanner:scan(Filename, Bin) of
                 {ok, Tokens} ->
-                    Tokens1 = map_text_tokens(Tokens, []),
-                    {ok, extract_translations(Tokens1)};
+                    try
+                        Tokens1 = prepare_translation_tokens(Tokens, DefaultMsgCtxt),
+                        {ok, extract_translations(Tokens1)}
+                    catch throw:{error, _}=Error -> Error
+                    end;
                 {error, _} = Error ->
                     Error
             end;
@@ -524,7 +542,7 @@ is_matching_module(Module, ContentChecksum, EnabledDebugPoints, IsDebugPoints) -
 
 compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, EnabledDebugPoints, IsDebugPoints, Tokens, Options, Context) ->
     Runtime:trace_compile(Module, Filename, Options, Context),
-    case compile_tokens(
+    case compile_tokens_checked(
             template_compiler_parser:parse(Tokens),
             cs(Module, Filename, Options, Context, EnabledDebugPoints),
             Options)
@@ -542,6 +560,12 @@ compile_binary_1(Module, Filename, Mtime, Runtime, ContentChecksum, EnabledDebug
             end;
         {error, _} = Error ->
             Error
+    end.
+
+compile_tokens_checked(Tokens, CState, Options) ->
+    try compile_tokens(Tokens, CState, Options)
+    catch
+        throw:{error, _} = Error -> Error
     end.
 
 cs(Module, Filename, Options, Context, EnabledDebugPoints) ->
@@ -848,12 +872,18 @@ maybe_drop_text(_, OrgTks) ->
 
 %% @doc Expand all translations in the tokens. Translations are always looked up at compile time.
 expand_translations(Tokens, Runtime, Context) ->
-    Tokens1 = map_text_tokens(Tokens, []),
-    [ expand_translation(Token, Runtime, Context) || Token <- Tokens1 ].
+    [ expand_translation(Token, Runtime, Context) || Token <- Tokens ].
+
+prepare_translation_tokens(Tokens, DefaultMsgCtxt) ->
+    template_compiler_msgctxt:apply(map_text_tokens(Tokens, []), DefaultMsgCtxt).
 
 
 map_text_tokens([], Acc) ->
     lists:reverse(Acc);
+map_text_tokens([{trans_keyword, _, _}=Trans,
+        {string_literal, SrcPos, Singular}, {string_literal, _, Plural}|Ts], Acc) ->
+    Pair = {plural, unescape_trim(Singular), unescape_trim(Plural)},
+    map_text_tokens(Ts, [{trans_literal, SrcPos, Pair}, Trans|Acc]);
 map_text_tokens([{trans_keyword, _, _}=Trans, {string_literal, SrcPos, Text}|Ts], Acc) ->
     Acc1 = [{trans_literal, SrcPos, unescape_trim(Text)},Trans|Acc],
     map_text_tokens(Ts, Acc1);
@@ -874,11 +904,20 @@ unescape_trim(Text) ->
     z_string:trim(Unescaped).
 
 
+expand_translation({trans_literal, SrcPos, {context, MsgCtxt, {plural, Singular, Plural}}}, Runtime, Context) ->
+    Tr = template_compiler_plural:translations(Runtime, Singular, Plural, MsgCtxt, Context),
+    {trans_literal, SrcPos, {plural, {Singular, Plural}, Tr}};
+expand_translation({Kind, SrcPos, {context, MsgCtxt, Text}}, Runtime, Context)
+        when Kind =:= trans_text; Kind =:= trans_literal ->
+    {Kind, SrcPos, template_compiler_msgctxt:translations(Runtime, Text, MsgCtxt, Context)};
 expand_translation({trans_text, SrcPos, Text}, Runtime, Context) ->
     case Runtime:get_translations(Text, Context) of
         {trans, _} = Tr -> {trans_text, SrcPos, Tr};
         B when is_binary(B) -> {text, SrcPos, B}
     end;
+expand_translation({trans_literal, SrcPos, {plural, Singular, Plural}}, Runtime, Context) ->
+    Tr = template_compiler_plural:translations(Runtime, Singular, Plural, Context),
+    {trans_literal, SrcPos, {plural, {Singular, Plural}, Tr}};
 expand_translation({trans_literal, SrcPos, Text}, Runtime, Context) ->
     case Runtime:get_translations(Text, Context) of
         {trans, _} = Tr -> {trans_literal, SrcPos, Tr};

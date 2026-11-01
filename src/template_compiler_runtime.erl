@@ -66,7 +66,23 @@
 -callback set_context_vars(map()|list(), Context::term()) -> Context::term().
 
 -callback get_translations(Text :: binary(), Context :: term()) -> binary() | {trans, [{atom(), binary()}]}.
--callback lookup_translation({trans, list({atom(), binary()})}, TplVars :: map(), Context :: term()) -> binary().
+-callback lookup_translation({trans, [{atom(), term()}]}, TplVars :: map(), Context :: term()) -> term().
+
+%% Plural values are {Rule, TupleOfForms}. lookup_translation/3 selects the
+%% language for these values as it does for binaries and compiled functions.
+-callback get_plural_translations(binary(), binary(), term()) ->
+    {trans, [{atom(), {template_compiler_plural:rule(), tuple()}}]}.
+-optional_callbacks([get_plural_translations/3]).
+
+%% Context-aware callbacks return contextual then contextless candidates per
+%% language. Old runtimes automatically use their contextless callbacks.
+-callback get_translations(binary(), binary(), term()) -> binary() | {trans, list()}.
+-callback get_plural_translations(binary(), binary(), binary(), term()) -> {trans, list()}.
+-optional_callbacks([get_translations/3, get_plural_translations/4]).
+
+%% Compile-time default supplied by the owner of the selected template file.
+-callback get_template_msgctxt(file:filename_all(), term()) -> binary() | undefined.
+-optional_callbacks([get_template_msgctxt/2]).
 
 -callback model_call(Model::atom(), Path::list(), Payload::term(), Context::term()) -> template_compiler:model_return().
 -callback custom_tag(Module::atom(), Args::list(), TplVars::map(), Context::term()) -> template_compiler:render_result().
@@ -278,7 +294,7 @@ get_translations(Text, _Context) ->
     {trans, [{en, Text}]}.
 
 %% @doc Find the best fitting translation.
--spec lookup_translation({trans, list({atom(), binary()})}, TplVars :: map(), Context :: term()) -> binary().
+-spec lookup_translation({trans, [{atom(), term()}]}, TplVars :: map(), Context :: term()) -> term().
 lookup_translation({trans, Tr}, TplVars, _Context) when is_map(TplVars) ->
     Lang = maps:get(z_language, TplVars, en),
     case lists:keyfind(Lang, 1, Tr) of
@@ -286,7 +302,7 @@ lookup_translation({trans, Tr}, TplVars, _Context) when is_map(TplVars) ->
             Text;
         false when Lang =/= en ->
             case lists:keyfind(en, 1, Tr) of
-                {Lang, Text} -> Text;
+                {en, Text} -> Text;
                 false -> <<>>
             end;
         false ->
